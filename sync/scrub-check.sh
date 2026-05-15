@@ -8,9 +8,13 @@
 
 set -euo pipefail
 
-REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)"
-if [ -z "$REPO_ROOT" ]; then
-  echo "scrub-check: not inside a git repo" >&2
+# Anchor to the script's own location so the check runs against THIS repo
+# regardless of the caller's cwd. The script lives in <repo>/sync/.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+if [ ! -d "$REPO_ROOT/.git" ]; then
+  echo "scrub-check: expected $REPO_ROOT to be a git repo root" >&2
   exit 2
 fi
 
