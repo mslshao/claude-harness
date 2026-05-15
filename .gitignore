@@ -1,0 +1,38 @@
+# OS and editor cruft
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*~
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+*.egg-info/
+
+# Node
+node_modules/
+.npm/
+.pnp.*
+
+# Scratch and personal-only paths (defense in depth; nothing of this shape
+# should end up here, but exclude explicitly so it cannot slip in by mistake)
+scratch/
+*.scratch.*
+memory/
+*/memory/
+.claude/projects/
+
+# Local-only secrets and tokens
+.env
+.env.*
+*.pem
+*_token*
+*_secret*
+
+# Lockfile noise (none expected here, but pre-empt)
+.DS_Store
+Thumbs.db
