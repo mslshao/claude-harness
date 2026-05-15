@@ -48,9 +48,16 @@ TIER2_PATTERNS=(
 )
 
 # Tier 3: internal tracking IDs.
+# Notes:
+# - Bead IDs (docr-XXXX) stay as authentic operational flavor. They tie
+#   calibration entries to specific historical instances; public readers
+#   see them as opaque references but the principle around them still reads.
+# - MX2-NNNNN ticket numbers similarly stay as authentic flavor.
+# - AWS resource names beginning with the workspace prefix (docr-deployment,
+#   docr-dev-deployment) are Tier 4 infrastructure detail; allowed.
+# Pattern hits below catch only the IDs that point at specific proprietary
+# atlassian or other-tool URLs.
 TIER3_PATTERNS=(
-  '\bdocr-[a-z0-9]{4,}\b'                                # bead IDs
-  '\bMX2-[0-9]{4,6}\b'                                   # Jira ticket numbers
   '<confluence-space-id>'               # confluence space ID
   '<atlassian-cloud-id>'                 # atlassian cloud ID
 )
