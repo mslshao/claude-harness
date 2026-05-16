@@ -10,6 +10,7 @@ Each entry describes a specific instance where the harness compressed previously
 - `before-after-template.md` (template for new first-person entries)
 - `2026-04-30-salesforce-dedup.md` (third-party anecdata: dedup compression on a known dataset)
 - `2026-05-08-pr-review-observability-calibration.md` (own-loop: PR review specialist + production verification chain)
+- `2026-05-13-cross-session-pr-review-handoff.md` (workflow evidence: typed-namespace bead memory enables cross-session continuation)
 
 The first entry is third-party anecdata. The second is the author's own loop: the harness chained parallel specialist dispatch with production-state verification to produce a calibrated review comment that human-only review would not have produced on its own.
 
