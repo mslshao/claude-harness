@@ -31,8 +31,8 @@ SCAN_DIRS=(
   evidence
 )
 
-# Always include the top-level README in the scan.
-SCAN_FILES=(README.md)
+# Always include top-level Markdown files in the scan.
+SCAN_FILES=(README.md WORLDMAP.md)
 
 # Tier 1: real names of teammates (first names only; first+last would be more
 # precise but more false-positive prone since 'a team lead manager' or 'a teammate' is generic).
@@ -59,14 +59,12 @@ TIER2_PATTERNS=(
 # - Bead IDs (docr-XXXX) stay as authentic operational flavor. They tie
 #   calibration entries to specific historical instances; public readers
 #   see them as opaque references but the principle around them still reads.
-# - MX2-NNNNN ticket numbers similarly stay as authentic flavor.
 # - AWS resource names beginning with the workspace prefix (docr-deployment,
 #   docr-dev-deployment) are Tier 4 infrastructure detail; allowed.
-# Pattern hits below catch only the IDs that point at specific proprietary
-# atlassian or other-tool URLs.
 TIER3_PATTERNS=(
   '<confluence-space-id>'               # confluence space ID
   '<atlassian-cloud-id>'                 # atlassian cloud ID
+  '\bMX2-[0-9]+\b'                                       # specific Jira ticket numbers (placeholder forms MX2-XXXXX/NNNNN do not match)
 )
 
 # Tier 4: infrastructure detail patterns (cautious; many of these will be
@@ -74,6 +72,9 @@ TIER3_PATTERNS=(
 TIER4_PATTERNS=(
   'dyn-<service>-.*-dlq'                                    # specific queue names
   'arn:aws:.*:.*:.*'                                     # AWS ARNs identify
+  '\bQuaero\b'                                           # internal service name (capital, prose contexts)
+  '\bquaero\b'                                           # internal service name (lowercase, identifier contexts)
+  'morgan\.atlassian\.net'                               # team's Atlassian instance hostname
 )
 
 FINDINGS=0
