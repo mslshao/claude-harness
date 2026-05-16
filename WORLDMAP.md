@@ -81,7 +81,7 @@ Specific limits worth naming, in approximate order of severity:
 | `dotclaude/skills/` | 22 skill directories (47 files); WORLDMAP per-skill commentary complete | None for V0; review for accuracy on skill rev |
 | `dotclaude/hooks/` | description-first README + 6 portable examples; WORLDMAP category-shaped commentary complete | None for V0 |
 | `dotclaude/CLAUDE.md` | scrubbed personal global instructions | None for V0 |
-| `project-tier/` | placeholder README only | Mirror of promoted artifacts (3 agents, 3 skills, ~18 rules) |
+| `project-tier/` | 3 agents (observability-reviewer, test-quality-reviewer, silent-failure-hunter) + 3 skills (enrich, investigate, review) mirrored from team-reviewed PR promotions; README documents the lift and the scrubbing applied | Optional: mirror selected project-tier rules; deferred to patterns/lab-to-production.md cross-references for V1 |
 | `graveyard/` | placeholder README only | agentcore, medical-legal-specialist entries + git scan for project-tier deletions |
 | `sync/` | SCRUB-SPEC.md + scrub-check.sh | install.sh + uninstall.sh |
 | `evidence/` | placeholder README | a teammate SF dedup entry + own-loop entry |
