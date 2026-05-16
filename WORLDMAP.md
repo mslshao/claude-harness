@@ -72,18 +72,18 @@ Specific limits worth naming, in approximate order of severity:
 
 | Directory | V0 contents | Pending |
 |---|---|---|
-| `patterns/` | 11 philosophy docs | None for V0; expand on adoption |
-| `dispatch/` | 4 routing docs | None for V0 |
-| `scaffolding/` | 7 memory architecture docs | None for V0 |
+| `patterns/` | 11 philosophy docs; WORLDMAP pointer-shaped commentary complete | None for V0; expand on adoption |
+| `dispatch/` | 4 routing docs; WORLDMAP pointer-shaped commentary complete | None for V0 |
+| `scaffolding/` | 7 memory architecture docs; WORLDMAP pointer-shaped commentary complete | None for V0 |
 | `learnings/` | placeholder README only | AI Learning Track corpus migration from Confluence (12 pages, 5 named) |
 | `evidence/` | placeholder README only | At least one own-loop before/after entry |
 | `dotclaude/agents/` | 21 agent files + calibration + shared; WORLDMAP per-agent commentary complete | None for V0; review for accuracy on agent rev |
 | `dotclaude/skills/` | 22 skill directories (47 files); WORLDMAP per-skill commentary complete | None for V0; review for accuracy on skill rev |
-| `dotclaude/hooks/` | description-first README + 6 portable examples | None for V0 |
+| `dotclaude/hooks/` | description-first README + 6 portable examples; WORLDMAP category-shaped commentary complete | None for V0 |
 | `dotclaude/CLAUDE.md` | scrubbed personal global instructions | None for V0 |
 | `project-tier/` | placeholder README only | Mirror of promoted artifacts (3 agents, 3 skills, ~18 rules) |
 | `graveyard/` | placeholder README only | agentcore, medical-legal-specialist entries + git scan for project-tier deletions |
 | `sync/` | SCRUB-SPEC.md + scrub-check.sh | install.sh + uninstall.sh |
 | `evidence/` | placeholder README | a teammate SF dedup entry + own-loop entry |
 
-V0 is the foundational layout plus the philosophy content. The substantive AI-authored commentary (WORLDMAP per-component) is the next milestone.
+V0 is the foundational layout plus the philosophy content. The AI-authored per-component commentary (WORLDMAP files in agents/, skills/, patterns/, dispatch/, scaffolding/, hooks/) is now complete; V1 priorities are `evidence/` empirical entries and the `learnings/` migration from Confluence.
