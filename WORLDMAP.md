@@ -77,8 +77,8 @@ Specific limits worth naming, in approximate order of severity:
 | `scaffolding/` | 7 memory architecture docs | None for V0 |
 | `learnings/` | placeholder README only | AI Learning Track corpus migration from Confluence (12 pages, 5 named) |
 | `evidence/` | placeholder README only | At least one own-loop before/after entry |
-| `dotclaude/agents/` | 21 agent files + calibration + shared | WORLDMAP per-agent commentary partial; sweep in progress |
-| `dotclaude/skills/` | 22 skill directories (47 files) | WORLDMAP per-skill commentary partial; sweep in progress |
+| `dotclaude/agents/` | 21 agent files + calibration + shared; WORLDMAP per-agent commentary complete | None for V0; review for accuracy on agent rev |
+| `dotclaude/skills/` | 22 skill directories (47 files); WORLDMAP per-skill commentary complete | None for V0; review for accuracy on skill rev |
 | `dotclaude/hooks/` | description-first README + 6 portable examples | None for V0 |
 | `dotclaude/CLAUDE.md` | scrubbed personal global instructions | None for V0 |
 | `project-tier/` | placeholder README only | Mirror of promoted artifacts (3 agents, 3 skills, ~18 rules) |
