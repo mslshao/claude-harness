@@ -5,7 +5,7 @@ Empirically verified 2026-04-03. See `memory/github-api.md` for full context.
 ## Posting a Review with Inline Comments
 
 ```bash
-gh api -X POST /repos/<company>/docr/pulls/{pull_number}/reviews --input - <<'JSON'
+gh api -X POST /repos/lawfirm/main/pulls/{pull_number}/reviews --input - <<'JSON'
 {
   "body": "review summary",
   "event": "COMMENT",

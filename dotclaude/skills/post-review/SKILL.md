@@ -337,7 +337,7 @@ sys.path.insert(0, '/home/vscode/.claude/tooling/pr-review-bot/pkg')
 from pr_review_state import Review, ProposedComment, write_review
 
 review = Review(
-    repo="<company>/docr",
+    repo="lawfirm/main",
     pr=<PR_NUMBER>,
     timestamp=<UTC_ISO_TIMESTAMP>,
     head_sha=<HEAD_SHA>,

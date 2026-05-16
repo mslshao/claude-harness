@@ -194,7 +194,7 @@ review pattern (see decision bead `docr-59ev` item 8).
 For each `bot-review` finding, build the link as:
 
 ```
-[Fix this →](https://claude.ai/code?q=<URI_ENCODED_INSTRUCTIONS>&repo=<company>/docr)
+[Fix this →](https://claude.ai/code?q=<URI_ENCODED_INSTRUCTIONS>&repo=lawfirm/main)
 ```
 
 `<URI_ENCODED_INSTRUCTIONS>` is the URL-encoded form of a self-contained instruction

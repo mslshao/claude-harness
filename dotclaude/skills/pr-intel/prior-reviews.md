@@ -95,7 +95,7 @@ AWS_PROFILE=dev AWS_DEFAULT_REGION=us-east-1 uv run --with boto3 --with 'pydanti
 import sys, json
 sys.path.insert(0, '/home/vscode/.claude/tooling/pr-review-bot/pkg')
 from pr_review_state import list_reviews_for_pr
-reviews = list_reviews_for_pr("<company>/docr", <PR_NUMBER>)
+reviews = list_reviews_for_pr("lawfirm/main", <PR_NUMBER>)
 for r in reviews:
     print(json.dumps({
         "timestamp": r.timestamp,
@@ -130,7 +130,7 @@ AWS_PROFILE=dev AWS_DEFAULT_REGION=us-east-1 uv run --with boto3 --with 'pydanti
 import sys, json
 sys.path.insert(0, '/home/vscode/.claude/tooling/pr-review-bot/pkg')
 from pr_review_state import get_review
-review = get_review("<company>/docr", <PR_NUMBER>, "<TIMESTAMP>")
+review = get_review("lawfirm/main", <PR_NUMBER>, "<TIMESTAMP>")
 print(json.dumps(review.__dict__ if review else None, default=str))
 PY
 ```

@@ -58,12 +58,12 @@ git -C /workspaces/main rev-list --count "origin/main..<branch>"
 Use a sequence of search strategies (per personal CLAUDE.md "Exhaust search strategies before claiming external-system absence"):
 
 ```
-gh pr list --head "<branch>" --state all --repo <company>/docr --json number,state,mergedAt --limit 3
+gh pr list --head "<branch>" --state all --repo lawfirm/main --json number,state,mergedAt --limit 3
 ```
 
 If empty for a branch with unique commits, also try:
 - `gh pr list --search "head:<branch>" --state all`
-- `gh search prs --head "<branch>" --repo <company>/docr --state closed`
+- `gh search prs --head "<branch>" --repo lawfirm/main --state closed`
 
 Three empty searches = "no PR exists" with reasonable confidence.
 

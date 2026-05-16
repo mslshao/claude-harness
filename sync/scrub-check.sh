@@ -40,11 +40,18 @@ SCAN_FILES=(README.md)
 # 'atomic', etc.). Tweak this list as the team composition changes.
 TIER1_NAMES_REGEX='\b(the engineering lead|a team lead|a teammate|a peer reviewer|a solo-team engineer|a teammate|a teammate|a teammate)\b'
 
-# Tier 2: incident-specific patterns.
+# Tier 2: incident-specific patterns + employer identification.
+# The repo refers to the employer's actual GitHub org and codebase paths
+# using generic placeholders (lawfirm/main, /workspaces/main). Any reversion
+# to the real identifiers signals a regression and gets caught here.
 TIER2_PATTERNS=(
   'Anthropic.*[Rr]ejection'
   'Anthropic.*technical enablement'
   'rejected.*from Anthropic'
+  '<company>'
+  '\bM&M\b'
+  '/workspaces/main\b'
+  '-workspaces-main\b'
 )
 
 # Tier 3: internal tracking IDs.

@@ -115,7 +115,7 @@ gh pr view <N> --json title,body,changedFiles,url,state,author,baseRefName
 
 **For inline review comments** (when the briefing needs reviewer context):
 ```bash
-gh api /repos/<company>/docr/pulls/<N>/comments \
+gh api /repos/lawfirm/main/pulls/<N>/comments \
   --jq '[.[] | {user: .user.login, path: .path, line: .line, body: .body}]'
 ```
 Adds inline thread context (Copilot/Sentry comments live here). Also fetch

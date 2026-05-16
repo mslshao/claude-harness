@@ -456,7 +456,7 @@ Present to the user:
 ## Launch Complete: [topic]
 
 **PR**: [URL] (draft)
-**Graphite**: https://app.graphite.dev/github/pr/<company>/docr/[number]
+**Graphite**: https://app.graphite.dev/github/pr/lawfirm/main/[number]
 **Branch**: [branch-name]
 **Jira**: [MX2-XXXXX]
 
