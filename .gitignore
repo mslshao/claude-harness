@@ -36,3 +36,4 @@ memory/
 # Lockfile noise (none expected here, but pre-empt)
 .DS_Store
 Thumbs.db
+STATUS.md
