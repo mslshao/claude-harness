@@ -75,7 +75,7 @@ Specific limits worth naming, in approximate order of severity:
 | `patterns/` | 11 philosophy docs; WORLDMAP pointer-shaped commentary complete | None for V0; expand on adoption |
 | `dispatch/` | 4 routing docs; WORLDMAP pointer-shaped commentary complete | None for V0 |
 | `scaffolding/` | 7 memory architecture docs; WORLDMAP pointer-shaped commentary complete | None for V0 |
-| `learnings/` | placeholder README only | AI Learning Track corpus migration from Confluence (12 pages, 5 named) |
+| `learnings/` | 11 of 12 corpus pages lifted from Confluence with editorial scrubbing; PM-focused 12th page deferred | When/if the deferred PM-focused page returns, it returns as a fresh audience-broad write |
 | `evidence/` | placeholder README only | At least one own-loop before/after entry |
 | `dotclaude/agents/` | 21 agent files + calibration + shared; WORLDMAP per-agent commentary complete | None for V0; review for accuracy on agent rev |
 | `dotclaude/skills/` | 22 skill directories (47 files); WORLDMAP per-skill commentary complete | None for V0; review for accuracy on skill rev |

@@ -1,63 +1,65 @@
 # learnings/
 
-The AI Learning Track corpus. Originally authored as a Confluence series for team-internal knowledge sharing on Claude Code adoption. Generic content (not company-specific); migrated here for public access.
+The AI Learning Track corpus. Originally authored as an internal Confluence series on Claude Code adoption; migrated here with editorial scrubbing applied (real teammate names, internal Jira IDs, internal Confluence URLs, and org-specific examples removed or anonymized).
 
 ## Status
 
-V0 placeholder. The full 12-page corpus was enumerated during a V1 prep session (2026-05-16). The sanity-check pass found that NO page is a clean lift-as-is candidate: every page needs at least URL rewriting (cross-page Confluence links), and several have editorial scrub items (real teammate names, internal Jira ticket IDs, org-specific examples). The per-page recommendation table lives in the author's session scratch and is pending review.
+V1. 11 of the original 12 pages lifted. The 12th page (PM-focused workflows) is deferred pending broader-audience editorial rewriting; an audience note in `workflows-developers.md` flags the deferral.
 
-After review, the migration order will be (easiest first, to land cross-references cleanly):
+## Reading order
 
-1. Agent Design Lessons (cleanest, philosophy fit)
-2. AI-Assisted Debugging
-3. Personalize Claude
-4. Your First Week
-5. Build Your Context Engine
-6. Spotting AI Failure Patterns (anonymize teammate)
-7. AI Coding Tools (parent, lifts LAST so sibling cross-links resolve)
-8. Building Skills at Scale (anonymize teammate)
-9. Build Your First Skill (genericize a worked example)
-10. Teaching AI to Remember (restructure appendix)
-11. AI Workflows for Developers (genericize service paths)
-12. AI Workflows for PMs (deferred entirely; heavily org-specific, audience mismatch with rest of corpus)
+The corpus has a natural reading order. New readers start at `first-week.md` and continue based on intent.
 
-## Corpus shape (when populated)
+| Page | Track | Read when |
+|---|---|---|
+| [first-week.md](./first-week.md) | Foundation | You've never used an AI coding tool, or tried once and stopped |
+| [ai-coding-tools.md](./ai-coding-tools.md) | Parent / Insights | You've had a few productive AI sessions and want to level up |
+| [spotting-failure-patterns.md](./spotting-failure-patterns.md) | Sharpen | You want to recognize the six AI failure modes at authoring time |
+| [build-context-engine.md](./build-context-engine.md) | Sharpen | You're turning review findings into rules that catch the same failure next time |
+| [teaching-ai-to-remember.md](./teaching-ai-to-remember.md) | Sharpen | Your AI keeps forgetting your conventions across sessions |
+| [ai-assisted-debugging.md](./ai-assisted-debugging.md) | Sharpen | You're stuck on a bug and the AI keeps guessing |
+| [workflows-developers.md](./workflows-developers.md) | Apply | Concrete prompts for the four stages of a real dev workflow |
+| [personalize-claude.md](./personalize-claude.md) | Build (side-door) | You have strong opinions about how Claude should behave for you |
+| [build-first-skill.md](./build-first-skill.md) | Build | You want to build your own reusable workflow as a skill or command |
+| [skills-at-scale.md](./skills-at-scale.md) | Build (advanced) | You've shipped a skill and want the next-level patterns |
+| [agent-design-lessons.md](./agent-design-lessons.md) | Build (philosophy) | Pairs with skills-at-scale; the "why agents are designed this way" angle |
 
-The 12 pages divide into four tracks:
+## Scrubbing applied during the lift
 
-| Track | Pages |
-|---|---|
-| Foundation (one-page on-ramp) | Your First Week |
-| Sharpen how you use AI | Spotting AI Failure Patterns, Build Your Context Engine, Teaching AI to Remember, AI-Assisted Debugging |
-| Apply AI across your workflow | AI Workflows for Developers (+ deferred AI Workflows for PMs) |
-| Build your own AI tools | Personalize Claude, Build Your First Skill, Building Skills at Scale, Agent Design Lessons |
-| Parent (insights and patterns) | AI Coding Tools |
+Mechanical scrubs:
 
-## Page format spec
+- Internal GitHub org name in code blocks
+- The team's Atlassian cloud ID and personal Confluence space ID
+- The internal repo path (`/workspaces/main`)
+- All cross-page Confluence URLs rewritten to local relative paths
 
-A `page-format-spec.md` capturing the corpus's authoring conventions (header callout block: "Where this fits", "Format", "Output", "If you only have 5 minutes"; the consistent "Where to Go Next" footer; parent-page bidirectional navigation) is planned. The spec is portable harness content beyond just the corpus, and the V1 lift will follow it for each lifted page so the corpus reads consistently.
+Editorial scrubs:
 
-## What lifts cleanly vs what needs editorial work
+- Real teammate names (the engineering lead, a teammate) replaced with "a human reviewer" / "a teammate"
+- Internal Jira ticket IDs (MX2-NNNNN) generally removed
+- PR numbers (#8585, #8140, #8517) kept as authentic anchors but each one's failure mode is described inline so the lesson lands without access to the codebase
+- Org-specific examples (firm name, office names, internal tool names) genericized
+- Internal service paths replaced with descriptive shapes (e.g., "a complex document indexing pipeline" instead of the internal name)
 
-Mechanical scrubs (caught by `sync/scrub-check.sh`):
+The MX2 codebase vocabulary itself stays in places where it appears as authentic flavor (per the harness's privacy boundary decision); it tells readers "this came from a real codebase" without identifying which.
 
-- Real GitHub org name in code blocks
-- The Atlassian cloud ID and personal Confluence space ID
-- The internal `/workspaces/main` path
+## Editorial decisions made during the lift
 
-Editorial scrubs (NOT caught by scrub-check; require human pass):
+Four decisions were ratified by the author before this lift:
 
-- Real teammate first names (the engineering lead, a teammate) used in worked examples
-- Internal Jira ticket references (MX2-NNNNN) used as anchor examples
-- Internal Confluence cross-page URLs (about 80 across the corpus)
-- Org-specific terms (Litify, Jacksonville, LibreChat incident) in the PM-focused page
-- Internal service paths (`src/python/mx2/<service>`, `dec_page/extr`) in code-flow examples
+1. **PR-anchor pattern**: keep PR numbers (#8585, #8140, #8517) as concrete anchors, paired with inline descriptions of the failure mode each one teaches. The numbers say "this came from a real codebase"; the descriptions deliver the lesson without requiring access.
+2. **First-week ramp worked example** in `build-first-skill.md`: keep the worked example structure (the `/enrich` origin story), describe the underlying pipeline's shape without naming it. The case study is load-bearing because it's the first instance where cross-session memory scaffolding became the operative capability.
+3. **Mature setup appendix** in `teaching-ai-to-remember.md`: rewritten generic. The MX2-Specific framing is dropped; the SSO bootstrap and S3 bucket pattern descriptions stay (shape, not precise identifiers) because they document a real concrete implementation an adopter can model.
+4. **PM Workflows page**: deferred. The original is heavily org-specific (firm name, office names, internal tools, an internal Jira ticket as a worked example) and the audience differs from the rest of the corpus (PMs vs. engineers). When it returns, it returns as a fresh audience-broad write rather than a heavy edit. The framing matters because broader-audience teaching is itself a portfolio claim.
 
-The editorial scrubs are why every page is "lift-with-edits" rather than "lift-as-is."
+## Page format
 
-## Open decisions (deferred to author)
+The corpus uses a consistent format across all pages:
 
-- PR-anchor pattern: keep PR numbers (#8585, #8140, #8517) as concrete anchors or strip and replace with abstracted descriptions? The PRs themselves are not public; the numbers tell readers "this came from a real codebase," not where.
-- <service> ramp anonymization in "Build Your First Skill or Command": preserve the worked example with the service name genericized, or replace with a synthesized example that conveys the same lesson?
-- Teaching AI to Remember appendix: keep the "What a Mature Setup Looks Like" appendix (marked MX2-Specific with a disclaimer) or rewrite as a generic "what mature setups tend to look like" framing?
-- AI Workflows for PMs: defer entirely, or do the editorial work? The audience is fundamentally different from the rest of the corpus.
+- Header callout block with "Where this fits", "Format", "Output" / "Prereq", and "If you only have 5 minutes"
+- Numbered top-level sections
+- "Try This Today" callouts for exercises during real work
+- A closing "Where to Go Next" section with relative links to siblings
+- Bidirectional navigation: every page links back to the parent (`ai-coding-tools.md`) and to its peers
+
+A separate format spec is not provided; the consistent structure across the 11 pages serves as the spec.

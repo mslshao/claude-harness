@@ -4,7 +4,7 @@ A personalized Claude Code harness, published as a portfolio artifact.
 
 Agents, skills, hooks, dispatch heuristics, and memory scaffolding accumulated through months of daily use, with AI-authored commentary explaining why each component exists and what failure mode it prevents.
 
-> **Status: V0.** Per-component AI-authored commentary (`WORLDMAP.md` in each directory) is complete. `project-tier/` now mirrors 6 promoted artifacts; `evidence/` has both a third-party and an own-loop entry. `learnings/` is still pending the corpus lift from Confluence; `graveyard/` may grow.
+> **Status: V1.** Per-component AI-authored commentary (`WORLDMAP.md` in each directory) is complete. `project-tier/` mirrors 6 promoted artifacts; `evidence/` has 3 entries (one third-party, two own-loop); `learnings/` has 11 of 12 pages lifted from the original Confluence corpus with editorial scrubbing applied. `graveyard/` may grow as more historical context is reconstructed.
 
 ## Thesis
 
@@ -18,7 +18,7 @@ The claim this repo carries is not "I use AI well." It is "I built scaffolding f
 | `dispatch/` | Routing logic: which specialist runs when, model selection rules, PR review routing. | 4 docs + WORLDMAP commentary |
 | `scaffolding/` | Memory architecture: two-tier doctrine, key namespace, dating conventions. | 7 docs + WORLDMAP commentary |
 | `dotclaude/` | Scrubbed mirror of `~/.claude/`. Drop-in install via `sync/install.sh`. | 21 agents, 22 skills, hooks catalog, all with WORLDMAP commentary |
-| `learnings/` | AI Learning Track corpus. Originally authored as an internal Confluence series, migrated here. | Placeholder; migration is V1 work |
+| `learnings/` | AI Learning Track corpus. Originally authored as an internal Confluence series, migrated here with editorial scrubbing. | 11 of 12 pages lifted; 12th (PM workflows) deferred |
 | `evidence/` | Empirical anecdata: before-after entries demonstrating compression of human-only work. | Salesforce-dedup (third-party) + PR-review observability calibration (own-loop); more entries accumulate as instances surface |
 | `project-tier/` | Promoted artifacts. Demonstrates the lab-to-production pattern (personal-tier sandbox to team-reviewed PR). | 3 agents + 3 skills mirrored from team-reviewed PR promotions, with internal identifiers genericized |
 | `graveyard/` | Perma-deleted components with the Keymaker principle (build for a need, retire when the need is met by something else). | Keymaker principle + 4 entries |
