@@ -4,10 +4,13 @@ The empirical claim this harness rests on: it lowers back-and-forth turnaround b
 
 Each entry describes a specific instance where the harness compressed previously-human-only work, or a specific before-after comparison. Anecdata is selection-biased; the discipline is to include the entries where the harness did NOT help as well as the ones where it did, so the corpus stays honest.
 
-## Planned contents
+## Contents
 
 - `anecdata-pattern.md` (the running-log convention)
 - `before-after-template.md` (template for new first-person entries)
-- Individual dated entries (one file per anecdote)
+- `2026-04-30-salesforce-dedup.md` (third-party anecdata: dedup compression on a known dataset)
+- `2026-05-08-pr-review-observability-calibration.md` (own-loop: PR review specialist + production verification chain)
 
-The opening entry covers a case where AI compressed a multi-day Salesforce dedup task to roughly fifteen minutes. More entries arrive as instances accumulate, including at least one direct first-person before-after from the author's own loop.
+The first entry is third-party anecdata. The second is the author's own loop: the harness chained parallel specialist dispatch with production-state verification to produce a calibrated review comment that human-only review would not have produced on its own.
+
+More entries arrive as instances accumulate. The corpus is honest about what each entry supports and what it does not, so the running claim stays calibrated.
