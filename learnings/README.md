@@ -30,14 +30,14 @@ Mechanical scrubs:
 
 - Internal GitHub org name in code blocks
 - The team's Atlassian cloud ID and personal Confluence space ID
-- The internal repo path (`/workspaces/main`)
+- The internal monorepo workspace path
 - All cross-page Confluence URLs rewritten to local relative paths
 
 Editorial scrubs:
 
-- Real teammate names (the engineering lead, a teammate) replaced with "a human reviewer" / "a teammate"
-- Internal Jira ticket IDs (MX2-NNNNN) generally removed
-- PR numbers (#8585, #8140, #8517) kept as authentic anchors but each one's failure mode is described inline so the lesson lands without access to the codebase
+- Real teammate first names replaced with "a human reviewer" / "a teammate"
+- Internal Jira ticket IDs generally removed
+- PR numbers kept as authentic anchors (so readers see "this came from a real codebase"), with each one's failure mode and rule described inline so the lesson lands without access to the codebase
 - Org-specific examples (firm name, office names, internal tool names) genericized
 - Internal service paths replaced with descriptive shapes (e.g., "a complex document indexing pipeline" instead of the internal name)
 
