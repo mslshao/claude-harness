@@ -1,305 +1,356 @@
 ---
 name: converge
 description: >
-  End-to-end planning pipeline that chains refine, forge, challenge, consult,
-  and synthesize into a single invocation. Produces a converged, stress-tested
-  PLAN (no code written) and only creates beads after human approval. Use when
-  the user has a rough idea and wants a production-quality plan without manually
-  orchestrating each skill. For hands-off implementation from a well-scoped
-  ticket (plan + code + PR), use /launch instead.
-argument-hint: "[rough idea, feature description, or bead reference]"
+  End-to-end planning pipeline with challenge + consult stress-test,
+  mandatory tenth-man pass, and decision-maker proceed/iterate gate. Use
+  when the user has a rough idea and wants a production-quality plan
+  without manually orchestrating each skill. Accepts free-text, Jira
+  tickets, beads, Slack threads, Confluence rough-drafts, or transcripts.
+  Produces a converged plan (no code written) with iteration log,
+  convergence delta category, and verification paths per work item.
+  Detects mechanism-prescribed inputs and forces specialists to challenge
+  the prescribed mechanism rather than rubber-stamp it. For hands-off
+  implementation from a well-scoped ticket (plan + code + PR), use
+  /launch. For divergent approach generation BEFORE a plan exists, use
+  /ideate.
+argument-hint: "[rough idea, feature description, bead ID, Jira ticket, Slack URL, Confluence URL, or transcript]"
 allowed-tools: ["Bash", "Glob", "Grep", "Read", "Agent", "WebFetch"]
 ---
 
 # Converge
 
-Orchestrate the full planning pipeline: refine a rough idea, decompose it into
-a plan, stress-test assumptions, get specialist review, synthesize findings, and
-present the converged result for signoff. The user sees one thing: the final plan.
+Orchestrate the full planning pipeline: refine a rough idea, decompose
+it into a plan, stress-test assumptions, get specialist review,
+synthesize findings, run an adversarial tenth-man pass, run a
+decision-maker proceed/iterate gate, then present the converged result
+for signoff. The user sees one synthesis-level output: the final plan.
 
 ## Why This Exists
 
-Without this skill, the user manually invokes /refine, /bead-forge, /challenge,
-/consult, and /synthesize in sequence, passing context between each. They review
-intermediate output they don't care about. This skill runs the full pipeline
-internally and presents only the converged result.
+Without this skill, the user manually invokes `/refine`, `/bead-forge`,
+`/challenge`, `/consult`, and `/synthesize` in sequence, passing
+context between each. They review intermediate output they don't care
+about. This skill runs the full pipeline internally and presents only
+the converged result.
 
 ## Input
 
-One of:
+One or more of:
 - A rough idea or feature description (text)
 - A bead reference (`bd show <id>` output or bead ID)
-- A source file or Jira ticket to plan around
+- A Jira ticket ID (`MX2-\d+`)
+- A Slack thread URL or pasted thread excerpt
+- A Confluence page URL or pasted page body (often a rough-draft doc)
+- A PR reference (`#\d+` or `gh pr` URL)
+- A conversation transcript
 - A mix of the above
+
+Mixed inputs are consolidated. Precedence on disagreement:
+**inline text > Slack/transcript > Confluence > Jira/PR > bead notes**.
+Disagreements surface in Phase 5 "Open Assumptions".
+
+For the full input-loading protocol, URL parsing rules, mixed-input
+precedence handling, and bias-detection (INPUT_MODE classification),
+see [input-loading.md](input-loading.md).
 
 ## Pipeline Overview
 
 ```
-rough idea
+rough idea (text, Jira, bead, Slack, Confluence, transcript)
     |
     v
-[Phase 1: Refine]          Internal. Expand context, clarify scope.
-    |
-    v
-[Phase 2: Scope & Decompose]  Internal. Analyze codebase, find seams, draft plan.
-    |
-    +--------+--------+
-    |                 |
-    v                 v
-[Phase 3a:         [Phase 3b:
- Challenge]         Consult]    Parallel via Agent tool.
-    |                 |
-    +--------+--------+
+[Phase 1: Refine] <-------+
+    |                     |  (loop-back on ESCALATE-QUESTIONS,
+    v                     |   after user answers narrowing Qs)
+[Phase 2: Scope & Decompose] <----+
+    |                             |  (loop-back on ITERATE, scoped
+    +--------+--------+           |   to the named WEAK_DIMENSION)
+    |                 |           |
+    v                 v           |
+[Phase 3a:         [Phase 3b:     |
+ Challenge]         Consult]      |
+    |                 |           |
+    +--------+--------+           |
+             |                    |
+             v                    |
+[Phase 4: Synthesize] ------------+
+             |                    |
+             v                    |
+[Phase 4.5: Tenth-Man Lens]       |
+             |                    |
+             v                    |
+[Phase 4.6: Convergence Gate] ----+
              |
+             | (PROCEED only)
              v
-[Phase 4: Synthesize]       Merge findings, modify plan.
-             |
-             v
-[Phase 5: Present]          First thing the user sees.
+[Phase 5: Present]          First synthesis-level user-facing output.
              |
        [user approval]
              |
              v
 [Phase 6: Create]           Beads created, optional gate.
+
+Phase 4.6 verdicts:
+  PROCEED            -> Phase 5
+  ITERATE            -> Phase 2 (cap: 2 rounds)
+  ESCALATE-QUESTIONS -> ask user, then Phase 1 (cap: 1 round)
+  ESCALATE-ROUTE     -> Phase 5 with no plan; suggest a different
+                        skill (/ideate, /investigate, direct execution)
 ```
 
-Phases 1-4 are INTERNAL. Do not show intermediate output to the user. Phase 5
-is the first visible output.
+Phases 1-4.6 are INTERNAL. The only user-facing output before Phase 5
+is the narrowing questions in ESCALATE-QUESTIONS (when fired). Phase 5
+is the first synthesis-level visible output.
 
 ## Process
 
 ### Phase 1: Refine (internal)
 
-Apply the refine protocol to expand the rough input into a well-specified scope:
+Load all inputs, detect bias mode, clarify scope.
 
-1. **Pre-load domain context** (best-effort, not a gate): Before extracting
-   intent, surface existing terminology from bead memories so Phase 2 enters
-   with prior decisions in hand. Run the domain-matcher to infer domain
-   keywords from the rough input:
+For the full protocol (multi-input loading with URL parsing,
+mixed-input precedence, bias-detection / INPUT_MODE classification,
+domain context pre-load, sibling-bead sweep, enrich, expand
+specificity), see [input-loading.md](input-loading.md).
 
-   ```bash
-   bash /home/vscode/.claude/scratch/domain-matcher/match.sh "<user input>" \
-     | cut -d: -f1 | head -10
-   ```
+Key invariants:
+- Detect `INPUT_MODE: problem-framed` vs `INPUT_MODE: mechanism-prescribed`
+  in step 0. Mechanism-prescribed triggers enhanced scrutiny in Phase 3
+  and the Prior Thinking Comparison section in Phase 5.
+- Sibling-bead sweep is mandatory, not optional. Ratified architectural
+  decisions in sibling beads supersede any plan formed fresh.
+- Domain-matcher misfires must NOT block convergence (best-effort).
 
-   For each matched keyword, run `bd memories <keyword>` and skim the top
-   5 results. If the input names a known service (e.g., `<service>`, `folio`,
-   `salesforce`, `metadata_updater`) or a path under
-   `src/python/mx2/<service>/`, also read the service-level `CLAUDE.md` when
-   one exists.
-
-   **Quality bar.** This is a best-effort context loader, not a gate. The
-   matcher's calibration is ~79% recall / ~82% precision (n=18 baseline);
-   misfires are expected. If the matcher returns no results, returns
-   tokens that look like noise, or fails to run, skip pre-load and
-   continue with step 2. A misfire must NOT block convergence.
-
-   Fold pre-loaded results into the refined scope under a `Loaded context:`
-   heading listing matched keywords, the bead-memory entries surfaced, and
-   any service-level `CLAUDE.md` excerpts read. Phase 2 cites this section
-   when checking for terminology collisions.
-
-2. **Extract intent**: Core goal, implicit context (check conversation history,
-   git state, active beads), scope signals.
-3. **Gather context**: Use tools. `git status`/`git diff` for current work state.
-   `bd ready`/`bd list --status=in_progress` for tracked work. Grep the codebase
-   if the idea mentions functionality by name. Read CLAUDE.md for project rules.
-4. **Enrich** (when references detected): If the input mentions a Jira ticket
-   (`MX2-\d+`), bead ID (`docr-\w+`), or PR number (`#\d+`), run the enrich
-   protocol inline (not as a separate skill invocation):
-   - Fetch the Jira ticket via Atlassian MCP (AC, description, status)
-   - Run `bd search <keywords>` from the ticket/bead title (top 5 results)
-   - Run `bd memories <keyword>` with service name or domain (top 10 matches)
-   - Fold all results into the refined scope as structured context
-   Skip if no identifiers detected. This replaces the need for a manual
-   `/enrich` call before `/converge`.
-5. **Expand specificity**: Name files, functions, patterns, and constraints.
-   Include context the LLM needs that the user takes for granted.
-
-Output: an internal "refined scope" document. Not shown to user.
+Output: refined scope (1-3 sentences with constraints surfaced) plus
+the `Loaded context:` block and the `INPUT_MODE:` classification.
 
 ### Phase 2: Scope & Decompose (internal)
 
 Using the refined scope, perform the core bead-forge analysis:
 
-1. **Understand scope**: Read source files mentioned. Search the MX2 codebase for
-   existing patterns. Identify natural seams.
+1. **Understand scope**: Read source files mentioned. Search the MX2
+   codebase for existing patterns. Identify natural seams.
 
-   **Infrastructure pull-up**: Before scoping to the named service, check whether
-   the prompt touches a cross-cutting concern (observability, worker lifecycle,
-   error handling, queueing). If so, search for shared base classes and
-   infrastructure modules that all services in that domain inherit from or
-   depend on. A fix at the base class often outweighs N individual service fixes.
-   Concretely: if the prompt mentions "pipeline", "worker", "processing", or any
-   named ECS/Lambda service, check `mx2.worker.worker`, `mx2.sqs.*`, `mx2.telemetry.*`,
-   and any shared Lambda handler patterns before deciding where changes belong.
-   Also read relevant Terraform/infrastructure config (e.g., Lambda module env vars)
-   to verify what is already configured in production - do not assume a capability
-   is missing without checking infra.
+   **Infrastructure pull-up**: Before scoping to the named service,
+   check whether the prompt touches a cross-cutting concern
+   (observability, worker lifecycle, error handling, queueing). If so,
+   search for shared base classes and infrastructure modules. A fix at
+   the base class often outweighs N individual service fixes. Check
+   `mx2.worker.worker`, `mx2.sqs.*`, `mx2.telemetry.*`, and relevant
+   Terraform/infrastructure config before deciding where changes
+   belong.
 
-2. **Pipeline reuse gate** _(this is the Pipeline Bypass assumption category from
-   `challenge/assumption-taxonomy.md` - same check, authoritative definition there)_:
-   Before designing any new code path, check whether the
-   existing pipeline already provides the needed behavior. Ask: "What happens if
-   we just send one message through the normal path?" New paths mean new bugs and
-   new contracts to maintain. The existing path is tested. If reuse works, the plan
-   should leverage it even if it involves a small overhead (e.g., one redundant
-   Lambda invocation that early-exits). This check has the highest ROI of any
-   single review question.
-3. **Codebase collision check**: Search for existing code that overlaps. Note where
-   new code must stay separate and why.
-4. **Terminology-collision check**: Cross-reference each new concept the plan
-   introduces (new bead title, new function name, new module name, new domain
-   noun) against the `Loaded context:` section from Phase 1. If a name in the
-   plan collides with an existing term defined in bead memory or service docs,
-   surface to the user: "You named this X, but bead memories define X as Y.
-   Are you proposing to extend Y or introduce something orthogonal?" If
-   orthogonal, propose a sub-term (e.g., `Pitched X`, `Unattached X`) so the
-   plan does not silently overload an existing concept.
+2. **Pipeline reuse gate** _(the Pipeline Bypass assumption category
+   from `challenge/assumption-taxonomy.md`)_: Before designing any new
+   code path, check whether the existing pipeline already provides the
+   needed behavior. Ask: "What happens if we just send one message
+   through the normal path?" New paths mean new bugs and new contracts.
+   The existing path is tested. If reuse works, the plan should
+   leverage it even with small overhead (e.g., one redundant Lambda
+   invocation that early-exits). Highest-ROI single review question.
 
-   Skip if Phase 1 pre-load was empty or skipped. Surface the collision in the
-   Phase 5 "Open Assumptions" section if the user has not adjudicated by the
-   time Phase 5 fires.
-5. **Decompose**: Break into work items with:
-   - Title (imperative, scoped)
-   - Description (what and why)
-   - Acceptance criteria (observable outcomes)
-   - Design notes (approach, patterns to follow, codebase references)
-   - Dependencies (what blocks what)
+3. **Codebase collision check**: Search for existing code that
+   overlaps. Note where new code must stay separate and why.
+
+4. **Terminology-collision check**: Cross-reference each new concept
+   the plan introduces (new bead title, new function name, new module
+   name, new domain noun) against the `Loaded context:` section from
+   Phase 1. If a name collides, surface to the user: "You named this
+   X, but bead memories define X as Y. Are you proposing to extend Y
+   or introduce something orthogonal?" If orthogonal, propose a
+   sub-term so the plan does not silently overload an existing concept.
+
+5. **Decompose**: Break into work items. For the full work item field
+   structure (Title, Description, AC, Design notes, Dependencies,
+   Verification path, Consequence of wrong, Context) and field-level
+   invariants, see [work-item-structure.md](work-item-structure.md).
+
 6. **Category assignment**: Each item gets a bead category label
    (task/memory/decision/discovery/review).
 
-Apply the granularity check from bead-forge: each item should be completable in
-one focused session. If an item is too large, decompose further.
+Apply the granularity check from bead-forge: each item should be
+completable in one focused session. If an item is too large, decompose
+further.
 
-Output: an internal "draft plan" - the work items, their dependencies, and the
+Key invariants:
+- Every work item has a Verification path. Absent VP triggers ITERATE.
+- Consequence=high items must have matching Verification path OR an
+  explicit risk-reduction note.
+- Context (greenfield/legacy/hybrid) is annotation, not scored.
+
+Output: an internal "draft plan" with work items, dependencies, and
 dependency graph. Not shown to user yet.
 
 ### Phase 3: Stress Test (parallel, internal)
 
-Launch two parallel subagents via the Agent tool. Both receive the draft plan.
+Launch two parallel subagents via the Agent tool: Phase 3a (Challenge)
+and Phase 3b (Consult). Both receive the draft plan plus the
+INPUT_MODE classification.
 
-**CRITICAL: Launch both in a single message. Do not serialize.**
+For the full Challenge and Consult subagent prompt templates (including
+the enhanced-scrutiny instructions for mechanism-prescribed inputs),
+see [stress-test-prompts.md](stress-test-prompts.md).
 
-#### Phase 3a: Challenge (subagent)
-
-Prompt the subagent with the draft plan and instruct it to:
-
-1. Extract assumptions using the challenge taxonomy triggers:
-   - "We'll use..." / "We should..." (approach assumptions)
-   - "The existing..." / "There's already..." (codebase state)
-   - "This will..." / "This should..." (outcome assumptions)
-   - References to code not Read in this conversation (codebase)
-   - What's NOT mentioned (scope/completeness)
-2. Apply the relevance gate: "If wrong, does the plan change?" Drop irrelevant
-   assumptions. Target 3-7.
-3. Score on fragility (SOLID/SOFT/FRAGILE) and impact (HIGH/LOW).
-4. For FRAGILE assumptions: gather evidence via tools. Record searches and findings.
-5. Produce a modification table: what needs to change based on evidence.
-
-Include in the subagent prompt: "Search `bd memories` for domain-specific gotchas
-relevant to this plan. Read source files to verify codebase assumptions."
-
-#### Phase 3b: Consult (subagent)
-
-Prompt the subagent to act as a tech lead coordinator. Provide the draft plan and
-instruct it to:
-
-1. Determine relevant specialists from the roster (see consult/specialists.md).
-   Not every plan needs every specialist. Match specialists to concerns in the plan.
-2. Spawn specialist subagents in parallel. Each specialist gets:
-   - The relevant plan items (not the full plan if only some items are relevant)
-   - A focused question (what specifically to evaluate)
-   - Author Mode preamble: "CI has not run yet. Flag everything: style, types,
-     lint, naming, and design issues."
-3. Synthesize specialist outputs: themes, contradictions, gaps.
-4. Triage findings: Fix now / Fix next / Defer / Won't fix.
-
-Include in the subagent prompt: "Focus on design-level concerns, not
-implementation details. The plan hasn't been built yet. For each plan item
-in your domain, probe for: Pipeline Bypass (does this add a new code path
-when the existing pipeline could serve?), Reasoning Chain gaps (do the steps
-actually follow from each other?), and Scope/Completeness (what production
-concerns - rollback, observability, migration - does this plan omit?)."
+Key invariants:
+- **Parallel is mandatory.** Launch both subagents in a single message
+  with multiple Agent tool calls. Serializing defeats the purpose.
+- When INPUT_MODE=mechanism-prescribed, both subagents receive
+  enhanced-scrutiny instructions: treat the prescribed mechanism as
+  an explicit assumption to evaluate on first-principles grounds, not
+  a given.
+- Both subagents must check sibling beads for ratified architectural
+  decisions that supersede the draft plan.
 
 ### Phase 4: Synthesize (internal)
 
 When both Phase 3 subagents return, merge their findings:
 
 1. **Gather**: Collect challenge modifications and consult findings.
-2. **Connect**: Find themes across both. Where do challenge and consult agree?
-   Where do they contradict?
+2. **Connect**: Find themes across both. Where do challenge and consult
+   agree? Where do they contradict?
 3. **Deduplicate**: Multiple sources may flag the same issue. Merge.
 4. **Apply to plan**: Modify the draft plan based on findings:
-   - INVALIDATED assumptions: remove or revise affected plan items
-   - Specialist concerns rated "Fix now": incorporate into plan items
-   - Gaps identified by either source: add items or acceptance criteria
-   - Contradictions: make the judgment call, note the trade-off. For FRAGILE+HIGH
-     contradictions, use the decision record format from `consult/report-format.md`
-5. **Capture what changed**: Record a brief "convergence delta" listing what
-   the challenge and consult phases changed about the original plan.
+   - INVALIDATED assumptions: remove or revise affected plan items.
+   - Specialist concerns rated "Fix now": incorporate into plan items.
+   - Gaps identified by either source: add items or acceptance criteria.
+   - Contradictions: make the judgment call, note the trade-off. For
+     FRAGILE+HIGH contradictions, use the decision record format from
+     `consult/report-format.md`.
+5. **Capture what changed**: Record a "convergence delta" with ONE of
+   four labels. The label appears in Phase 5 output so the user knows
+   the depth of pushback:
 
-Output: the converged plan (modified work items + convergence delta).
+   - **CONFIRMED**: specialists agreed; no structural changes; only
+     minor clarifications. Means the plan actually withstood scrutiny.
+   - **MINOR_ADJUSTMENTS**: structure kept; small number of items
+     adjusted (added AC, narrowed scope, swapped pattern).
+   - **MAJOR_REVISIONS**: goal kept; materially different approach
+     recommended.
+   - **SCRAPPED_AND_REBUILT**: different framing entirely. Original
+     mechanism was wrong. The canonical Fulfillment-vs-Coverage
+     outcome.
 
-### Phase 4.5: Tenth-Man Lens (adversarial post-synthesis pass)
+   **Watch for false CONFIRMED.** CONFIRMED is suspicious when the
+   input was complex or mechanism-prescribed; bias toward
+   MINOR_ADJUSTMENTS unless specialists offered concrete evidence
+   (file paths, function names, pattern citations). Empty
+   challenge + empty consult on a non-trivial mechanism-prescribed
+   input usually means specialists punted, not that the plan is solid.
+   The Phase 4.6 gate catches this and fires
+   ITERATE+WEAK_DIMENSION=mechanism.
 
-After Phase 4 produces the converged plan, dispatch `mx2-tenth-man` (via Agent
-tool, `subagent_type: mx2-tenth-man`) with the converged plan as input. The
-tenth-man asks naive, dumb, or obvious-but-unasked questions designed to surface
-risks the consensus consult and challenge passes assumed away. Output is
-advisory-only, never blocks; format is the agent's standard `🔻` prefix block.
+Output: the converged plan (modified work items + convergence delta
+prose + DELTA_CATEGORY label).
 
-The tenth-man commentary appears in the Phase 5 output as a `## Tenth-Man Lens`
-section AFTER the Convergence Delta and BEFORE the Work Items, so the user sees
-adversarial dissent before reading the recommended plan. If the agent returns
-`🔻 No concerns from this lens`, omit the section entirely.
+### Phase 4.5: Tenth-Man Lens (internal)
 
-This is the lowest-traffic surface for tenth-man and the calibration starting
-point. Calibration data accumulates here before tenth-man expands to autopilot
-ESCALATE and decision-maker borderline calls. If the tenth-man dispatch fails
-(agent missing, calibration file unreadable, transient error), proceed without
-it; do not block convergence on advisory tooling. Note the failure in the
-Phase 5 output as a one-line "Tenth-Man Lens unavailable: <reason>" so the
-user knows the adversarial pass did not run.
+Dispatch `mx2-tenth-man` for an adversarial pass on the converged
+plan. The agent asks naive, dumb, or obvious-but-unasked questions
+designed to surface risks the consensus passes assumed away. Output
+is advisory.
+
+For the full Tenth-Man dispatch prompt and failure handling, see
+[stress-test-prompts.md](stress-test-prompts.md).
+
+Key invariants:
+- Tenth-man is mandatory, not opt-in. Findings fold into Phase 5 as a
+  `Tenth-Man Lens` block.
+- If dispatch fails, note "Tenth-Man Lens unavailable: <reason>" and
+  proceed. Do not silently drop the pass.
+- The Phase 4.6 gate receives tenth-man output (or unavailable-reason)
+  as input. Missing tenth-man pass lowers gate confidence.
+
+### Phase 4.6: Convergence Gate (internal)
+
+Run a decision-maker gate on the synthesized plan. The gate may PROCEED,
+ITERATE, ESCALATE-QUESTIONS, or ESCALATE-ROUTE.
+
+For the full decision-maker dispatch prompt (with `MODE: CONVERGENCE
+GATE` preamble), branch logic per verdict, WEAK_DIMENSION instructions
+for ITERATE, narrowing-question constraints for ESCALATE-QUESTIONS,
+suggested-skill mapping for ESCALATE-ROUTE, and iteration caps, see
+[convergence-gate.md](convergence-gate.md).
+
+Key invariants:
+- The gate is `mx2-decision-maker` invoked with `MODE: CONVERGENCE GATE`
+  preamble. Calibration drift gets recorded with
+  `bd remember --key='calibration:mx2-decision-maker:converge:<topic>'`.
+- ITERATE re-runs Phase 2 + 3 with a focused WEAK_DIMENSION
+  modification (verification / consequence / scope / decomposition /
+  mechanism). Cap: 2 ITERATE rounds per invocation.
+- ESCALATE-QUESTIONS poses 1-3 focused narrowing questions to the
+  user via `AskUserQuestion`. Each question must include a WHY clause.
+  Cap: 1 user-question round per invocation.
+- ESCALATE-ROUTE surfaces in Phase 5 with no plan, just the suggested
+  next skill (`/ideate`, `/investigate`, direct execution).
+- The mechanism case is canonical for catching Fulfillment-vs-Coverage:
+  INPUT_MODE=mechanism-prescribed AND DELTA_CATEGORY=CONFIRMED on a
+  non-trivial plan triggers ITERATE with WEAK_DIMENSION=mechanism.
 
 ### Phase 5: Present
 
-This is the **first output the user sees**. Format:
+First synthesis-level output the user sees.
 
-> **Deliverable adaptation.** The format below assumes the deliverable is a
-> set of work items. When the deliverable is a communication artifact (PR
-> comment, decision doc, briefing, Slack draft), replace the "Work Items"
-> section with the draft artifact ready to copy/post. The Convergence Delta,
-> Open Assumptions, and Checkpoint Recommendation still apply unchanged. The
-> Phase 6 "Create" step is replaced by user signoff to send/post.
+> **Deliverable adaptation.** The format below assumes the deliverable
+> is a set of work items. When the deliverable is a communication
+> artifact (PR comment, decision doc, briefing, Slack draft), replace
+> the "Work Items" section with the draft artifact ready to copy/post.
+> The Convergence Delta, Open Assumptions, Iteration Log, and
+> Checkpoint Recommendation still apply unchanged. The Phase 6 "Create"
+> step is replaced by user signoff to send/post.
 
 ```markdown
-## Converged Plan: [topic, 3-8 words]
+## Converged Plan: [topic, 3-8 words]  (low-confidence)?
+
+[Suffix `(low-confidence)` on the H2 IF the Phase 4.6 gate forced a
+low-confidence PROCEED (2 ITERATE rounds hit the cap, or the user
+opted out of ESCALATE-QUESTIONS with "you decide"). Add a
+"Low-confidence reason:" line at the end of the Summary stating which
+path triggered it. Without this signal, the user has no indication the
+plan is provisional.]
 
 ### Summary
 [2-5 sentences: what this plan accomplishes, how many work items, key design decisions]
 
-### Convergence Delta
+### Iteration Log
+[Always present even when Round 0 was final, so the user sees the
+gate ran. List each round with verdict + action taken:]
+- Round 0 (initial): N work items drafted; DELTA_CATEGORY=<X>.
+- Round 1 (if any): VERDICT (REASON). Action: <what changed>.
+- Round 2 (if any): VERDICT (REASON). Action: <what changed>.
+- Final verdict: PROCEED | LOW-CONFIDENCE | ESCALATE-ROUTE.
+
+### Convergence Delta  [CATEGORY: CONFIRMED | MINOR_ADJUSTMENTS | MAJOR_REVISIONS | SCRAPPED_AND_REBUILT]
 > [What changed during stress-testing. 2-4 bullet points showing the
-> most significant modifications from challenge/consult. This tells the
-> user their plan was actually tested, not rubber-stamped.]
+> most significant modifications from challenge/consult. The CATEGORY
+> tag is load-bearing: CONFIRMED means specialists agreed with
+> concrete evidence (not punted); MAJOR_REVISIONS or
+> SCRAPPED_AND_REBUILT means the original framing did not survive.]
+
+### Prior Thinking Comparison  [only when INPUT_MODE = mechanism-prescribed]
+[Surface how the converged plan compares to the user's prescribed
+mechanism. One of:
+- "Specialists agreed the prescribed mechanism is right. <Brief
+  evidence cited.>" (CONFIRMED outcome)
+- "Specialists refined the prescribed mechanism: <what changed>"
+  (MINOR_ADJUSTMENTS)
+- "Specialists recommended a different mechanism: <X>. <Brief why.>"
+  (MAJOR_REVISIONS)
+- "Specialists recommended scrapping the prescribed mechanism: it
+  should be folded into <Y> as a feature of <Y>, not a new noun."
+  (SCRAPPED_AND_REBUILT, canonical Fulfillment-vs-Coverage outcome)
+This section makes mechanism-vs-feature decisions visible BEFORE the
+user commits to beads. Omit when INPUT_MODE = problem-framed.]
+
+### Tenth-Man Lens
+[Verbatim 🔻 block from Phase 4.5. Always present (the pass is
+mandatory). If returned "🔻 No concerns from this lens", include that
+line verbatim so the user can see the pass ran.]
 
 ### Work Items
 
-[For each item, in dependency order:]
-
-#### [N]. [Title]
-**Type**: [task/feature/bug/decision/discovery]
-**Priority**: [P0-P4]
-**Depends on**: [item numbers or "none"]
-
-[Description: 2-4 sentences. What and why.]
-
-**Acceptance criteria:**
-- [ ] [Observable outcome 1]
-- [ ] [Observable outcome 2]
-
-**Design notes:** [Approach, patterns, codebase references. 1-3 sentences.]
+[For each item in dependency order, using the format defined in
+work-item-structure.md.]
 
 ---
 
@@ -307,38 +358,59 @@ This is the **first output the user sees**. Format:
 [ASCII representation showing execution order and parallelism]
 
 ### Open Assumptions
-[Any FRAGILE/UNVERIFIABLE assumptions the user should confirm. Omit if none.]
+[Any FRAGILE/UNVERIFIABLE assumptions the user should confirm. Include
+any mixed-input precedence disagreements from Phase 1. Omit only if
+none.]
 
 ---
 
-**Approve this plan?** Reply "yes" to create beads (with optional human gate
-on implementation), or provide feedback to revise.
+### OR: Escalation: No Plan Produced  [only when final verdict was ESCALATE-ROUTE]
+[Replaces the Work Items / Dependency Graph / Open Assumptions
+sections when the Phase 4.6 gate fired ESCALATE-ROUTE. 2-3 sentences
+naming the SUGGESTED_NEXT_SKILL and the reason no plan is being
+produced. Format:
+
+"The convergence gate fired ESCALATE-ROUTE: <reason from gate>. No
+plan is being produced; the suggested next step is
+<SUGGESTED_NEXT_SKILL: /ideate, /investigate, or direct execution>.
+The draft work items are preserved above for reference, but /converge
+is not the right tool for this problem."
+
+The Iteration Log + Convergence Delta + Prior Thinking Comparison
+sections are still shown so the user understands WHY the gate
+refused to converge.]
+
+---
+
+**Approve this plan?** Reply "yes" to create beads (with optional
+human gate on implementation), or provide feedback to revise.
 ```
 
 ### Phase 6: Create (on approval)
 
 When the user approves:
 
-1. Create beads via `bd create` for each work item. Use `--title`, `--description`,
-   `--type`, `--priority`. Include acceptance criteria and design notes in the
-   description.
+1. Create beads via `bd create` for each work item. Use `--title`,
+   `--description`, `--type`, `--priority`. Include AC, design notes,
+   verification path, and consequence-of-wrong in the description.
 2. Wire dependencies via `bd dep add`.
-3. If the plan has 3+ implementation items, ask: "Add a signoff gate? This blocks
-   implementation beads in `bd ready` until you explicitly resolve the gate."
-   If yes, create a gate bead with `--type=task --title="Signoff: [plan topic]"`
-   and make implementation items depend on it.
+3. If the plan has 3+ implementation items, ask: "Add a signoff gate?
+   This blocks implementation beads in `bd ready` until you explicitly
+   resolve the gate." If yes, create a gate bead with
+   `--type=task --title="Signoff: [plan topic]"` and make
+   implementation items depend on it.
 4. Present the created bead IDs and the dependency graph.
 
-If the user provides feedback instead of approving, revise the plan and re-present
-(Phase 5 again). Do not loop more than twice - if the user has extensive changes,
-suggest they provide the feedback and you'll run `/bead-forge` with the converged
-context directly.
+If the user provides feedback instead of approving, revise the plan
+and re-present (Phase 5 again). Do not loop more than twice; if the
+user has extensive changes, suggest they provide the feedback and
+you'll run `/bead-forge` with the converged context directly.
 
 ## Checkpoint Protocol
 
-If this skill produces findings that would be lost to compaction (especially the
-convergence delta and rejected alternatives), include a Checkpoint Recommendation
-block in the Phase 5 output:
+If this skill produces findings that would be lost to compaction
+(especially the convergence delta and rejected alternatives), include
+a Checkpoint Recommendation block in the Phase 5 output:
 
 ```
 ## Checkpoint Recommendation
@@ -352,22 +424,93 @@ Context to preserve:
 Rationale: convergence analysis produced decisions that inform implementation
 ```
 
-The main agent should persist this via `/bead-forge checkpoint` if the plan is
-approved.
+The main agent should persist this via `/bead-forge checkpoint` if the
+plan is approved.
+
+## Distinctions
+
+- **vs `/ideate`**: `/ideate` is upstream of `/converge`. `/ideate`
+  generates 3-5 candidate approaches and ranks them; `/converge` takes
+  ONE approach and stress-tests it. When the user has not yet picked
+  an approach, the Phase 4.6 gate fires ESCALATE-ROUTE with
+  SUGGESTED_NEXT_SKILL=/ideate.
+- **vs `/launch`**: `/launch` writes code and produces a draft PR.
+  `/converge` writes a plan (no code). For hands-off implementation
+  from a well-scoped ticket, use `/launch`.
+- **vs `/challenge`**: `/challenge` extracts assumptions from an
+  EXISTING plan. `/converge` produces the plan. `/converge` invokes
+  `/challenge`-style assumption extraction internally in Phase 3a.
+- **vs `/consult`**: `/consult` runs parallel specialists with
+  DIFFERENT lenses on the SAME code. `/converge` invokes
+  `/consult`-style specialist orchestration internally in Phase 3b.
+- **vs `/investigate`**: `/investigate` finds root cause for a
+  production error. `/converge` produces a plan AFTER the root cause
+  is known. When root cause is unknown, the Phase 4.6 gate fires
+  ESCALATE-ROUTE with SUGGESTED_NEXT_SKILL=/investigate.
 
 ## Rules
 
-- **No intermediate output.** Phases 1-4 are invisible to the user. If a phase
-  fails (e.g., can't reach codebase), note it in Phase 5 presentation rather
-  than asking mid-pipeline.
-- **Parallel is mandatory.** Challenge and consult MUST run in parallel via
-  separate Agent tool calls in the same message. Serializing them defeats the
-  purpose.
-- **Beads are created last.** Do not create beads during Phases 1-4. The whole
-  point is convergence before commitment.
-- **Don't rubber-stamp.** If challenge finds nothing and consult has no concerns,
-  that's fine - but the convergence delta should honestly say "no significant
-  changes" rather than fabricating modifications.
-- **Scope guard.** If the refined input is too large for a single converge pass
-  (10+ work items likely), say so in Phase 5 and suggest breaking into
-  sub-features that each get their own converge pass.
+- **No intermediate output.** Phases 1-4.6 are invisible. Phase 5 is
+  the first synthesis-level visible output. Exception: the narrowing
+  questions in ESCALATE-QUESTIONS are explicitly user-facing.
+- **Parallel is mandatory.** Phase 3 Challenge and Consult run in
+  parallel via separate Agent tool calls in the same message.
+- **Beads are created last.** Do not create beads during Phases 1-4.6.
+  The whole point is convergence before commitment.
+- **Don't rubber-stamp.** A CONFIRMED delta category is suspicious
+  when the input was complex or mechanism-prescribed. Bias toward
+  MINOR_ADJUSTMENTS unless specialists offered concrete evidence
+  (file paths, function names, pattern citations). The Phase 4.6
+  gate enforces this.
+- **Scope guard.** If the refined input is too large for a single
+  converge pass (10+ work items likely), say so in Phase 5 and
+  suggest breaking into sub-features.
+- **Mixed-input precedence is fixed.** Inline text > Slack/transcript
+  > Confluence > Jira/PR > bead notes. Surface disagreements in
+  Phase 5 Open Assumptions.
+- **Detect mechanism-prescription up front.** Phase 1 must classify
+  the input as `problem-framed` or `mechanism-prescribed`.
+  Mechanism-prescribed requires ENHANCED scrutiny in Phase 3 and a
+  Prior Thinking Comparison section in Phase 5. The
+  Fulfillment-vs-Coverage failure mode (refining the wrong noun
+  because the user prescribed it without challenge) is the canonical
+  risk.
+- **Verification path is mandatory per work item.** Items without it
+  trigger ITERATE with WEAK_DIMENSION=verification.
+- **Consequence-of-wrong is mandatory per work item.** Consequence=high
+  AND no concrete verification path is a workstream-killer; synthesis
+  must either add the path or downgrade scope.
+- **Convergence Delta gets a category, not just prose.** One of
+  CONFIRMED / MINOR_ADJUSTMENTS / MAJOR_REVISIONS /
+  SCRAPPED_AND_REBUILT.
+- **Tenth-man is mandatory.** Phase 4.5 runs always. If dispatch
+  fails, note "Tenth-Man Lens unavailable" and proceed; do not
+  silently drop.
+- **Convergence gate is mandatory.** Phase 4.6 runs always. PROCEED
+  is not the default; the gate must affirmatively reach it. ITERATE
+  cap is 2 rounds; ESCALATE-QUESTIONS cap is 1 round per invocation.
+- **Ask the user when convergence space is too ambiguous.** Phase 4.6
+  can fire ESCALATE-QUESTIONS with 1-3 narrowing questions. Max 3
+  questions, each with a WHY clause. User can reply "you decide" to
+  opt out (forces low-confidence PROCEED).
+- **Calibration soak is expected.** The decision-maker invoked in
+  Phase 4.6 was calibrated for autopilot and launch gates, not
+  convergence. First 3-5 `/converge` invocations are calibration
+  soak. Record drift via
+  `bd remember --key='calibration:mx2-decision-maker:converge:<topic>'`.
+- **Iteration log is always visible.** Phase 5 shows it even when
+  Round 0 was final.
+- **/converge is downstream of /ideate.** When the input is rough
+  and multiple plausible mechanisms exist with no clear winner, the
+  gate fires ESCALATE-ROUTE with SUGGESTED_NEXT_SKILL=/ideate.
+
+## Additional Resources
+
+- [input-loading.md](input-loading.md): Phase 1 multi-input loading,
+  URL parsing, mixed-input precedence, bias-detection.
+- [stress-test-prompts.md](stress-test-prompts.md): Phase 3a Challenge,
+  Phase 3b Consult, and Phase 4.5 Tenth-Man dispatch prompts.
+- [convergence-gate.md](convergence-gate.md): Phase 4.6 decision-maker
+  dispatch, branch logic, caps, iteration log format.
+- [work-item-structure.md](work-item-structure.md): Phase 2 work item
+  field structure and Phase 5 presentation format.

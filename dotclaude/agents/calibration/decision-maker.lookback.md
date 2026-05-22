@@ -28,3 +28,11 @@ Format per entry:
 - **Action**: new-rule
 - **Summary**: End-to-end loop verification fixture merged to confirm /calibrate closes the channel.
 - **Rationale**: Verification path per skill SKILL.md; user accepted merge to confirm the loop. Manual cleanup of the FIXTURE entry from decision-maker.md is the documented next step.
+
+## 2026-05-21
+
+- **Source key**: `calibration:decision-maker:proceed-gate:plan-must-specify-exception-coverage`
+- **Category**: proceed-gate (Rule Overrides)
+- **Action**: new-rule
+- **Summary**: Added "Fail-closed semantics: plan must name concrete exception classes" rule; ITERATE at Gate 1 when fail-closed handling around an external library call doesn't enumerate concrete exception classes.
+- **Rationale**: Evidence-backed by PR #9193 / docr-5x7j ES-rescue: `elasticsearch.ApiError` is sibling (not subclass) of `TransportError`, so deferring to "existing class contract" let 401/403/400 escape and inverted the fail-closed intent. Surfaced by `mx2-silent-failure-hunter` at Gate 2. Worth promoting to a Gate-1 plan-check.

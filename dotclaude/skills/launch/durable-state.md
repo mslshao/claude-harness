@@ -1,10 +1,53 @@
-# Durable State: Event Log, Cold-Start, and Retry Protocols
+# Durable State: Event Log, Stage Events, Cold-Start, and Retry Protocols
 
 The `/launch` skill uses a bead as its workflow event history. This provides Temporal-style
 durable execution: if the orchestrator dies mid-execution, a cold-start re-invocation
 reads the event log and resumes from the last verified checkpoint.
 
 Mental model: bead = Temporal event history, agent = activity, orchestrator = workflow.
+
+Two parallel mechanisms write to the bead's notes blob:
+- **`[LAUNCH_STAGE ...]` entries** for pre-execution stages (Phases 1-3.6).
+  Addressable by stage name + round number. Heavy payloads go to scratch
+  files referenced by `path=`.
+- **`[LAUNCH_EVENT ...]` entries** for execution (Phase 5). Temporal
+  sequence of agent activity used by the retry loop.
+
+Bead metadata stores single-value pointers: `launch_skill_version`,
+`launch_branch`, `launch_worktree`.
+
+Beads memories are NOT used for launch state. They're reserved for
+cross-session knowledge (gotchas, decisions, architecture); launch
+state pollutes that namespace.
+
+---
+
+## Schema Version + Stage Manifest
+
+The skill stamps a schema version on the bead at launch start. Within a
+version, stage names are fixed. Renames or additions require bumping
+the version and updating this manifest in the same PR.
+
+```
+SKILL_SCHEMA_VERSION=v1
+STAGES=[enrich, decompose, challenge, consult, synthesize, tenth-man, gate]
+```
+
+Stage names are semantic (not numbered) so we can reorder or insert
+phases later without renaming existing stages.
+
+Stage order (used by cold-start to determine resume point):
+1. enrich (Phase 1)
+2. decompose (Phase 2)
+3. challenge (Phase 3a)
+4. consult (Phase 3b)
+5. synthesize (Phase 3c)
+6. tenth-man (Phase 3.5)
+7. gate (Phase 3.6)
+
+Phases 4, 5, 6 are tracked via `[LAUNCH_EVENT ...]` entries (not stages)
+because they're execution sequence, not addressable pre-execution
+state.
 
 ---
 
@@ -54,9 +97,140 @@ bd update $LAUNCH_BEAD_ID --set-metadata launch_worktree="$WORKTREE_DIR"
 
 ---
 
+## Pre-Execution Stage Events
+
+Phases 1-3.6 write `[LAUNCH_STAGE ...]` entries to the same bead notes
+blob. Format:
+
+```
+[LAUNCH_STAGE stage=<name> round=<N> status=<enum> ts=<ISO8601> <optional fields>]
+```
+
+Rules:
+- `stage` is one of the names in the Stage Manifest above.
+- `round` is the iteration counter starting at 0. ITERATE increments
+  all stages' round counters together (round 1 means everything ran a
+  second time after a gate-triggered ITERATE).
+- `status` is per-stage (see status enums below).
+- Optional `path=` field points to a scratch file when the payload
+  exceeds the inline threshold (~2KB).
+
+### Status Enums per Stage
+
+| Stage | Status values | Optional fields |
+|-------|---------------|-----------------|
+| `enrich` | `loaded` / `failed` | `input_mode=<problem-framed\|mechanism-prescribed>`, `path=` for brief if >2KB |
+| `decompose` | `drafted` / `failed` | `n_items=<count>`, `path=` for work-item list if >2KB |
+| `challenge` | `done` / `failed` | `path=` for findings (always; findings are heavy) |
+| `consult` | `done` / `failed` | `path=` for findings (always; findings are heavy) |
+| `synthesize` | `confirmed` / `minor-adjustments` / `major-revisions` / `scrapped-and-rebuilt` | `path=` for converged plan (always) |
+| `tenth-man` | `no-concerns` / `concerns` / `unavailable` | `path=` if concerns (otherwise inline); `reason=` if unavailable |
+| `gate` | `proceed` / `iterate` / `escalate-questions` / `escalate-route` / `low-confidence` | `verdict_reason=<short>` or `path=` for long reason; `weak_dimension=<enum>` if iterate; `suggested_next_skill=<skill>` if escalate-route |
+
+### Example Pre-Execution Sequence (with ITERATE)
+
+```
+[LAUNCH_STAGE stage=enrich round=0 status=loaded input_mode=mechanism-prescribed ts=2026-05-21T10:00:00Z]
+[LAUNCH_STAGE stage=decompose round=0 status=drafted n_items=4 path=~/.claude/scratch/launch-docr-xyz/decompose-0.md ts=2026-05-21T10:01:00Z]
+[LAUNCH_STAGE stage=challenge round=0 status=done path=~/.claude/scratch/launch-docr-xyz/challenge-0.md ts=2026-05-21T10:03:00Z]
+[LAUNCH_STAGE stage=consult round=0 status=done path=~/.claude/scratch/launch-docr-xyz/consult-0.md ts=2026-05-21T10:03:30Z]
+[LAUNCH_STAGE stage=synthesize round=0 status=confirmed path=~/.claude/scratch/launch-docr-xyz/synthesize-0.md ts=2026-05-21T10:04:00Z]
+[LAUNCH_STAGE stage=tenth-man round=0 status=no-concerns ts=2026-05-21T10:05:00Z]
+[LAUNCH_STAGE stage=gate round=0 status=iterate verdict_reason=mechanism-rubber-stamped weak_dimension=mechanism ts=2026-05-21T10:05:30Z]
+[LAUNCH_STAGE stage=decompose round=1 status=drafted n_items=5 path=~/.claude/scratch/launch-docr-xyz/decompose-1.md ts=2026-05-21T10:07:00Z]
+[LAUNCH_STAGE stage=challenge round=1 status=done path=~/.claude/scratch/launch-docr-xyz/challenge-1.md ts=2026-05-21T10:09:00Z]
+[LAUNCH_STAGE stage=consult round=1 status=done path=~/.claude/scratch/launch-docr-xyz/consult-1.md ts=2026-05-21T10:09:30Z]
+[LAUNCH_STAGE stage=synthesize round=1 status=major-revisions path=~/.claude/scratch/launch-docr-xyz/synthesize-1.md ts=2026-05-21T10:10:00Z]
+[LAUNCH_STAGE stage=tenth-man round=1 status=concerns path=~/.claude/scratch/launch-docr-xyz/tenth-man-1.md ts=2026-05-21T10:11:00Z]
+[LAUNCH_STAGE stage=gate round=1 status=proceed ts=2026-05-21T10:11:30Z]
+```
+
+After the final `gate:proceed`, Phase 4 user-approval fires; on
+approval, Phase 5 starts and `[LAUNCH_EVENT ...]` entries begin.
+
+### Inline vs Scratch Threshold
+
+Practical rule: if the payload exceeds ~2KB, write it to scratch and
+put the path in the entry. If it fits inline, store the relevant
+fields directly in the entry (e.g., `verdict_reason=<short text>`).
+
+Heavy payloads (always scratch): challenge findings, consult findings,
+converged plan, work-item list when N>3.
+
+Light payloads (always inline): INPUT_MODE enum, item count, gate
+verdict, weak dimension, suggested next skill.
+
+---
+
+## Scratch File Convention
+
+Heavy payloads referenced by `path=` in `[LAUNCH_STAGE ...]` entries
+live under:
+
+```
+~/.claude/scratch/launch-<bead-id>/<stage>-<round>.md
+```
+
+Examples:
+- `~/.claude/scratch/launch-docr-xyz/challenge-0.md`
+- `~/.claude/scratch/launch-docr-xyz/synthesize-1.md`
+
+Format: markdown for human-readable subagent outputs; the
+orchestrator parses them as opaque blobs (they get fed back into the
+next stage's prompt verbatim, not re-parsed).
+
+Lifecycle:
+- **Created** by the orchestrator when writing a `[LAUNCH_STAGE ...]`
+  entry with `path=`.
+- **Persisted** for the life of the codespace (machine-local; NOT
+  Dolt-synced).
+- **NOT cleaned up automatically.** "Leave as breadcrumbs" policy:
+  scratch files remain after launch completion so retrospectives can
+  diff between launches or re-feed prior outputs.
+
+### Codespace Recycling
+
+GitHub recycles inactive codespaces. If a codespace is recycled,
+scratch files vanish but bead notes survive. Cold-start logic must
+handle missing scratch files gracefully:
+
+- Read the `[LAUNCH_STAGE ...]` entry. Status enum is intact (from
+  notes).
+- Attempt to read the scratch file at `path=`.
+- If file missing: log "scratch payload lost for stage=<name>
+  round=<N>; re-running stage". Re-spawn the relevant subagent to
+  regenerate the payload.
+
+This is best-effort durability across codespace lifetimes; full
+durability requires re-running expensive stages on recycle but the
+status sequence is preserved.
+
+---
+
 ## Bead Acquisition
 
-Before Phase 5 can write events, a bead must exist as the event log target.
+Before any `[LAUNCH_STAGE ...]` or `[LAUNCH_EVENT ...]` entry can be
+written, a bead must exist as the event log target. The bead is
+acquired at the END of Phase 1 (after `prompt-refiner` produces the
+implementation brief), not at Phase 5 as in the prior design.
+
+Acquisition timing:
+- Earlier acquisition would create beads for inputs that fail
+  validation (e.g., user provides no identifier and the skill bails).
+- Later acquisition would leave Phase 1's expensive work (Jira fetch,
+  domain matcher, prompt-refiner dispatch) undurable.
+- Acquiring after the brief is produced is the right tradeoff: by
+  then we know the input is valid AND the heavy Phase 1 work has
+  already happened (durability matters from this point forward).
+
+The first stage entry written after acquisition is `enrich:0:loaded`
+with the brief either inline (if <2KB) or pointed at via `path=`.
+After that, every subsequent stage writes its own entry on completion.
+
+Also write the schema version stamp on the bead at acquisition:
+```bash
+bd update "$LAUNCH_BEAD_ID" --set-metadata launch_skill_version=v1
+```
 
 ```bash
 # For Jira-ticket launches: find or create a bead
@@ -96,20 +270,86 @@ bd update "$LAUNCH_BEAD_ID" --claim 2>/dev/null
 
 ## Cold-Start Protocol
 
-Triggered when `/launch <bead-id>` is invoked and prior LAUNCH_EVENT entries exist.
+Triggered when `/launch <bead-id>` is invoked and prior `[LAUNCH_STAGE ...]`
+or `[LAUNCH_EVENT ...]` entries exist. The protocol has two cold-start
+modes depending on which phase the prior execution reached:
 
-### Step 1: Read Event Log
+- **Pre-Execution Cold-Start** (Phase 1-3.6): only `[LAUNCH_STAGE ...]`
+  entries exist, no `[LAUNCH_EVENT ...]` yet. Resume by re-running
+  the next stage in the manifest order with prior payloads loaded
+  from scratch.
+- **Execution Cold-Start** (Phase 5+): `[LAUNCH_EVENT ...]` entries
+  exist (worktree was created, agents spawned). Resume the retry
+  loop on the in-flight agent slot.
+
+### Step 1: Read Notes Blob
 
 ```bash
 NOTES=$(bd show "$LAUNCH_BEAD_ID" --json | jq -r '.[] | .notes // ""')
+STAGES=$(echo "$NOTES" | grep '^\[LAUNCH_STAGE')
 EVENTS=$(echo "$NOTES" | grep '^\[LAUNCH_EVENT')
+SKILL_VERSION=$(bd show "$LAUNCH_BEAD_ID" --json | jq -r '.[] | .metadata.launch_skill_version // "v1"')
 ```
 
-If `$EVENTS` is empty: this is a fresh execution. Proceed to normal Phase 5.
+If both `$STAGES` and `$EVENTS` are empty: fresh execution. Proceed
+to normal Phase 1.
 
-### Step 2: Parse State
+If `$SKILL_VERSION` does not match the current skill schema version
+in this file: refuse to resume; log "schema version mismatch (bead:
+$SKILL_VERSION, current: v1); restart this launch from scratch" and
+exit. Schema changes that break resume should be rare and explicit.
 
-Process events in order to reconstruct orchestrator position:
+### Step 2: Determine Cold-Start Mode
+
+- If `$EVENTS` is non-empty: Execution Cold-Start (proceed to Step 4).
+- Else if `$STAGES` is non-empty: Pre-Execution Cold-Start (proceed to
+  Step 3).
+
+### Step 3: Pre-Execution Cold-Start
+
+Parse `$STAGES` to find the latest stage + round + status.
+
+```bash
+# Sort by ts to get chronological order; the last entry is the most recent state.
+LATEST=$(echo "$STAGES" | tail -1)
+```
+
+Compute resume target:
+- If latest is `gate round=N status=proceed`: skip to Phase 4 user-approval.
+  Load the converged plan from `synthesize round=N path=...`.
+- If latest is `gate round=N status=low-confidence`: same as proceed but
+  surface low-confidence annotation in Phase 4 output.
+- If latest is `gate round=N status=iterate weak_dimension=W`: resume at
+  Phase 2 (decompose) round=N+1 with WEAK_DIMENSION=W modifier. Load
+  prior work items from `decompose round=N path=...` so the iteration
+  modifies them rather than starting fresh.
+- If latest is `gate round=N status=escalate-questions`: surface the
+  questions to the user. If the user has already answered (a
+  user-answered marker exists), fold answers into refined scope and
+  resume Phase 1 round=N+1. If not answered, re-prompt.
+- If latest is `gate round=N status=escalate-route`: Phase 4 already
+  surfaced this; no resume action; user should run the
+  SUGGESTED_NEXT_SKILL.
+- If latest is `tenth-man round=N status=*`: resume at gate round=N.
+  Load tenth-man payload from path if needed.
+- If latest is `synthesize round=N status=*`: resume at tenth-man round=N.
+- If latest is `consult round=N status=done` and `challenge round=N
+  status=done` both exist: resume at synthesize round=N.
+- If latest is `challenge round=N status=done` OR `consult round=N
+  status=done` (only one): wait for the other? No - cold-start re-runs
+  both in parallel. The completed one's payload is loaded from scratch;
+  the other is re-dispatched.
+- If latest is `decompose round=N status=drafted`: resume at challenge +
+  consult round=N (parallel dispatch).
+- If latest is `enrich round=0 status=loaded`: resume at decompose round=0.
+
+For scratch payloads (`path=` entries): attempt to read the file. If
+missing (codespace recycle), re-run the relevant stage instead of
+loading the prior payload.
+
+### Step 4: Execution Cold-Start (Phase 5+)
+
+Process `$EVENTS` in order to reconstruct orchestrator position:
 
 - **`LAST_COMPLETED_PHASE`**: highest `phase=X` value in `PHASE_GATE_PASSED` events
 - **`COMPLETED_AGENTS`**: set of `(agent, phase)` pairs that have `AGENT_COMPLETED` entries

@@ -73,28 +73,45 @@ Save new correction memories via `bd remember --key="correction:<domain>:<topic>
 
 ## Phase 2: Cold-Start Handoff Prompt
 
-Gather in-flight state across surfaces, in parallel:
+### Step 1: Gather state across surfaces, in parallel
+
+The handoff is only as fresh as its inputs. Do not synthesize from conversation context alone: that misses adjacent work the user owns that lives in beads, Slack, Jira, or Confluence but never got mentioned this session. Pull from every surface where in-flight state could live.
 
 ```bash
-# In-flight beads
+# Beads: in-flight tasks, today's corrections
 bd list --status=in_progress --json | jq -r '.[] | "\(.id) \(.title)"'
-
-# Open PRs I authored
-gh pr list --author @me --state open --json number,title,isDraft,url --jq '.[] | "\(.number) \(.title) (draft=\(.isDraft))"'
-
-# Open PRs awaiting my review
-gh pr list --review-requested @me --state open --json number,title,url
-
-# Active worktrees
-git -C /workspaces/main worktree list
-
-# Corrections saved this session (today's date in UTC)
 bd memories correction: 2>/dev/null | grep "$(date -u +%Y-%m-%d)"
 
-# Any active ScheduleWakeup loops (note: cannot query directly; check conversation state)
+# GitHub: authored + review-requested + recent self-activity
+gh pr list --author @me --state open --json number,title,isDraft,mergeStateStatus,reviewDecision
+gh pr list --search "is:open review-requested:@me" --json number,title,author
+
+# Worktrees
+git -C /workspaces/main worktree list
+
+# Any active ScheduleWakeup loops (no direct query; check conversation state)
 ```
 
-Synthesize into the template below. Substitute placeholders; drop sections that genuinely don't apply (do NOT include empty sections as boilerplate).
+For Slack, Jira, Confluence: use the MCP tools (`mcp__plugin_slack_slack__slack_search_public_and_private`, `mcp__atlassian__searchJiraIssuesUsingJql`, `mcp__atlassian__getConfluencePage`). Targeted queries, not exhaustive sweeps:
+
+- **Slack: recent self-authored standups + open threads waiting on me.** `from:me` over last 7 days catches standup updates whose claims may have rotted (a PR I said was "open" may have merged, a design doc I said was "in progress" may have shipped). Also `to:me` and `is:thread` to find threads I haven't replied to.
+- **Jira: tickets assigned to me, not yet Done.** `assignee = currentUser() AND status NOT IN (Done, Closed, Resolved, Cancelled)`. For tickets the session referenced explicitly, fetch the latest comment thread to confirm no new info landed after my last interaction.
+- **Confluence: design docs referenced in recent standups.** If a Slack standup or bead points to a `<company>.atlassian.net/wiki/spaces/.../pages/<id>/...` URL, fetch the page to confirm status (DRAFT vs PUBLISHED vs ARCHIVED) and whether any new inline comments need response.
+
+### Step 2: Cross-reference for adjacent context
+
+This is the step that makes the handoff complete. The session you just had focused on a topic (call it T). The handoff's job is not to summarize T; it is to make sure the NEXT session knows EVERY in-flight thing the user owns, whether or not T touched it.
+
+For each item surfaced in Step 1, ask:
+
+- **Does it appear in the current session's working memory?** If yes, the focus already covers it.
+- **If no, would it be lost without the handoff?** A bead that's been in-progress for two weeks with no movement IS in-flight, even if nothing happened this session. A design doc whose state changed since the last standup IS adjacent. A Jira ticket with a new comment from a stakeholder IS adjacent.
+
+Pull every "no but yes-to-lose" item into the handoff's **ADJACENT IN-FLIGHT WORK** section (see template). Do not pad with cold beads or stale tickets that genuinely require no action.
+
+### Step 3: Synthesize into the template
+
+Substitute placeholders; drop sections that genuinely don't apply (do NOT include empty sections as boilerplate).
 
 ### Cold-start template
 
@@ -130,6 +147,12 @@ NOTABLE FILES TOUCHED OR EDITED THIS SESSION
 OPEN ASKS WAITING FOR ME
 [Anything where the next move is mine and would be lost without re-deriving.]
 - [item]
+
+ADJACENT IN-FLIGHT WORK (not session focus, surfaced via cross-reference)
+[Items owned by me in beads/Slack/Jira/Confluence that the current session did NOT
+touch, but where the next session would otherwise lose context. Each item: one line
+naming the artifact and current state. Drop this whole section if nothing surfaced.]
+- [bead-id | jira-key | confluence-page-id | slack-thread-link]: <state, one line>
 ```
 
 Wrap the template in a fenced code block in the output so the user can copy-paste cleanly.
@@ -137,8 +160,9 @@ Wrap the template in a fenced code block in the output so the user can copy-past
 ## Principles
 
 - **Audit fixes apply to the CURRENT session.** Handoff prompt is for the NEXT.
-- **Don't pad.** If a section has nothing to say, drop it. A boilerplate-heavy handoff buries the actual deltas.
-- **Reference durable artifacts.** Beads, PR numbers, commit SHAs, memory keys. The next session fetches fresh state from these; the handoff just points the way.
+- **Cross-surface freshness is not optional.** Beads, GitHub, Slack, Jira, Confluence are all sources of in-flight state. The handoff is incomplete if it only reflects the conversation. Pull from every surface; cross-reference for adjacent work; surface anything that would be lost.
+- **Don't pad.** If a section has nothing to say, drop it. A boilerplate-heavy handoff buries the actual deltas. The cross-surface rule above produces ADDITIONS only when genuine adjacent work exists; cold beads and stale tickets get dropped.
+- **Reference durable artifacts.** Beads, PR numbers, commit SHAs, Jira keys, Confluence page IDs, memory keys. The next session fetches fresh state from these; the handoff just points the way.
 - **Test the prompt.** Read your own output as if you were a cold-start agent: would you know what to do next? If you'd ask "what's the active topic" or "where did we leave off", the prompt failed.
 - **Substantive over comprehensive.** A 15-line handoff that names the active topic, the in-flight PR, and the one calibration shift that matters is better than a 60-line dump of every bead in the repo.
 - **No personal-tier paths in shared-artifact-bound output.** The handoff prompt itself stays local (user pastes it into their own new session), but if the user is going to paste it into anything shared, scrub bead IDs and personal paths first.
@@ -150,6 +174,7 @@ Wrap the template in a fenced code block in the output so the user can copy-past
 - Listing every bead in `bd list` rather than only in-flight items.
 - Emitting calibration shifts as memory keys without their body (the next session can't look them up if the key is wrong; include the rule itself).
 - Adding boilerplate like "remember to be helpful" or "follow the rules" to the handoff. The next session already has CLAUDE.md.
+- Synthesizing from conversation context only. Beads, Slack, Jira, and Confluence all hold in-flight state the conversation may not have surfaced. Skipping the cross-surface gather (Step 1) and cross-reference (Step 2) produces a handoff that LOOKS complete but silently drops adjacent work; the next session re-derives it the hard way.
 
 ## Output format
 

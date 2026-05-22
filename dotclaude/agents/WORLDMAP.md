@@ -1,7 +1,7 @@
 ---
 component: dotclaude/agents
 type: directory-map
-status: V0 complete (all 21 agents have entries; 12 are individual, 1 combined for the launch-flex/implementer/tester trio)
+status: V0 complete (22 agents covered by 20 entries; one combined entry for the launch-flex/implementer/tester trio)
 authored_by: Claude Opus 4.7
 ---
 
@@ -509,3 +509,26 @@ Limits: severity triage is subjective. A blocker on one project might be advisor
 ---
 
 Calibration files (`calibration/*.md`) deserve their own commentary; they are the reflection-trigger mechanism applied to specialist agent calls. When an agent's calls drift from the author's preferred quality, the calibration file is updated with examples; the agent's prompt then references the calibration. Periodic review (the `/calibrate` skill) prevents drift accumulation.
+
+```yaml
+---
+component: provenance-classifier
+type: agent
+status: active
+trigger_signals:
+  - "/pr-intel synthesis step 5d batch dispatch with the full findings list"
+  - "any finding's verification path needs the speed-amplified vs bot-surfaced split classified"
+prevents:
+  - "misclassifying bot-surfaced findings as speed-amplified when their verification path needed live state, multi-page synthesis, or cross-file blast radius the reviewer could not have sustained at speed"
+  - "the classifier-vs-voice decoupling failure that emerged on three PRs where SonarCloud-sourced findings were uniformly misclassified despite the comment text opening with explicit Sonar attribution"
+related: [pr-intel, post-review, bot-review]
+---
+```
+
+When I reach for it: never directly; the classifier is invoked in batch by `/pr-intel` synthesis (step 5d) with the full findings list, and returns one classification per finding plus a one-sentence rationale. The synthesizer wires the classification into the finding briefing, the audit line in the Review Recommendation header, and the audit field counts written to bd memory by `/post-review`.
+
+What it prevents: speed-amplified vs bot-surfaced is the wrong split to make from the comment text. The verification path is the load-bearing signal: if the path required querying production state, cross-referencing N source files, or reading a long external doc, no human reviewer would have sustained the work at PR-review speed, regardless of how the comment reads. Decoupling the classifier from the voice/rendering layer makes the audit signal a property of the work, not the prose.
+
+How it compounds: with `pr-intel` (the upstream skill that produces the findings) and `post-review` (the downstream skill that posts and records the audit counts). The agent is a narrow stage in the pipeline; the harness is shaped to make narrow stages composable.
+
+Limits: classification quality is bounded by the finding's metadata. If the synthesizer hands the classifier a finding without verification-path evidence, the agent has to infer from the rendered comment text, which is exactly the failure mode the agent exists to prevent. Synthesizer discipline (passing the full verification context, not just the comment) is the upstream guard.

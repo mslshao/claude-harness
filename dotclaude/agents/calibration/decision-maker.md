@@ -89,6 +89,21 @@ external system)?" If the answer is unknown, that is the FRAGILE assumption
 to challenge first. Source: `~/.claude/CLAUDE.md` "Strategy enumeration:
 include zero-code paths."
 
+### Fail-closed semantics: plan must name concrete exception classes
+
+When a plan describes fail-closed handling around an external library call
+(Elasticsearch, Salesforce, boto3, third-party SDK), the plan text must
+enumerate the specific exception classes the `except` clause will catch.
+Phrases like "raised by the existing class contract" or "handled by the
+standard wrapper" defer the contract to implementation time, where it slips:
+the caught class can be a sibling (not parent) of what the plan implied, so
+peer error classes escape and crash the path that was supposed to fail
+closed. ITERATE at Gate 1 when the plan invokes fail-closed semantics on
+an external call without naming the concrete classes. Source: 2026-05-19
+`docr-5x7j` ES-rescue plan, PR #9193; `mx2-silent-failure-hunter` found
+`elasticsearch.ApiError` is a sibling (not subclass) of `TransportError`,
+so 401/403/400 escaped the catch and inverted the fail-closed intent.
+
 ---
 
 ## Example Decisions
@@ -175,9 +190,9 @@ to 3 services. The original ask was a single-service bug fix.
 
 ## Threshold Notes
 
-**a doc-indexing pipeline domain**: a doc-indexing pipeline services (metadata-updater, search-api, indexer) have
+**<service> domain**: <service> services (metadata-updater, search-api, indexer) have
 complex interactions with Elasticsearch and DynamoDB Streams. Plans touching
-a doc-indexing pipeline should have evidence of ES index structure verification and DynamoDB
+<service> should have evidence of ES index structure verification and DynamoDB
 Stream configuration checks. Missing these is an ITERATE, not an ESCALATE
 (the information is available in the codebase).
 

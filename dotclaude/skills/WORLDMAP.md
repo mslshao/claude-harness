@@ -1,7 +1,7 @@
 ---
 component: dotclaude/skills
 type: directory-map
-status: V0 complete (all 22 skills have entries)
+status: V0 complete (all 24 skills have entries)
 authored_by: Claude Opus 4.7
 ---
 
@@ -614,3 +614,52 @@ What it prevents: an agent producing a full response to a problem that a differe
 How it compounds: with every skill in the catalog. The catalog is the index; each entry includes the trigger condition and the value-add. An agent reading the catalog can route the user to the right skill.
 
 Limits: the catalog is curated by the author; new skills require manual entry. Skill auto-discovery would solve this but introduces drift (a catalog claiming a skill that has since been deleted is worse than a manually-curated one). Manual curation is the author's tradeoff.
+
+```yaml
+---
+component: compound
+type: skill
+status: active
+trigger_signals:
+  - "substantial-completion signal (PR merged, /launch shipped, bead closed) AND the work surfaced a novel technique not yet captured as a habit:* memory"
+  - "user explicitly says 'extract the pattern', 'capture this workflow', 'what's reusable here', '/compound'"
+  - "3+ exchanges where the user landed on a deliberate technique, not just an outcome"
+prevents:
+  - "novel approaches lost between session compactions because nothing wrote them to memory"
+  - "first-observation insights that never reach workflow.md or topic files because hand-noticing is unreliable under multi-window operational reality"
+related: [reflect, bead-forge, handoff, workflow.md memory file]
+---
+```
+
+When I reach for this: after work that worked. The proactive sibling of `/reflect`. Reflect fires on user corrections (something went wrong); compound fires on novel-but-quiet successes (nothing went wrong, but the approach is worth replicating). Without the proactive variant, only failures shape the harness; successes evaporate.
+
+What it prevents: the gap between `/reflect`, `/bead-forge` checkpoint mode, and `/handoff`. Reflect catches mistakes. Checkpoint preserves in-flight conversation context. Handoff produces a cold-start prompt for one specific next session. None of these capture "this work just shipped, the approach was novel, a future session would benefit from knowing what we figured out." Compound is the missing routing primitive.
+
+How it compounds: with `workflow.md` (the second-observation promotion gate; compound writes first-observation habits there) and `bead-forge` (compound invokes forge's memory checkpoint mode internally for Routes 1 and 3, so habits get a real bead ID, structured fields, and chronological log entry). The skill is built on top of existing primitives, not in parallel to them.
+
+Limits: requires human judgment at the present-for-accept gate. The user reviews each candidate pattern before it lands as a habit memory; the skill does not write to durable surfaces unilaterally. Throughput is bounded by the human review step; the design choice favors precision over volume.
+
+```yaml
+---
+component: ideate
+type: skill
+status: active
+trigger_signals:
+  - "user says 'what are my options for X', 'brainstorm Y', 'tradeoffs between X and Y', 'which approach should I take'"
+  - "problem statement before any specific approach is on the table"
+  - "/ideate explicit invocation, often with a Jira ticket, bead, Slack thread, Confluence draft, or transcript as input"
+prevents:
+  - "jumping into /converge on the first plausible approach without considering N alternatives"
+  - "rejected alternatives lost (only the winning approach gets stress-tested; rivals evaporate after the decision)"
+  - "missing the upstream-of-converge gap in the planning pipeline"
+related: [converge, consult, challenge]
+---
+```
+
+When I reach for this: the user has a problem but does not yet know which of N approaches to pursue. `/converge` starts from a refined approach and stress-tests it; `/consult` is multi-specialist review on the SAME code; `/challenge` is adversarial assumption extraction on an EXISTING plan. None of those answer "I have a problem, I do not yet know what to do." Ideate is that upstream entry point.
+
+What it prevents: the single-approach trap. When the agent jumps to the first plausible approach, the rejected alternatives are not just lost; they were never considered. The structured ideate pass forces divergent generation, ranking, and a tenth-man pass before handing the winner to `/converge`. The rejected alternatives are preserved in the output for later reference (a later session may find the rejected option was actually right under changed constraints).
+
+How it compounds: with `converge` (the downstream stress-test on the chosen approach), `consult` (specialists weigh in on borderline rankings during ideate's evaluative phase), and `challenge` (adversarial pressure on the winner's assumptions inside ideate's tenth-man pass). The four skills compose into a planning pipeline: ideate (divergent) → converge (stress-test the winner) → launch (build it) → babysit-pr (watch the rollout).
+
+Limits: the ranked-approach output is the artifact; the user decides whether to accept the recommended winner. The decision-maker iterate gate at the end of ideate flags low-confidence calls for escalation, but the human still owns the final approach choice. Ideate is a structured thinker, not a decider.

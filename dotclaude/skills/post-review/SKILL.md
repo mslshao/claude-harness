@@ -40,6 +40,8 @@ expected structure.
   - File path: from the `#### \`file.py\`` heading
   - Line number: from the `**Line N**` marker (this is file-relative, use directly)
   - Ready-to-paste text: content of the fenced block ONLY
+  - Classification: `speed-amplified` or `bot-surfaced` from the briefing-context section's classification line (synthesis.md step 5d). Used to populate audit counts in Step 5.
+- **Bot reactions** (when present): from the pr-intel `bot_reactions` list (rendered as a `### Bot Reactions (for /post-review)` section in the briefing output per pr-intel's bot-reactions.md). Each entry has `{comment_id, endpoint, reaction, bot_name, finding_summary}` where `endpoint` is `pulls` (inline review comment) or `issues` (issue-level conversation comment), and `reaction` is `+1` (bot finding was correct) or `-1` (bot finding was a false positive). If absent, skip Step 3.5. Legacy fallback: if the briefing renders a `### Bot Endorsements` section (old name), treat each entry as implicit `reaction: +1` and accept the schema; Step 3.5 documents the transitional support window.
 
 **SAFETY RULE - CRITICAL**: Extract ONLY the fenced ready-to-paste text blocks as comment body.
 NEVER extract briefing context into posted comments. Briefing context appears AFTER the fenced
@@ -233,6 +235,79 @@ JSON
   line-level (drop), then re-post.
 - Any other error: report the full error message and the command attempted. Do not retry silently.
 
+## Step 3.5: Bot Reactions
+
+After the main review post succeeds (Step 3), apply bot reactions (thumbs-up
+or thumbs-down) to bot comments that pr-intel classified during its Bot
+Reactions phase. This is the upgraded form of a teammate's 2026-05-20 "thumbs-up
+instead of repeat" feedback: a thumbs-up signals the bot's finding was
+correct (whether or not the reviewer also added a comment); a thumbs-down
+signals it was a false positive (whether or not the reviewer also wrote a
+rebuttal). See pr-intel `bot-reactions.md` for the 5-category decision tree
+that produces the `bot_reactions` list this step consumes.
+
+The `bot_reactions` list is part of the pr-intel output (extracted in Step 1
+alongside review summary and inline comments). Each entry has:
+
+- `comment_id`: GitHub comment ID
+- `endpoint`: `pulls` (inline review comment from Copilot/Sentry/Datadog
+  code-quality) or `issues` (issue-level conversation comment from
+  SonarQube/Vercel/PR Metrics/Datadog PR-summary)
+- `reaction`: `+1` (bot finding was correct) or `-1` (bot finding was a
+  false positive)
+- `bot_name`: the bot that authored the comment (Copilot, Sentry, Datadog,
+  SonarQube, Vercel, PR Metrics, etc.)
+- `finding_summary`: one-line description of what the bot caught
+
+For each entry, POST the reaction:
+
+```bash
+# For inline review comments (Copilot, Sentry, Datadog code-quality):
+gh api -X POST \
+  /repos/{owner}/{repo}/pulls/comments/{comment_id}/reactions \
+  -f content=<reaction>
+
+# For issue-level conversation comments (SonarQube, Vercel, PR Metrics, Datadog PR-summary):
+gh api -X POST \
+  /repos/{owner}/{repo}/issues/comments/{comment_id}/reactions \
+  -f content=<reaction>
+```
+
+Where `<reaction>` is the literal value from the entry (`+1` or `-1`). The
+reactions endpoint accepts the same auth as the rest of `gh api` (no extra
+setup).
+
+**Error handling**:
+- 404: the bot comment was deleted between pr-intel and post-review. Log and
+  skip; do not retry. The classification was based on a comment that no longer
+  exists.
+- 422 "already exists": Michael already reacted to this comment in a prior
+  session. Treat as success (the reaction signal is already on the comment).
+  If the prior reaction was the OPPOSITE of the new one (e.g., a `-1` exists
+  but the new entry is `+1`), surface to user with a note so they can decide
+  whether to clear the prior reaction before re-posting; do NOT silently
+  overwrite (changing a reaction requires DELETE on the old reaction ID first).
+- 403: token lacks `repo` scope for reactions. Surface to user and skip; main
+  review post already succeeded.
+
+**Skip silently** if `bot_reactions` is empty (no bot overlap on this PR).
+
+**Backwards compatibility** (transitional, remove after 2 weeks): if the
+pr-intel output emits the legacy `bot_endorsements` section name instead of
+`bot_reactions`, treat each entry as having implicit `reaction: +1` (the
+legacy schema only supported thumbs-up). This handles in-flight briefings
+from before the 2026-05-21 phase promotion. Drop this when no
+`bot_endorsements`-format outputs remain in active session memory.
+
+Add the reaction counts to the user-facing report:
+```
+Review posted to PR #NNN.
+<review URL>
+N inline comments posted. <skip note if applicable>
+M bot reactions applied (P thumbs-up, Q thumbs-down across <bot names>).
+Memory: review:pr-NNN:YYYY-MM-DD recorded.
+```
+
 ## Step 4: Report
 
 On success:
@@ -242,6 +317,7 @@ Review posted to PR #NNN.
 <review URL>#pullrequestreview-<id>
 
 N inline comments posted. <note if any were skipped with reason>
+M bot endorsements applied (<list bot names>).
 ```
 
 On partial failure (some comments skipped): list which were skipped and why.
@@ -269,6 +345,17 @@ Gather these facts (most come from the pr-intel output and the successful post r
 - `<posted_inline_count>` - number of inline comments actually posted (not dropped/folded)
 - `<body_fold_count>` - number of findings that were folded into the body because they
   couldn't be posted inline (NOT_IN_HUNK / path-not-resolved / user-dropped)
+- `<bot_surfaced_count>` - number of posted inline comments classified as bot-surfaced
+  per synthesis.md step 5d (comments that opened with an attribution prefix)
+- `<speed_amplified_count>` - number of posted inline comments classified as
+  speed-amplified per synthesis.md step 5d (comments written in Michael's voice
+  without attribution)
+- `<bot_reaction_count>` - total number of reactions applied to bot comments in
+  Step 3.5 (sum of thumbs-up and thumbs-down)
+- `<bot_thumbs_up_count>` - number of `+1` reactions (bot finding agreed-with;
+  per bot-reactions.md categories 1, 2, 3)
+- `<bot_thumbs_down_count>` - number of `-1` reactions (bot finding disagreed-with
+  as false positive; per bot-reactions.md categories 4, 5)
 - `<findings_summary>` - one clause per posted inline comment plus any body-fold
   findings, formatted as `file.py:LINE (short clause)`. Keep each clause under 80
   chars and the total under ~6 lines.
@@ -284,8 +371,18 @@ rounds are different artifacts.
 
 Write with:
 ```bash
-bd remember --key="review:pr-<N>:<YYYY-MM-DD>" "<YYYY-MM-DD> <event> on PR #<N> (<title>, <author>). Rev <commit_count> at <head_sha_short>. Posted <posted_inline_count> inline + <body_fold_count> body-fold. Findings: <findings_summary>. URL: <review_url>"
+bd remember --key="review:pr-<N>:<YYYY-MM-DD>" "<YYYY-MM-DD> <event> on PR #<N> (<title>, <author>). Rev <commit_count> at <head_sha_short>. Posted <posted_inline_count> inline (<bot_surfaced_count> bot-surfaced + <speed_amplified_count> speed-amplified) + <body_fold_count> body-fold + <bot_reaction_count> bot-reactions (<bot_thumbs_up_count> up / <bot_thumbs_down_count> down). Findings: <findings_summary>. URL: <review_url>"
 ```
+
+The `<bot_surfaced_count>` and `<speed_amplified_count>` fields support an
+audit signal over time: the ratio of bot-surfaced to speed-amplified posted
+comments tracks whether pr-intel output is biased toward bot-noise (high
+bot-surfaced count with low author engagement) or genuine reviewer judgment.
+Read these back via `bd memories review:pr-` to spot-check the trust signal
+direction; if bot-surfaced consistently dominates and author engagement drops,
+the skill is producing bot-noise rather than amplifying judgment. The
+`<bot_endorsement_count>` measures how often the dedup-and-react path fires;
+high count signals the bots are catching things upstream.
 
 Example (illustrative only; do not copy verbatim):
 ```
@@ -337,7 +434,7 @@ sys.path.insert(0, '/home/vscode/.claude/tooling/pr-review-bot/pkg')
 from pr_review_state import Review, ProposedComment, write_review
 
 review = Review(
-    repo="lawfirm/main",
+    repo="<org>/<repo>",
     pr=<PR_NUMBER>,
     timestamp=<UTC_ISO_TIMESTAMP>,
     head_sha=<HEAD_SHA>,

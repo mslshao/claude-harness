@@ -1,11 +1,19 @@
 ---
 name: launch
 description: >
-  Execution launcher: takes a Jira ticket or bead, enriches context, converges on
-  a plan, then dispatches an agent team to BUILD it - producing real commits and a
-  draft PR. The key distinction from /converge: launch writes code, converge writes
-  a plan. Use when the ticket is well-scoped and you want hands-off implementation.
-  Multiple invocations run in parallel via worktrees.
+  Execution launcher: takes a Jira ticket, bead, Slack thread, Confluence
+  rough-draft, or free text and dispatches an agent team to BUILD it,
+  producing real commits and a draft PR. Pipeline: enrich context, classify
+  INPUT_MODE (problem-framed vs mechanism-prescribed), converge on a plan
+  with challenge + consult stress-test, mandatory tenth-man pass, and
+  decision-maker proceed/iterate gate before user approval. Detects when
+  the ticket prescribes a mechanism that should have been a feature of an
+  existing noun (Fulfillment-vs-Coverage protection). The key distinction
+  from /converge: launch writes code, converge writes a plan. Use when the
+  ticket is well-scoped and you want hands-off implementation. Multiple
+  invocations run in parallel via worktrees. For divergent approach
+  generation before a plan exists, use /ideate. For planning only with no
+  code, use /converge. For root cause investigation, use /investigate.
 argument-hint: "[MX2-XXXXX | docr-XXXX | description] [--skip-checks]"
 allowed-tools: ["Bash", "Glob", "Grep", "Read", "Agent", "Write", "Edit", "WebFetch"]
 ---
@@ -25,6 +33,92 @@ Parse the raw invocation (`/launch $ARGUMENTS`) to extract:
 
 If no identifier is found, stop and ask the user for a Jira ticket number.
 
+## Pipeline Overview
+
+```
+ticket / bead / Slack / Confluence / transcript / free text
+   |
+   v
+[Phase 1: Context Enrichment] <-------+
+   |                                  |  (loop-back on ESCALATE-QUESTIONS,
+   v                                  |   after user answers narrowing Qs)
+[Phase 2: Decompose] <----------+     |
+   |                            |     |  (loop-back on ITERATE,
+   +--------+--------+          |     |   scoped to the named
+   |                 |          |     |   WEAK_DIMENSION)
+   v                 v          |     |
+[Phase 3a:        [Phase 3b:    |     |
+ Challenge]        Consult]     |     |
+   |                 |          |     |
+   +--------+--------+          |     |
+            |                   |     |
+            v                   |     |
+[Phase 3c: Synthesize] ---------+     |
+            |                         |
+            v                         |
+[Phase 3.5: Tenth-Man Lens]           |
+            |                         |
+            v                         |
+[Phase 3.6: Convergence Gate] --------+
+            |
+            | (PROCEED or LOW-CONFIDENCE only)
+            v
+[Phase 4: Approval Gate]      First synthesis-level user-facing output.
+            |
+       [user approval]
+            |
+            v
+[Phase 5: Execution]          Worktree + agent team + retry loop.
+            |
+            v
+[Phase 6: Finalization]       /review fan-out + bot-review + PR creation.
+
+Phase 3.6 verdicts:
+  PROCEED            -> Phase 4
+  LOW-CONFIDENCE     -> Phase 4 with (low-confidence) annotation
+  ITERATE            -> Phase 2 (cap: 2 rounds)
+  ESCALATE-QUESTIONS -> ask user, then Phase 1 (cap: 1 round)
+  ESCALATE-ROUTE     -> Phase 4 with no agent team; suggest a different
+                        skill (/converge, /ideate, /investigate)
+```
+
+Phases 1-3.6 are INTERNAL. The only user-facing output before Phase 4 is
+the narrowing questions in ESCALATE-QUESTIONS (when fired). Phase 4 is the
+first synthesis-level visible output; Phase 5 is execution (commits) and
+Phase 6 is finalization (PR creation).
+
+## Distinctions
+
+- **vs `/converge`**: `/converge` writes a plan and creates beads;
+  `/launch` writes code and creates a draft PR. `/launch` internally
+  runs the same Phase 2-3.6 pipeline as `/converge` (challenge +
+  consult + tenth-man + decision-maker gate), then continues into
+  Phase 5 execution. Use `/converge` when you want a plan without
+  burning a worktree.
+- **vs `/ideate`**: `/ideate` is upstream of both `/converge` and
+  `/launch`. It generates 3-5 candidate approaches and ranks them.
+  `/launch` takes ONE approach (the ticket's prescription) and builds
+  it. When `/launch`'s gate detects multiple plausible mechanisms with
+  no clear winner, it fires ESCALATE-ROUTE with
+  SUGGESTED_NEXT_SKILL=/ideate.
+- **vs `/investigate`**: `/investigate` finds root cause for a
+  production error. `/launch` builds a fix AFTER root cause is known.
+  When the gate detects an unknown root cause (the ticket is actually
+  a bug investigation), it fires ESCALATE-ROUTE with
+  SUGGESTED_NEXT_SKILL=/investigate.
+- **vs `/challenge`**: `/challenge` extracts assumptions from an
+  EXISTING plan. `/launch` invokes `/challenge`-style assumption
+  extraction internally in Phase 3a.
+- **vs `/consult`**: `/consult` runs parallel specialists with
+  DIFFERENT lenses on the SAME code. `/launch` invokes
+  `/consult`-style specialist orchestration internally in Phase 3b.
+- **vs `/autopilot`**: `/autopilot` runs the full plan+build pipeline
+  without human approval gates (uses `mx2-decision-maker` at every
+  checkpoint). `/launch` keeps the human in the loop at Phase 4 and
+  uses `mx2-decision-maker` only at the pre-approval Phase 3.6 gate.
+  Use `/autopilot` when you want hands-off; use `/launch` when you
+  want a draft PR you can review before publishing.
+
 ## Phase 1: Context Enrichment
 
 See [context-enrichment.md](context-enrichment.md) for the full protocol.
@@ -36,39 +130,97 @@ files, then dispatch `prompt-refiner` in headless mode. Output is a 200-400 word
 All tool calls in this phase run in parallel where possible. Do not show
 intermediate output to the user.
 
-## Phases 2-3: Plan Pipeline (Internal)
+## Phases 2-3.6: Plan Pipeline (Internal)
 
 Run the converge-style plan pipeline against the implementation brief: refine
 plus decompose plus pipeline-reuse gate (Phase 2), then challenge plus consult
-in parallel (Phase 3a/3b), then synthesize plus parallelization strategy
-(Phase 3c). Output is an internal converged plan + parallelization-strategy
-YAML; not shown to the user yet.
+in parallel (Phase 3a/3b), then synthesize (Phase 3c), then tenth-man lens
+(Phase 3.5), then decision-maker gate (Phase 3.6). Output is an internal
+converged plan + parallelization-strategy YAML + iteration log; not shown to
+the user yet.
 
 **Load-bearing invariants:**
 - Challenge and consult MUST run as parallel subagents in a single Agent-tool
   message. Serializing defeats the purpose.
-- Phase 3c output is the **parallelization strategy** (agent roster, phasing,
-  checkpoint gates, agent inputs), not just a converged plan. Phase 4 consumes
-  this directly.
+- Phase 3c output includes the DELTA_CATEGORY label (CONFIRMED /
+  MINOR_ADJUSTMENTS / MAJOR_REVISIONS / SCRAPPED_AND_REBUILT). CONFIRMED on
+  a non-trivial `mechanism-prescribed` input is suspicious; Phase 3.6 gate
+  fires ITERATE with WEAK_DIMENSION=mechanism when it sees that pattern
+  (canonical Fulfillment-vs-Coverage protection).
+- Phase 3.5 Tenth-Man Lens is mandatory. Runs `mx2-tenth-man` on the
+  converged plan with the DELTA_CATEGORY and INPUT_MODE as input. Output
+  folds into Phase 4 as a `Tenth-Man Lens` block. If dispatch fails, note
+  "Tenth-Man Lens unavailable" and proceed; do not silently drop.
+- Phase 3.6 Decision-Maker Gate is mandatory. Runs `mx2-decision-maker` with
+  `MODE: LAUNCH GATE` preamble. Returns PROCEED / ITERATE / ESCALATE-QUESTIONS
+  / ESCALATE-ROUTE. ITERATE cap: 2 rounds; ESCALATE-QUESTIONS cap: 1 round.
+- Phase 3.6 output is the **parallelization strategy** (agent roster, phasing,
+  checkpoint gates, agent inputs) only when verdict is PROCEED. ESCALATE-ROUTE
+  means no agent team gets dispatched; Phase 4 shows the gate's reason
+  + suggested next skill.
 - Every checkpoint gate must be programmatically verifiable (e.g., "pants check
   passes" not "implementation complete").
+- Every work item must include a Verification path. Consequence=high items
+  must have either a matching Verification path or an explicit risk-reduction
+  note. Phase 3.6 gate enforces this.
 
-For the full subagent prompt templates, the parallelization-strategy YAML
-schema, and example phase diagrams, see [plan-pipeline.md](plan-pipeline.md).
+For the orchestration shape (Phase 2 decompose, Phase 3c synthesize +
+DELTA_CATEGORY, parallelization-strategy YAML), see
+[plan-pipeline.md](plan-pipeline.md). For the Phase 3a + 3b Challenge
+and Consult subagent prompt templates (with INPUT_MODE-aware framing),
+see [stress-test-prompts.md](stress-test-prompts.md). For the Phase 3.5
+Tenth-Man Lens dispatch + the Phase 3.6 Decision-Maker Gate dispatch +
+branch logic + caps + iteration log format, see
+[gate-prompts.md](gate-prompts.md).
 
 ## Phase 4: Approval Gate
 
-**First output the user sees.** Present the converged plan:
+**First synthesis-level output the user sees** (the only earlier user-facing
+output is the narrowing questions from a Phase 3.6 ESCALATE-QUESTIONS, when
+fired). Present the converged plan:
 
 ```markdown
-## Launch Plan: [topic, 3-8 words]
+## Launch Plan: [topic, 3-8 words]  (low-confidence)?
+
+[Suffix `(low-confidence)` on the H2 IF the Phase 3.6 gate forced a
+low-confidence PROCEED (2 ITERATE rounds hit the cap, or user opted out
+of ESCALATE-QUESTIONS with "you decide"). Add a "Low-confidence reason:"
+line at the end of Summary stating which path triggered it.]
 
 ### Summary
 [2-5 sentences: what this builds, design decisions, key constraints]
 
-### Convergence Delta
+### Iteration Log
+[Always present even when Round 0 was final, so the user sees the gate
+ran. List each round with verdict + action taken:]
+- Round 0 (initial): N work items drafted; DELTA_CATEGORY=<X>.
+- Round 1 (if any): VERDICT (REASON). Action: <what changed>.
+- Round 2 (if any): VERDICT (REASON). Action: <what changed>.
+- Final verdict: PROCEED | LOW-CONFIDENCE | ESCALATE-ROUTE.
+
+### Convergence Delta  [CATEGORY: CONFIRMED | MINOR_ADJUSTMENTS | MAJOR_REVISIONS | SCRAPPED_AND_REBUILT]
 > [What changed during stress-testing. 2-4 bullets showing modifications
-> from challenge/consult. Honest - say "no significant changes" if clean.]
+> from challenge/consult. The CATEGORY tag is load-bearing: CONFIRMED
+> means specialists agreed with concrete evidence (not punted);
+> MAJOR_REVISIONS or SCRAPPED_AND_REBUILT means the original framing
+> did not survive.]
+
+### Prior Thinking Comparison  [only when INPUT_MODE = mechanism-prescribed]
+[Surface how the converged plan compares to the ticket's prescribed
+mechanism. One of:
+- "Specialists agreed the prescribed mechanism is right. <Brief evidence.>"
+- "Specialists refined the prescribed mechanism: <what changed>"
+- "Specialists recommended a different mechanism: <X>. <Why.>"
+- "Specialists recommended scrapping the prescribed mechanism: it
+  should be folded into <Y> as a feature of <Y>, not a new noun."
+  (canonical Fulfillment-vs-Coverage outcome)
+This section makes mechanism-vs-feature decisions visible BEFORE the
+agent team starts writing code. Omit when INPUT_MODE = problem-framed.]
+
+### Tenth-Man Lens
+[Verbatim 🔻 block from Phase 3.5. Always present (the pass is
+mandatory). If returned "🔻 No concerns from this lens", include that
+line verbatim so the user sees the pass ran.]
 
 ### Work Items
 [For each item in dependency order:]
@@ -77,6 +229,7 @@ schema, and example phase diagrams, see [plan-pipeline.md](plan-pipeline.md).
 **Type**: [task/feature/bug]
 **Agent**: [implementer | tester | flex-{role}]
 **Phase**: [A | B | C | ...]
+**Context**: [greenfield | legacy | hybrid]
 **Depends on**: [item numbers or "none"]
 
 [Description: 2-4 sentences.]
@@ -84,6 +237,13 @@ schema, and example phase diagrams, see [plan-pipeline.md](plan-pipeline.md).
 **Acceptance criteria:**
 - [ ] [Observable outcome 1]
 - [ ] [Observable outcome 2]
+
+**Verification path:** [How the implementer (and orchestrator at
+checkpoint gating) will know this is correct BEFORE committing. Cite
+specific test, command, or pattern. 1-2 sentences.]
+
+**Consequence of wrong:** [low | med | high. If high, must have a
+matching Verification path OR explicit risk-reduction note.]
 
 ---
 
@@ -102,16 +262,45 @@ Phase A: [agents] → Gate: [criteria] → Phase B: [agents] → ...
 [One commit | N commits at behavior boundaries. Explain the gates.]
 
 ### Open Assumptions
-[FRAGILE/UNVERIFIABLE assumptions the user should confirm. Omit if none.]
+[FRAGILE/UNVERIFIABLE assumptions the user should confirm. Include any
+mixed-input disagreements from Phase 1. Omit only if none.]
 
 ---
 
+### OR: Escalation: No Agent Team Dispatched  [only when final verdict was ESCALATE-ROUTE]
+[Replaces the Work Items / Agent Roster / Phasing / Commit Strategy
+sections when the Phase 3.6 gate fired ESCALATE-ROUTE. 2-3 sentences
+naming the SUGGESTED_NEXT_SKILL and the reason no agent team is being
+dispatched. Format:
+
+"The launch gate fired ESCALATE-ROUTE: <reason from gate>. No agent
+team is being dispatched; the suggested next step is
+<SUGGESTED_NEXT_SKILL: /converge, /ideate, or /investigate>. The draft
+work items are preserved above for reference, but /launch is not the
+right tool for this ticket yet."
+
+The Iteration Log + Convergence Delta + Prior Thinking Comparison +
+Tenth-Man Lens are still shown so the user understands WHY the gate
+refused to launch.]
+
+---
+
+[When final verdict is PROCEED or LOW-CONFIDENCE:]
 **Approve?** Reply "yes" to start execution, or provide feedback to revise.
+
+[When final verdict is ESCALATE-ROUTE (replaces "Approve?" line):]
+**No agent team will be dispatched.** Run the suggested next skill
+(`<SUGGESTED_NEXT_SKILL>`) instead, or provide feedback if you believe
+`/launch` is still the right tool here.
 ```
 
 **This is a hard stop.** Do not proceed to Phase 5 without explicit human approval.
 If the user provides feedback, revise and re-present. Max 2 revision rounds - if
 more changes are needed, suggest the user provide consolidated feedback.
+
+When the gate fired ESCALATE-ROUTE, "approval" is not the operative action;
+the user is being told /launch is the wrong skill for this ticket. The
+template above conditionalizes the final prompt accordingly.
 
 ## Phase 5: Execution
 
@@ -456,7 +645,7 @@ Present to the user:
 ## Launch Complete: [topic]
 
 **PR**: [URL] (draft)
-**Graphite**: https://app.graphite.dev/github/pr/lawfirm/main/[number]
+**Graphite**: https://app.graphite.dev/github/pr/<org>/<repo>/[number]
 **Branch**: [branch-name]
 **Jira**: [MX2-XXXXX]
 
@@ -487,18 +676,99 @@ Present to the user:
 
 ## Rules
 
-- **No intermediate output during phases 1-3.** Phase 4 is the first thing the user sees.
+- **No intermediate output during phases 1-3.6.** Phase 4 is the first
+  synthesis-level user-facing output. Exception: the narrowing questions
+  in a Phase 3.6 ESCALATE-QUESTIONS verdict are explicitly user-facing.
 - **Hard stop at phase 4.** No execution without explicit human approval.
 - **You are the orchestrator.** Don't spawn an orchestrator agent. Stay active, steer, unblock.
 - **Shared worktree.** One worktree for all agents. No per-agent isolation.
 - **Standup protocol is mandatory.** Every agent checks in after every logical unit.
 - **Specialists are ephemeral.** Spawn them for review at checkpoints, don't persist them.
 - **Draft PR always.** Never create a ready-for-review PR.
+- **Detect INPUT_MODE up front.** Phase 1 classifies the input as
+  `problem-framed` or `mechanism-prescribed`. Jira tickets routinely
+  prescribe mechanisms; the implementation pipeline must NOT
+  rubber-stamp them. Mechanism-prescribed inputs trigger ENHANCED
+  scrutiny in Phase 3 (both challenge and consult) and a Prior Thinking
+  Comparison section in Phase 4. The Fulfillment-vs-Coverage failure
+  mode (refining and BUILDING the wrong noun because the ticket
+  prescribed it without challenge) is the canonical risk this rule
+  guards against.
+- **Tenth-man is mandatory.** Phase 3.5 runs always. If the dispatch
+  fails, note "Tenth-Man Lens unavailable" and proceed; do not silently
+  drop the pass.
+- **Decision-maker gate is mandatory.** Phase 3.6 runs always. PROCEED
+  is not the default; the gate must affirmatively reach it. ITERATE
+  cap is 2 rounds; ESCALATE-QUESTIONS cap is 1 round per invocation.
+  ESCALATE-ROUTE means no agent team is dispatched; Phase 4 shows the
+  user the gate's reason and the suggested next skill.
+- **Verification path is mandatory per work item.** Items without it
+  trigger ITERATE with WEAK_DIMENSION=verification.
+- **Consequence-of-wrong is mandatory per work item.** Consequence=high
+  AND no concrete Verification path is a workstream-killer; synthesis
+  must either add the path or downgrade scope.
+- **Convergence Delta gets a category, not just prose.** One of
+  CONFIRMED / MINOR_ADJUSTMENTS / MAJOR_REVISIONS /
+  SCRAPPED_AND_REBUILT. CONFIRMED on a complex mechanism-prescribed
+  input is suspicious; the Phase 3.6 gate will fire ITERATE with
+  WEAK_DIMENSION=mechanism on that pattern.
+- **Iteration log is always visible.** Phase 4 shows it even when
+  Round 0 was final, so the user knows the gate ran.
+- **Ask the user when launch space is too ambiguous.** Phase 3.6 can
+  fire ESCALATE-QUESTIONS with 1-3 narrowing questions. Max 3
+  questions, each with a WHY clause. User can reply "you decide" to
+  opt out (forces low-confidence PROCEED).
+- **/launch is downstream of /converge and /ideate.** When the input is
+  rough and no clear mechanism exists, the gate fires ESCALATE-ROUTE
+  with SUGGESTED_NEXT_SKILL=/converge or /ideate.
+- **Mixed-input precedence is fixed.** Inline text > Slack/transcript >
+  Confluence > Jira/PR > bead notes. Surface disagreements in the
+  Phase 4 "Open Assumptions" section. More recent/conversational inputs
+  better reflect current user intent.
+- **Calibration soak is expected.** The decision-maker invoked at Phase
+  3.6 was originally calibrated for autopilot and convergence gates,
+  not for launch (which has higher stakes: real commits, real PR
+  review burden). First 3-5 `/launch` invocations are calibration soak.
+  Record drift via
+  `bd remember --key='calibration:mx2-decision-maker:launch:<topic>' '...'`
+  so `/calibrate` reviews can keep launch-specific calibration
+  separate from autopilot/converge/ideation.
+- **Two independent revision caps.** Phase 3.6 has a 2-ITERATE cap
+  (auto, pre-user). Phase 4 has a 2-revision-round cap (post-user,
+  user feedback drives the revision). Theoretically a single `/launch`
+  can go through 4 plan-revision cycles (2 auto + 2 user) before
+  bailing. This is intentional: the auto caps catch structural
+  issues, the user caps catch ones only the user can adjudicate. Do
+  not collapse them; they catch different failure modes.
+- **Pre-execution durability via `[LAUNCH_STAGE ...]` bead notes.**
+  Phases 1-3.6 write stage events at each phase boundary; heavy
+  payloads (challenge findings, consult findings, converged plan)
+  go to `~/.claude/scratch/launch-<bead-id>/<stage>-<round>.md`
+  with a `path=` pointer in the entry. Cold-start parses the stage
+  entries, sorts by round + stage order, resumes at the next
+  uncompleted stage. Scratch files are machine-local (codespace);
+  if recycled, missing scratch payloads trigger re-running the
+  relevant stage. See [durable-state.md](durable-state.md) for the
+  full Pre-Execution Cold-Start protocol and Schema Manifest.
+- **Bead acquisition timing.** Bead is acquired at the END of Phase 1
+  (after prompt-refiner produces the brief), not at Phase 5. This
+  makes the Phase 1-3.6 subagent dispatches durable while avoiding
+  bead creation for inputs that fail early validation. See
+  [durable-state.md](durable-state.md) §Bead Acquisition.
+- **Schema version stamp.** Bead metadata carries
+  `launch_skill_version=v1` set at acquisition. Cold-start refuses
+  to resume across schema-version mismatches; the user starts the
+  launch from scratch. Schema changes that break resume are rare
+  and must bump the version + update the Stage Manifest in the same
+  PR.
 
 ## Additional Resources
 
-- [context-enrichment.md](context-enrichment.md) - Phase 1 protocol
-- [plan-pipeline.md](plan-pipeline.md) - Phases 2-3 protocol
+- [context-enrichment.md](context-enrichment.md) - Phase 1 protocol: input loading (Jira, bead, Slack, Confluence, PR, transcript), INPUT_MODE classification, prompt-refiner dispatch
+- [plan-pipeline.md](plan-pipeline.md) - Phase 2 decompose (with Verification path + Consequence + Context fields), Phase 3c synthesize + DELTA_CATEGORY, parallelization-strategy YAML
+- [stress-test-prompts.md](stress-test-prompts.md) - Phase 3a Challenge + Phase 3b Consult subagent prompts (INPUT_MODE-aware)
+- [gate-prompts.md](gate-prompts.md) - Phase 3.5 Tenth-Man Lens + Phase 3.6 Decision-Maker Gate dispatch prompts, branch logic, iteration caps, iteration log format
+- [durable-state.md](durable-state.md) - Phase 5 event log, cold-start protocol, retry loop
 - Agent templates: `~/.claude/agents/launch-implementer.md`, `launch-tester.md`, `launch-flex.md`
 - PR creation: `/pr` command in `.claude/commands/pr.md`
 - Jira tickets: `/jira` command in `.claude/commands/jira.md`

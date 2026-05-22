@@ -68,7 +68,7 @@ Use a dedicated worktree at the PR's HEAD so amends do not touch the operator's 
 
 **Reuse priority:**
 
-1. **Autopilot worktree** at `.launch-worktrees/autopilot-<bead-id>` for the same branch. When babysit follows /autopilot (the common case), this worktree already exists and is checked out at the PR's HEAD. Reuse it. Adding a second worktree for the same branch fails with `fatal: '<branch>' is already used by worktree at '<path>'`.
+1. **Agent-spawned worktree** under `.launch-worktrees/` for the same branch. When babysit follows /autopilot OR /launch, a worktree (`autopilot-<bead-id>`, `launch-<bead-id>-<ts>`, or `launch-<ts>`) already exists on the PR's head branch. Reuse it. Adding a second worktree for the same branch fails with `fatal: '<branch>' is already used by worktree at '<path>'`. Resolve via `git worktree list` and match by branch.
 2. **Prior babysit worktree** at `/tmp/babysit-pr-<number>` from an earlier session on the same branch. Reuse after confirming the branch matches.
 3. **Fresh worktree** at `/tmp/babysit-pr-<number>` if neither (1) nor (2) exists:
 
@@ -98,11 +98,13 @@ Post the cycle-0 state block (see State Schema below) as a `bd comment` on the b
 
 ```
 ScheduleWakeup(
-  delaySeconds=600,
+  delaySeconds=270,
   reason="babysit-pr #<number>: first poll, cache-warm cadence",
   prompt="/babysit-pr <number>"
 )
 ```
+
+The 270-second cadence sits just under the 300-second prompt-cache TTL so each wakeup re-enters with a warm cache. See Anti-pattern 5 for the rationale; do not regress to 300 or 600 even though those values appear in older docs.
 
 Note: the prompt is the same `/babysit-pr <number>` invocation. The skill re-enters preflight, detects the existing bead via `bd search "babysit-pr #<number>"`, skips re-creation, and jumps to the loop body. Idempotency is load-bearing because the cold-start re-entry must work the same as a hot continuation.
 
@@ -199,15 +201,13 @@ Use `bd comment` (append-only) rather than `bd update --notes` (replace). The cy
 
 If `escalations` was populated this cycle: STOP. Do not schedule another wakeup. The operator must adjudicate before the loop continues.
 
-If `now + 600 < window_end`: schedule the next wakeup at 600 seconds (cache-warm cadence).
+Default cadence is `270 seconds` (cache-warm; sits just under the 300-second prompt-cache TTL). This is both the steady-state value and the post-traffic value; there is no separate "adaptive band" because 270 is already the cache-warm maximum. If new comments arrived in the cycle that just ran, the next cycle still fires at 270; no need to drop lower (under 60 burns cache without benefit; the bot publishing rate rarely exceeds one comment per 270s anyway).
 
-If new comments arrived this cycle (active traffic): drop to 300 seconds for the next wakeup only; revert to 600 after the next cycle if no new comments. This is the adaptive band.
-
-If `now + 600 >= window_end`: schedule the final wakeup at `window_end - now` so the loop terminates cleanly on the window.
+If `now + 270 >= window_end`: schedule the final wakeup at `max(60, window_end - now)` so the loop terminates cleanly on the window. The 60-second floor avoids the under-60 cache-thrash anti-pattern even when the window is closing.
 
 ```
 ScheduleWakeup(
-  delaySeconds=<computed>,
+  delaySeconds=270,
   reason="babysit-pr #<number>: cycle N+1, <ci-status-summary>",
   prompt="/babysit-pr <number>"
 )
@@ -246,6 +246,7 @@ For activity not matched by the bot allowlist:
 1. **Author is a human reviewer (not a bot)**: ESCALATE. Always. Applies to inline comments, issue-level comments, AND review submissions (APPROVED, CHANGES_REQUESTED, COMMENTED at review level). A human can flip `reviewDecision` to APPROVED with no comment; that submission is still an ESCALATE because the operator needs to know the gate moved. Humans get adjudicated by the operator; the loop does not reply to humans without explicit authorization in the start handshake.
 
 2. **Author is a bot AND comment is an inline code suggestion**:
+   - **Convention check (run first for naming/structure/placement suggestions)**: Before classifying a suggestion about test file placement, BUILD target placement, module naming, directory layout, or import ordering, read the worktree CLAUDE.md hierarchy (`./CLAUDE.md`, `./src/python/mx2/CLAUDE.md`, `./src/python/mx2/<service>/CLAUDE.md`). Bot reviewers (Copilot especially) infer conventions from existing legacy files, not from rule files; the canonical convention lives in CLAUDE.md. If the rule contradicts the suggestion, classify REPLY-ONLY with a rule-citation decline (do not escalate). See `bd memories correction:workflow:babysit-load-worktree-claude-md` for the precedent.
    a. **Suggestion is mechanical AND `--authorize-force-push` is set**: AUTO-REMEDIATE.
       - Mechanical patterns: em-dash replacement, simple typo, missing import, single-line lint fix, redundant whitespace, simple rename suggested by Copilot when the new name is unambiguous.
       - All mechanical patterns must pass: change is single-file, single-hunk, and local pre-check (pants/pnpm) is green after the edit.
@@ -329,7 +330,11 @@ The loop terminates in any of:
 2. **PR merged** (`state == "MERGED"`): emit `[PR_BABYSIT_TERMINATED]` with `terminal_reason: pr-merged`. Note any orphaned local amends in the worktree as a follow-up for the operator.
 3. **PR closed** (`state == "CLOSED"` and not merged): emit `[PR_BABYSIT_TERMINATED]` with `terminal_reason: pr-closed`.
 4. **Escalations populated this cycle**: emit the cycle's `[PR_BABYSIT_STATE]` block, do not append a TERMINATED block (the loop is paused, not done). Skip the next wakeup; the operator resumes via a fresh `/babysit-pr <number>` after adjudicating.
-5. **CI fails persistently**: if 3+ consecutive cycles show FAILURE checks on the same job, ESCALATE and pause. Do not silently keep polling.
+5. **Code-quality CI fails persistently**: if 3+ consecutive cycles show FAILURE on the same **code-quality** check (Python Tests, Python Lint, TypeScript checks, CodeQL findings, SonarQube quality gate, etc.), ESCALATE and pause. Do not silently keep polling. Code-quality failures indicate a real regression the operator needs to see.
+
+   **Exclude operational-gate checks** from this rule. Operational checks (`check_reviewers` from the Require Reviewers workflow, `mergify` config validation, `lighthouse-budget` thresholds, branch-protection requirements that haven't been met) sit in FAILURE state by design until the operator performs an out-of-band action (assigns reviewers, fixes a mergify rule, etc.). Their FAILURE is steady-state, not a regression, and re-running the loop will not change anything until the operator acts. Note operational FAILUREs in the cycle's `ci_snapshot` for visibility, but do NOT trip the persistent-failure escalation on them.
+
+   The distinguishing question: "would this check pass automatically if we just waited and re-ran the workflow, or does the operator need to do something specific to the repo or PR to make it pass?" If the latter, it's operational; skip the escalation.
 6. **Operator explicitly stops**: if the operator types `/babysit-pr <number> --stop` or sends a stop signal, emit `[PR_BABYSIT_TERMINATED]` with `terminal_reason: operator-stopped`.
 
 After termination, clean up the worktree:
@@ -370,9 +375,9 @@ Mitigation: state lives in the tracking bead's notes (durable across compactions
 
 ### 5. Cache-window thrashing
 
-Sleeping past 300 seconds incurs a prompt-cache miss (5-minute TTL). Sleeping at exactly 300 incurs the miss without amortizing it. Sleeping under 60 burns cache constantly for no benefit.
+The prompt-cache TTL is 300 seconds. Sleeping past 300 incurs a cache miss; sleeping at exactly 300 incurs the miss without amortizing it (worst-of-both); sleeping under 60 burns cache constantly for no benefit.
 
-Mitigation: cadence stays in 600 seconds (cache-warm bound) for steady-state and 300 seconds for the immediate next cycle after active traffic. Never default to 5-15 minute round numbers.
+Mitigation: cadence is `270 seconds` for every wakeup, steady-state or post-traffic alike. 270 sits just under the TTL so each cycle re-enters cache-warm; there is no longer a separate steady-state-vs-adaptive split (the older 600/300 numbers in pre-2026-05 versions of this doc are obsolete). Final wakeup at window close uses `max(60, window_end - now)` to honor the under-60 floor.
 
 ## Principles
 
