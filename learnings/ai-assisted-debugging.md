@@ -36,7 +36,7 @@ Here's the anti-pattern, step by step:
 4. AI says "let me try a completely different approach." Fix D rewires the architecture.
 5. You now have a bigger mess than you started with.
 
-**Why this happens**: The AI has no memory of *why* each fix failed. When you say "that didn't work," it hears "the previous suggestion was wrong, generate a different one." It doesn't ask "what specifically happened when you tried it?" It doesn't update its understanding of the bug. Each attempt is essentially independent. (If you've read the sibling page on context persistence, you'll recognize this: the AI is forgetting within the conversation, not just between them.)
+**Why this happens**: The AI remembers its previous suggestions, but "that didn't work" gives it no new evidence about *why* the fix failed. It hears "the previous suggestion was wrong, generate a different one." It doesn't ask "what specifically happened when you tried it?" Without evidence it cannot narrow the diagnosis; it just samples a different plausible fix. (If you've read the sibling page on context persistence, you'll recognize this is a different failure: the AI hasn't forgotten anything; it's starving for evidence.)
 
 **The circuit breaker: three failed attempts means stop.** Not "try harder." Stop. If three fixes didn't work, the diagnosis is wrong. You're patching symptoms, not addressing the cause. This is the hardest habit to build because the AI's confidence doesn't decrease with each failed attempt. Fix 5 sounds just as confident as Fix 1.
 
@@ -51,7 +51,7 @@ Here's the anti-pattern, step by step:
 | What you're thinking | What's actually happening |
 | --- | --- |
 | "Let me just try one more thing" | You have no new information. The next attempt will be as blind as the last. |
-| "The AI is getting closer" | The AI has no trajectory. Each suggestion is statistically independent. |
+| "The AI is getting closer" | Without new evidence from you, each suggestion is another draw from the same guess pool, not a step closer. |
 | "This fix is different enough to work" | Different isn't better without a root cause hypothesis. |
 | "I'll revert if it doesn't work" | Can you actually revert cleanly after 4 stacked changes? |
 | "The runbook says to do Y if X crosses the threshold" | Runbooks encode an assumption about *why* X crosses the threshold. If your failure's actual cause doesn't match that assumption, executing the prescribed branch reproduces the same failure on the same data. Verify the cause matches the rubric before following the branch. |
@@ -96,7 +96,7 @@ If you can't articulate the hypothesis, you're back to guessing. That's the test
 
 ### Step 6: Verify, don't declare
 
-After applying a fix, the AI will want to say "that should work now." Don't accept it. Run the test. Check the output. Confirm the fix addresses the root cause, not just the symptom. "Should work now" is not evidence (more on this in Section 5).
+After applying a fix, the AI will want to say "that should work now." Don't accept it. In an agentic tool like Claude Code or Claude Cowork, the AI can run the test itself: make it run the test in this session and show you the fresh output. In a chat-only tool, run the test yourself. Either way, check the output and confirm the fix addresses the root cause, not just the symptom. "Should work now" is not evidence (more on this in Section 5).
 
 > 💡 **Try This Today**: Next time you debug with AI, don't let it suggest a fix until step 4. Keep it in investigation mode: "Don't suggest a fix yet. Help me understand the data flow that produces this error." You'll be surprised how much faster you reach the actual root cause.
 
@@ -144,7 +144,7 @@ These are confidence statements, not evidence. The fix works or it doesn't, and 
 | "The fix looks correct" | Looking correct and being correct are different things. Run it. |
 | "That test failure is unrelated" | Prove it. Run the test on the previous commit. |
 | "I've been debugging this for an hour, it's probably fine" | Fatigue is not evidence. The gate applies especially when you're tired. |
-| "The AI confirmed the fix is correct" | The AI confirmed it *looks* correct. It didn't run it either. |
+| "The AI confirmed the fix is correct" | Did it actually run the test in *this* session and show you the output, or did it just read the code? A confirmation without fresh command output is static analysis, not evidence. |
 
 > 💡 **Try This Today**: After your next AI-assisted fix, ask the AI: "What test would prove this fix is correct? What test would prove it's wrong?" Write both. Run them.
 

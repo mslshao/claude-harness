@@ -5,7 +5,7 @@ You've used Claude Code as a consumer. You've read the bot's PR review comments.
 > **Where this fits**: This page is the entry point in the "build your own AI tools" track of [AI Coding Tools](./ai-coding-tools.md). It is paired with [Personalize Claude for Your Context](./personalize-claude.md) (which configures Claude for how YOU work) and [Building Skills and Commands at Scale](./skills-at-scale.md) (the advanced patterns once your first skill ships).
 >
 > **Format**: Solo read, any pace. The complex-pipeline ramp worked example in §2 is short; the hands-on exercise in §3 takes about 30 minutes if you do it.
-> **Prereq**: You've used Claude Code as a consumer (read AI-generated review comments, used `/pr` or `/jira`, asked questions in the chat window). If you haven't used Claude Code at all yet, start with [Your First Week with AI Coding Tools](./first-week.md).
+> **Prereq**: Claude Code installed and working in your codespace, and you've used it as a consumer (read AI-generated review comments, used `/pr` or `/jira`, asked questions in the chat window). If you haven't used Claude Code at all yet, start with [Your First Week with AI Coding Tools](./first-week.md).
 > **Output**: A first skill or command (in `.claude/skills/` or `.claude/commands/`) exercised against a real service you don't yet understand.
 > **If you only have 5 minutes**: read §1 (skill vs command, and how to choose) and §2 (the worked example). The rest is the hands-on walkthrough.
 
@@ -37,7 +37,7 @@ A **skill** and a **command** are two ways to give Claude Code a reusable, named
 * If you want it to fire automatically based on what you're doing, write a skill.
 * When in doubt, start with a command. They're simpler. You can promote to a skill later.
 
-> 💡 **Tip**: Ask Claude: "What's the difference between a skill and a command in Claude Code, and which fits my use case better?" then describe what you're trying to do. Official docs: [Claude Code Skills](https://code.claude.com/docs/en/skills).
+> 💡 **Tip**: Ask Claude: "What's the difference between a skill and a command in Claude Code, and which fits my use case better?" then describe what you're trying to do. If your setup has a Claude Code guidance agent available, it will route you correctly. Official docs: [Claude Code Skills](https://code.claude.com/docs/en/skills).
 
 > **Project vs. personal location.** Skills and commands can live at `~/.claude/` (personal, only you have them) or at `.claude/` (project, everyone on the repo gets them). For your first one, default to project-level. That way your teammates benefit too, and the file is reviewed and version-controlled. Personal ones are for opinions you hold that the org doesn't share, see [Personalize Claude for Your Context](./personalize-claude.md).
 
@@ -71,15 +71,15 @@ Pick a service you don't fully understand. It can be a service you're about to b
 
 ### Step 1: Open Claude Code
 
-In your codespace (or local terminal), open Claude Code. If your installation shows a version older than 2.1.45, run `claude --update`.
+In your codespace, click the Claude Code icon (top-right panel), or open Claude Code in your local terminal. If it shows a version older than 2.1.45, run `claude --update` in the terminal.
 
 ### Step 2: Verify your model
 
-Type `/model` in the Claude Code window. Make sure you're on a recent model. The difference between generations of the same model family is significant for harness-driven workflows; newer is generally more capable.
+Type `/model` in the Claude Code window and pick the newest, most capable model in the list. If it shows an older default, switch. The difference between generations of the same model family is significant for harness-driven workflows; newer is generally more capable.
 
 ### Step 3: Connect your tools
 
-Type `/mcp` and authenticate any MCP servers your project uses (Atlassian, Datadog, AWS, etc.). This is a one-time OAuth flow. Without this, the next step works on code only and misses half the picture.
+Type `/mcp` and authenticate any MCP servers your project uses (Atlassian, Datadog, AWS, etc.). This is a one-time OAuth flow. MCP servers are pre-configured connectors that give Claude direct access to external systems: issue trackers, wikis, logs, and cloud resources. Without this, the next step works on code only and misses half the picture. If `/mcp` shows nothing or auth fails, don't get stuck: skills and commands work fine without MCP, and it's optional for your first one.
 
 ### Step 4: Run /enrich
 
@@ -115,13 +115,19 @@ weren't sure about as "needs verification."
 
 You now have a draft technical reference doc. Edit it for accuracy and ship it.
 
+### Step 7: Turn the prompt into a command
+
+You'll want that Step 4 prompt again for the next unfamiliar service. Make it reusable: create `.claude/commands/ramp.md` containing the prompt text (optionally with a one-line `description:` frontmatter field at the top), or just ask Claude: "Save the prompt I used in Step 4 as a command at `.claude/commands/ramp.md`."
+
+Open a fresh session and type `/ramp`. That file is your first command.
+
 > 💡 **Try This Today**: Pick the service. Run the prompt. Spend 30 minutes on it. Even if you don't ship a doc afterward, you'll know that service better than you did this morning.
 
 ---
 
 ## 4. When the Conversation Gets Long: The Handoff Pattern
 
-Long sessions hit a wall. Claude Code shows your context usage near the top of the window. When it climbs past 50%, you'll start to notice degraded responses: missed details, forgotten decisions, repeated questions.
+Long sessions hit a wall. Claude Code shows your context usage in the status area near the input box. When it climbs past 50%, you'll start to notice degraded responses: missed details, forgotten decisions, repeated questions. Claude Code also auto-compacts (summarizes) the conversation when context fills, and `/compact` triggers it manually; compaction summarizes, so details can be lost, which is why the handoff habit below still matters.
 
 Don't fight it. Plan a handoff.
 

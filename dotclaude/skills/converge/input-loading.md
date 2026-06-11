@@ -46,7 +46,7 @@ strip the user's solution-thinking the way `/ideate` does. BUT we DO
 detect whether the input is:
 
 - **Problem-framed**: "we need to handle X better" / "users are hitting
-  Y" / "MX2-NNNNN says we should figure out Z". The plan space is wide
+  Y" / "MX2-XXXXX says we should figure out Z". The plan space is wide
   open.
 - **Mechanism-prescribed**: "add a Redshift query that does X" / "build
   a Fulfillment service" / "use approach Y to solve Z". The user has
@@ -123,8 +123,8 @@ not the nominal-parent epic of the current ticket.
 
 **Recurrence note**: 2026-05-19 <service>-self-containment session
 converged through six wrong directions because docr-b7xa's ratified
-Path B decision (in a sibling epic MX2-NNNNN, not the nominal-parent
-MX2-NNNNN) was never loaded. The decision lived in the bead
+Path B decision (in a sibling epic MX2-XXXXX, not the nominal-parent
+MX2-XXXXX) was never loaded. The decision lived in the bead
 description, not in `bd remember`, so `bd memories <keyword>` did not
 surface it. `bd list --status=in_progress` + `bd show` is the only
 path that catches this class.

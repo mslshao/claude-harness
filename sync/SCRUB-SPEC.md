@@ -25,10 +25,9 @@ Not scrubbed (allowed to contain personal context):
 
 ### Tier 1: Always removed (private to third parties)
 
-These are non-negotiable removals. Public artifacts naming real coworkers without their consent is an ethics line. Real names of MX2 teammates that appear in the live `~/.claude/CLAUDE.md` and `memory/` files:
+These are non-negotiable removals. Public artifacts naming real coworkers without their consent is an ethics line. The class covered: real first names, spaced/compound name forms, and GitHub/Slack handles of current or former teammates that appear in the live `~/.claude/CLAUDE.md` and `memory/` files, plus any other name fragment that resolves to a real coworker.
 
-- the engineering lead, a teammate, a team lead, a teammate, a team lead manager, a peer reviewer, a team lead, a solo-team engineer, a teammate, a teammate, a teammate
-- Plus any other first-or-last name fragments that resolve to real coworkers
+The concrete pattern list is deliberately NOT in this file or anywhere else in the committed repo: a detector must know what it detects, so making the committed repo name-free requires keeping the list out of the commit entirely. The patterns live in the gitignored local file `sync/scrub-names.local` (one extended-regex pattern per line; format documented in its header). That file is the source of truth; extend it as team composition changes. `scrub-check.sh` builds its Tier 1 scan from it and, when the file is absent, loudly disables the Tier 1 scan rather than reporting a false "clean" (Tiers 2-4 still run).
 
 Replacement: role-neutral phrasing (`a peer reviewer`, `a teammate`, `another engineer`) or removed entirely if not load-bearing.
 

@@ -19,6 +19,37 @@ positives. The depth scales with PR size:
    chains, check exception hierarchies, verify that claimed behavior matches reality.
    Record what you searched and what you found.
 
+   **Falsifiable library/framework claims.** When a specialist's finding rests on a
+   claim about library or framework behavior that can be checked directly (e.g.,
+   "mockito's `times(never)` is syntactically broken," "Pydantic v2 rejects field X,"
+   "FastAPI swallows ValueError at the boundary"), run the verification: a one-line
+   Python invocation in Bash, a Read of the library's installed source, or a doc
+   check. Do NOT accept a confident specialist claim about library behavior as
+   evidence; verify it. A specialist's reputation does not transfer to claims they
+   could not actually test from their tool surface. This is the load-bearing case
+   the falsifiable-claims rule in CLAUDE.md is written for.
+
+   **Escalate inconclusive falsifiable claims to the `@claude` bot.** When the local
+   check is inconclusive (behavior depends on framework version or wiring, the
+   installed source is ambiguous, or the claim asserts repo-wide consistency such as
+   "all callers migrated" or "field X is unused" that a worktree grep cannot fully
+   settle), do NOT ship the claim in reviewer voice and do NOT silently drop it.
+   Convert the finding to the bot-invoked `@claude` form (synthesis.md "Bot-Invoked
+   Comment Form"): the GitHub bot validates against repo HEAD with fresh context and
+   is empirically more reliable on framework-internal and repo-wide-state assertions
+   than a code-only specialist pass, which can carry a confident-but-wrong claim onto
+   the PR. The bot's answer lands on the record in bot voice, so the reviewer never
+   stakes their name on a claim they could not verify. Canonical instance (2026-05-29,
+   PR 9451): a confident specialist claim that "Starlette's default TestClient is a
+   loopback client" drove a false "healthcheck any-client test gap"; the default host
+   is the non-IP string "testclient", and the `@claude` bot caught it from repo-HEAD
+   reading where the local pass had shipped the gap. This verification pass is
+   size-gated off for XS/S PRs; on those the same escalation fires at synthesis time
+   (synthesis.md "Bot-Invoked Comment Form" second trigger). 9451 was S-sized, so
+   verification was skipped, which is exactly why the wrong claim would have shipped.
+   Bot-routing is `default` mode only; in `--mine`, surface the unverified claim as a
+   pre-submission item to check rather than routing it to the bot.
+
 3. **Adjudicate.** For each assumption:
    - **CONFIRMED**: Code evidence supports the claim. Keep the finding.
    - **INVALIDATED**: Code evidence contradicts the claim. Drop or correct the finding.

@@ -25,7 +25,7 @@ re-invented each time. See bd memories `gotcha:orphaned-worktrees-2026-05-07`.
 ## Scope (do check)
 
 All worktree branches under `/workspaces/main/.launch-worktrees/` matching:
-- `agent/agent-*` (ephemeral launch agent worktrees)
+- `launch-<timestamp>` (ephemeral /launch worktrees) and `<user-prefix>/<jira-or-bead>` (e.g. `mslshao/mx2-...`)
 - `autopilot/*` (autopilot bead-driven runs)
 - `MX2-NNNNN/*` (Jira-prefixed feature branches)
 - `chore/*`, `fix/*` (bead-driven chores)
@@ -111,9 +111,21 @@ Group order: DELETE candidates first, SKIPPED-IN-FLIGHT, FLAGGED-UNSHIPPED-WORK,
 
 ### Step 6: Confirm before deletion
 
-If deletion count > 15 OR `--auto` not passed: present the table and ask the user via AskUserQuestion to confirm, with at least three options (yes-all, yes-conservative-subset, hold-off).
+Always present the audit table (Step 5) before deleting, so the plan is visible.
 
-If deletion count <= 15 AND `--auto` passed: proceed without confirmation.
+Skip the AskUserQuestion confirm gate and proceed when ALL hold: deletion count <= 15,
+a recovery SHA is captured for every DELETE candidate (worktree deletion is
+reflog-reversible), AND the invocation carries authorization. Authorization =
+`--auto` passed, OR an explicit upstream cleanup directive (the user typed "clean up
+worktrees" / "audit worktrees", or selected a cleanup action that routed here). Per
+~/.claude/CLAUDE.md "Don't re-confirm within a directive's scope": worktree deletion
+is the action "clean up" authorizes, and it is reversible, so a second confirm is a
+re-confirm to skip. Surface the plan, then proceed.
+
+Ask via AskUserQuestion (yes-all / yes-conservative-subset / hold-off) only when
+authorization is absent, OR deletion count > 15, OR any DELETE candidate lacks a
+recovery SHA. The count>15 and missing-SHA conditions are the safety floor: large or
+irreversible deletions always confirm regardless of directive.
 
 ### Step 7: Execute deletions in dependency-safe order
 

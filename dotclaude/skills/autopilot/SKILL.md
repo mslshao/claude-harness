@@ -6,7 +6,7 @@ description: >
   Modes: plan (converge only, output = beads) or build (converge + launch,
   output = draft PR). Use when you want to kick off work and walk away.
 argument-hint: "<task | MX2-XXXXX | docr-XXXX> [--mode plan|build] [--max-iterations N]"
-allowed-tools: ["Bash", "Glob", "Grep", "Read", "Agent", "Write", "Edit", "WebFetch", "ScheduleWakeup"]
+allowed-tools: ["Bash", "Glob", "Grep", "Read", "Agent", "Write", "Edit", "WebFetch", "ScheduleWakeup", "CronCreate", "Skill"]
 ---
 
 # Autopilot
@@ -63,12 +63,17 @@ Output: internal refined scope plus draft plan with dependency graph.
 
 ### Phase 4: Stress Test
 
-Run challenge and consult in parallel as subagents (per converge Phase 3a/3b).
-Each subagent receives the draft plan; challenge searches `bd memories` for
-domain-specific gotchas and produces a modifications table; consult dispatches
-relevant specialists from `~/.claude/skills/consult/specialists.md`.
+Run the stress test in parallel (per converge Phase 3a/3b): dispatch the
+Challenge subagent AND all selected consult specialists (roster:
+`~/.claude/skills/consult/specialists.md`) YOURSELF, in one message. There
+is NO consult-coordinator subagent: subagents cannot spawn subagents
+(verified 2026-06-09), so a coordinator would silently roleplay its
+specialists in one context. Challenge searches `bd memories` for
+domain-specific gotchas and produces a modifications table; each
+specialist reviews the plan items in its domain.
 
-**Launch both subagents in a single message. Do not serialize.**
+**Launch the Challenge subagent and every selected specialist in a single
+message. Do not serialize.**
 
 **Why autopilot embeds these protocols by reading their files at runtime
 rather than invoking `/converge` as a sub-skill**: skill invocation has no
@@ -93,8 +98,10 @@ Challenge subagent emits:
 - Modifications required: [list of changes to the plan]
 ```
 
-Consult subagent emits (after Author Mode preamble: "CI has not run yet. Flag
-everything."):
+The Consult Evidence block is composed by YOU (the orchestrator) from the
+real specialist results, after each specialist ran with the Author Mode
+preamble ("CI has not run yet. Flag everything."). "Specialists dispatched"
+is the truthful list of Agent calls you actually made:
 
 ```
 ## Consult Evidence
@@ -178,7 +185,7 @@ Follow the launch execution protocol:
 
 1. **Create shared worktree**: `git worktree add .launch-worktrees/autopilot-<bead-id> -b autopilot/<bead-id>`
 2. **Determine agent roster**: based on plan items (implementer, tester,
-   flex roles as needed). Follow launch Phase 3c parallelization strategy.
+   flex roles as needed). Follow launch Phase 3.6 parallelization strategy.
 3. **Spawn agents in parallel**: all Phase A agents in a single message.
    Each agent receives:
    - Their assigned work items with acceptance criteria
@@ -191,25 +198,33 @@ Follow the launch execution protocol:
      corrections or stop instructions. See "Mid-flight Updates from User" in
      the launch-* agent definitions.
 4. **Orchestrate**: read agent outputs, process standups, gate phase transitions,
-   handle scope creep (log to bead, do not expand without ESCALATE).
+   route RESULT.DISCOVERED items: non-blocking discoveries go to a linked
+   bead/ticket (never fixed inline); a blocking-AC discovery authorizes ONE
+   bounded detour agent per work item (minimum scope to unblock the AC, diff
+   counted against the same scope budget, 3-attempt breaker), gated through
+   `mx2-decision-maker` first whenever the fix touches files outside the plan
+   surface; a second detour on the same work item is an ESCALATE. Prefer
+   SendMessage continuation (agent ID, context intact) over cold re-dispatch
+   for adjudicating STATUS: blocked turn-ends, course corrections, and
+   truncation recovery (missing RESULT block per the SubagentStop hook).
 5. **Checkpoint gates**: verify acceptance criteria at each phase boundary.
 6. **Agent completion**: verify all acceptance criteria met across all agents.
 
 ### Phase 8.4: /review Fan-Out (broad evidence gate)
 
-Before the bot-review pass, invoke the `/review` skill against the worktree
-diff. `/review` dispatches four project review agents in parallel
-(`code-reviewer` for structural design, `test-quality-reviewer` for behavioral
-test quality, `observability-reviewer` for instrumentation gaps,
-`silent-failure-hunter` for error propagation), deduplicates overlapping
-findings, and produces a severity-grouped report.
+Invoke the `/review` skill against the worktree diff. `/review` resolves to the
+more comprehensive of the personal and project review skills (personal wins via
+name-overlap precedence and is the broader fan-out); it dispatches its full
+parallel review-agent roster (conditionally triggered), deduplicates overlapping
+findings, and produces a severity-grouped report. The roster evolves with the
+skill, so do not hardcode a count here.
 
-Distinct from 8.5: `/review` is the broad evidence gate (4-agent fan-out, runs
-on every diff, can emit CRITICAL/WARNING). `bot-review` (8.5) is the cross-file
-blast-radius specialist (runs only when public surface changes, hard-capped at
-COMMENT/NOTE/SUGGESTION). Both feed Phase 9; `/review` findings DO carry
-weight in `mx2-decision-maker`'s evaluation (it can return ITERATE on a
-`/review` CRITICAL), unlike `bot-review` which is purely informational.
+`/review` findings DO carry weight in `mx2-decision-maker`'s evaluation (it can
+return ITERATE on a `/review` CRITICAL). `bot-review` is one of `/review`'s
+conditional fan-out agents (runs when public surface changes, hard-capped at
+COMMENT/NOTE/SUGGESTION), so its cross-file blast-radius findings already arrive
+in the `## /review Evidence` as advisory (never forcing ITERATE). There is no
+separate bot-review dispatch.
 
 Invocation: from the worktree directory so `git diff origin/main..HEAD` is
 the natural scope, then:
@@ -221,45 +236,16 @@ Skill(skill="review")
 Append the report to the Evidence Trail under a `## /review Evidence` header
 (see Phase 9 format below).
 
-### Phase 8.5: bot-review Cross-File Blast-Radius Pass (advisory)
+### Phase 8.5: bot-review (folded into /review)
 
-After Phase 8.4, dispatch `bot-review` on the worktree diff to surface cross-file
-consumer-invariant breakage that mx2-decision-maker should consider. Advisory-only;
-the agent's severity vocabulary is hard-constrained to COMMENT/NOTE/SUGGESTION
-(BLOCKING/CRITICAL forbidden in its system prompt), so its findings flow into the
-Evidence Trail as informational without forcing ITERATE.
-
-Skip this phase when the diff has no public-symbol changes (compute the
-`changes_public_surface` signal per `~/.claude/skills/pr-intel/SKILL.md` Dispatch
-Signals; if false, log "bot-review: skipped (no public surface change)" to the
-tracking bead and proceed to Phase 9).
-
-When dispatched, the agent receives:
-
-```
-Agent(
-  subagent_type="bot-review",
-  prompt="""
-  REPO STATE: PR worktree at .launch-worktrees/autopilot-<bead-id>. Use as <code_root>.
-
-  SCOPE: full diff in the worktree (origin/main..HEAD).
-
-  Apply the verbatim three-citation gate from your agent definition. Severity
-  vocabulary is COMMENT/NOTE/SUGGESTION only. Output FINDING blocks or no-findings
-  line.
-
-  Diff:
-  [git diff origin/main..HEAD output]
-
-  Changed file paths:
-  [file path list]
-  """
-)
-```
-
-Append the agent's output to the Evidence Trail under a `## Bot-Review Evidence`
-header (see Phase 9 format below). If the agent emits a no-findings line, log
-"bot-review: no findings" and include the line for transparency.
+`bot-review` is now one of `/review`'s conditional fan-out agents (Phase 8.4),
+dispatched only when `changes_public_surface` is true and hard-capped at
+COMMENT/NOTE/SUGGESTION. Its cross-file blast-radius findings therefore arrive in
+the `## /review Evidence` as advisory (never forcing ITERATE). No separate
+bot-review dispatch: the standalone pass was retired when `/review` absorbed
+`bot-review` as a fan-out agent. The `## Bot-Review Evidence` block in Phase 9
+remains valid, sourced from `/review`'s bot-review output (or "skipped (no public
+surface change)" when the conditional did not fire).
 
 ### Phase 9: Decision Gate 2 (Implementation Approval)
 
@@ -288,8 +274,8 @@ Agent(
     - [agent_name] [file:line] [one-line articulation]
     - ...
   - WARNING findings summary: <one-line per WARNING, or "none">
-  - Agents that ran: [code-reviewer, test-quality-reviewer, observability-reviewer, silent-failure-hunter]
-    (skip agents whose conditional dispatch did not fire; note which were skipped and why)
+  - Agents that ran: enumerate the agents `/review` actually dispatched (its roster is conditional and evolves with the skill; do not hardcode it)
+    (note which conditional agents were skipped and why)
 
   ## Bot-Review Evidence
   - Findings: N (NOTE: M, SUGGESTION: K, COMMENT: J)
@@ -353,6 +339,15 @@ the decision-maker weighs them alongside pants tlc result and standup history.
    Defensive iteration prompts should check `bd show <tracking-bead>` for
    prior logged work in the same iteration before duplicating effort. See
    `bd memories gotcha:schedulewakeup-queues`.
+
+   **Harness fallback:** ScheduleWakeup is a main-loop tool documented as
+   /loop pacing machinery; direct calls work today (verified 2026-06-09) but
+   are not guaranteed across harness versions. If the call is rejected or the
+   tool is absent, schedule the wakeup with a CronCreate one-shot instead:
+   `CronCreate(cron="<minute> <hour> <dom> <month> *", recurring=false,
+   prompt="<same re-entry prompt>")` pinned to the chosen cadence rounded up
+   to the next minute. Do not silently drop a wakeup; if neither tool is
+   available, log the state to the tracking bead and stop cleanly.
 
    On each wakeup:
    a. Poll `gh pr checks <PR-number>` for completion status.
@@ -457,8 +452,11 @@ Agent(
   Failure: [what happened]
   Context: [relevant details]
 
-  Run your self-reflection protocol. Update the calibration file if
-  a new rule or example would have prevented this miss.
+  Run your self-reflection protocol. If a new rule or example would
+  have prevented this miss, emit calibration drift via bd remember per
+  your Self-Reflection Protocol. Never attempt to edit the calibration
+  file directly; subagent writes to ~/.claude are sandboxed and the
+  /calibrate skill is the only merge path.
   """
 )
 ```
@@ -478,8 +476,9 @@ This is a cold-start; treat the bead description as the authoritative state.
 
 - **No intermediate output to user.** Phases 1-5 are internal. The user sees
   the final report (Phase 7 or Phase 10) or an escalation notice.
-- **Parallel is mandatory.** Challenge and consult in Phase 4 MUST run in
-  parallel via separate Agent tool calls in the same message.
+- **Parallel is mandatory.** The Phase 4 Challenge subagent and all selected
+  consult specialists MUST run in parallel via separate Agent tool calls in
+  the same message (no coordinator subagent).
 - **Beads are the audit trail.** Every decision, iteration, and escalation is
   logged as a bead comment. The tracking bead is the single source of truth.
 - **Decision-maker is a subagent.** Always invoke via Agent tool with

@@ -6,7 +6,7 @@ duplicate content.
 
 ## Why Phase 4.6 Exists
 
-The plan has passed challenge + consult + tenth-man (Phases 3 + 4 +
+The plan has passed challenge + consult + skeptic (Phases 3 + 4 +
 4.5), but a plan that survived stress-testing might still fail a
 decision-maker's "would you bet on this" check, especially when
 DELTA_CATEGORY is CONFIRMED on a mechanism-prescribed input
@@ -16,8 +16,8 @@ Phase 4.6 is the calibration layer that catches this.
 ## Phase 4.6a: Dispatch the Decision-Maker
 
 The gate receives the synthesized plan, convergence delta, delta
-category, INPUT_MODE classification, and tenth-man findings (or
-unavailable-reason if Phase 4.5 failed). A missing tenth-man pass is
+category, INPUT_MODE classification, and skeptic findings (or
+unavailable-reason if Phase 4.5 failed). A missing skeptic pass is
 itself a signal: PROCEED carries lower confidence when adversarial
 check did not run.
 
@@ -28,8 +28,14 @@ Agent(
   prompt="**MODE: CONVERGENCE GATE.** You are gating a converged plan
   from /converge (not an autopilot checkpoint, not an ideation gate).
   Calibration context: the plan has passed challenge + consult +
-  tenth-man. Your job is to call PROCEED, ITERATE, ESCALATE-QUESTIONS,
+  skeptic. Your job is to call PROCEED, ITERATE, ESCALATE-QUESTIONS,
   or ESCALATE-ROUTE on the plan before Phase 5 Present.
+
+  The autopilot Evidence Trail input contract does not apply here; the
+  artifact you are gating is a converged plan plus its stress-test
+  outputs (challenge, consult, skeptic), described below. Treat absent
+  autopilot-specific fields as waived and a missing iteration history
+  as 'First evaluation'.
 
   If you detect calibration drift during this invocation, record via
   `bd remember --key='calibration:mx2-decision-maker:converge:<topic>' '...'`.
@@ -38,16 +44,22 @@ Agent(
 
   PROCEED if the plan is defensible: convergence delta is concrete,
   work items have verification paths, Consequence=high items have
-  matching verification paths or are explicitly downgraded, tenth-man
+  matching verification paths or are explicitly downgraded, skeptic
   findings either resolved or surfaced as Open Assumptions, and the
   scope matches the input intent. CONFIRMED delta is acceptable IF the
   input was simple or specialists offered concrete evidence; suspicious
-  otherwise.
+  otherwise. PROCEED also requires the plan is PROPORTIONATE: if the
+  input carries scope-signal words (lightweight / simple / minimal /
+  quick / for most users) OR the plan is materially heavier than a
+  minimal-viable 80/20 version, the extra complexity must be justified
+  component-by-component; if it is not, do not PROCEED, fire ITERATE with
+  WEAK_DIMENSION=proportionality.
 
   ITERATE if the plan is uncertain BUT another challenge+consult pass
   with a focused weak-dimension target would plausibly resolve it.
   Specify WEAK_DIMENSION (one of: verification, consequence, scope,
-  decomposition, mechanism). The mechanism case is canonical for
+  decomposition, mechanism, proportionality). The mechanism case is
+  canonical for
   catching Fulfillment-vs-Coverage: INPUT_MODE=mechanism-prescribed
   combined with DELTA_CATEGORY=CONFIRMED on a non-trivial plan
   usually means the prescribed mechanism was rubber-stamped, not
@@ -73,14 +85,14 @@ Agent(
   INPUT_MODE: <problem-framed | mechanism-prescribed>
   DELTA_CATEGORY: <CONFIRMED | MINOR_ADJUSTMENTS | MAJOR_REVISIONS | SCRAPPED_AND_REBUILT>
 
-  Tenth-man findings (or 'Tenth-Man Lens unavailable: <reason>' if
+  Skeptic findings (or 'Skeptic Lens unavailable: <reason>' if
   the Phase 4.5 dispatch failed):
-  <tenth-man block>
+  <skeptic block>
 
   Return VERDICT (PROCEED / ITERATE / ESCALATE-QUESTIONS /
   ESCALATE-ROUTE), REASON (1-3 sentences), and:
   - if ITERATE: WEAK_DIMENSION (one of: verification, consequence,
-    scope, decomposition, mechanism).
+    scope, decomposition, mechanism, proportionality).
   - if ESCALATE-QUESTIONS: NARROWING_QUESTIONS (1-3 questions, each
     with a WHY clause).
   - if ESCALATE-ROUTE: SUGGESTED_NEXT_SKILL (one of: /ideate,
@@ -111,8 +123,13 @@ with a focused WEAK_DIMENSION instruction:
   Fulfillment-vs-Coverage check."
 - `scope`: "Identify what is in vs out of scope; surface any items
   that crossed the boundary in either direction."
+- `proportionality`: "Re-decompose toward the minimal-viable variant.
+  Name the smallest 80/20 plan that meets the stated goal, then keep
+  only the work items whose extra value over that minimal plan is
+  justified by a STATED constraint (not a hypothetical future). Surface
+  the minimal-viable comparison in the convergence delta."
 
-Re-synthesize (Phase 4). Re-run tenth-man (Phase 4.5). Re-gate
+Re-synthesize (Phase 4). Re-run skeptic (Phase 4.5). Re-gate
 (Phase 4.6).
 
 ### ESCALATE-QUESTIONS
@@ -125,6 +142,12 @@ so the user knows what each answer unblocks.
 Frame: "I have a few narrowing questions before convergence would be
 productive. If you don't want to answer, reply 'you decide' and I'll
 proceed with the current draft as a low-confidence plan."
+
+Non-interactive callers (agent dispatch, /autopilot, a /launch-internal
+convergence, any context where no human can answer): do NOT block on
+AskUserQuestion. Treat as the 'you decide' opt-out: force a
+low-confidence PROCEED and carry the unanswered narrowing questions
+into the output's Open Assumptions section.
 
 Constraints on questions:
 - Max 3. One focused question is usually better than three.

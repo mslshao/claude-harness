@@ -33,16 +33,66 @@ runtime indirection for protocol-critical content.
 
 <!-- BEGIN SHARED-PROTOCOL:final-result-block -->
 Your final response (the one returned to the orchestrator) MUST include one of:
+- `COMPLETE: <one-line summary>` plus `BRANCH: <name>` when your commits are in
+  the shared worktree and PR creation belongs to the orchestrator (the normal
+  /launch team case).
 - `BRANCH: <name>` and `PR: <url>` lines if commits + draft PR are produced.
 - `INCOMPLETE: <reason>` if you ran out of turns or hit a blocker. Include
   `WORKTREE: <path>` and `UNCOMMITTED: yes|no` so the orchestrator can either
   re-dispatch with a continuation prompt or know to recover the work itself.
 
-A response with `status: completed` upstream but no BRANCH/PR/INCOMPLETE marker
-in your own result is misleading; orchestrators read your result block to
-decide whether to re-dispatch. Do not let a turn limit produce an empty
-"completed" signal.
+A response with `status: completed` upstream but no COMPLETE/BRANCH/PR/
+INCOMPLETE marker in your own result is misleading; orchestrators read your
+result block to decide whether to re-dispatch. Do not let a turn limit produce
+an empty "completed" signal.
 <!-- END SHARED-PROTOCOL:final-result-block -->
+
+### bead-comment-channel
+
+<!-- BEGIN SHARED-PROTOCOL:bead-comment-channel -->
+## Mid-flight Updates from User
+
+When your startup prompt names a bead (`docr-\w+`), the user can leave comments
+on that bead while you work to send real-time guidance, course corrections, or
+stop instructions. Poll for new comments at major checkpoints.
+
+**Startup snapshot**: run `bd comments <bead-id>` once at the start of work.
+Record the latest comment timestamp/ID. Treat anything before this snapshot as
+"already seen."
+
+**Polling cadence** (whichever comes first):
+- After each verification pass (lint, test, `terraform fmt`, `pants tlc`)
+- Before each commit, push, or amend
+- Before declaring done in your final result block
+- Approximately every 5 minutes during long-running operations
+
+**On poll**:
+1. Run `bd comments <bead-id>`.
+2. For new comments authored by you (prefixed with `[agent ack]` or `[agent
+   status]`; see hygiene below), skip.
+3. For new comments authored by the user, treat as input.
+
+**Acting on a user comment**:
+- **Informational** ("FYI: deploy unblocked"): acknowledge with `bd comment
+  <bead-id> "[agent ack] received; continuing"` and proceed.
+- **Course correction** (changes scope, alters AC, pivots strategy): apply the
+  change. Acknowledge with `bd comment <bead-id> "[agent ack] applied:
+  <one-line summary>"`.
+- **STOP / ABORT / PAUSE**: exit cleanly. Acknowledge with `bd comment
+  <bead-id> "[agent ack] stopping per instruction; worktree state: <summary>"`.
+  Return your final result block with `INCOMPLETE: stopped per user
+  instruction` and a STANDUP describing worktree state (uncommitted changes,
+  branch, last completed step).
+
+**Self-comment hygiene**: prefix every comment YOU post with `[agent status]`
+or `[agent ack]` so future polls (yours and other agents') can filter them
+out. Examples:
+- `bd comment <bead-id> "[agent status] verification passed; amending commit"`
+- `bd comment <bead-id> "[agent ack] received scope-change; updating monitor threshold"`
+
+**No bead ID in startup prompt**: skip this section. The user is running you
+without a tracked bead context.
+<!-- END SHARED-PROTOCOL:bead-comment-channel -->
 
 ## Role-tuned variations (intentionally NOT fenced)
 
@@ -67,10 +117,12 @@ useful standup output.
 
 ### Communication section trailer ("the orchestrator uses them...")
 
-`launch-implementer` includes an extra sentence after "Send via SendMessage to
-the orchestrator. Do not skip standups": "the orchestrator uses them to
-coordinate phasing, spawn specialists, and unblock you." `launch-flex` and
-`launch-tester` do not. The implementer does the most parallel work and is
+`launch-implementer` includes an extra clause after the standup-emission
+sentence ("Emit the STANDUP block in your output stream... Do not skip
+standups"): "the orchestrator uses them to coordinate phasing, dispatch
+specialists, and unblock you." `launch-flex` and `launch-tester` do not.
+(2026-06-09: standup delivery is output-stream emission, not SendMessage;
+subagents have no messaging tool and cannot dispatch sub-agents.) The implementer does the most parallel work and is
 most likely to drop standups under turn pressure; the trailer is intentional
 emphasis, not drift.
 
@@ -83,6 +135,16 @@ emphasis, not drift.
 | launch-tester | "Run `pants test <test-targets>` on all your test files" |
 
 The command is role-specific because the verification is role-specific.
+
+### Implementer pre-push poll (after the bead-comment-channel fence)
+
+`launch-implementer` carries one extra polling requirement immediately AFTER
+its bead-comment-channel fence (outside it, so the fence stays byte-identical):
+poll once more after verification passes clean and before any push or
+PR-creation command. PR-creation commands collapse push + PR + reviewer
+assignment into one step, and orchestrator adjudications (e.g.
+`[orchestrator] ORCHESTRATOR-SPLIT`) can arrive exactly there. Implementer-only
+because pushes/PR commands are implementer-tier actions.
 
 ### Retry Context Handling steps 2 and 4
 
@@ -108,7 +170,8 @@ list adds more confusion than value).
 
 ## How to update
 
-When editing one of the fenced sections (currently only `final-result-block`):
+When editing one of the fenced sections (`final-result-block`,
+`bead-comment-channel`):
 
 1. Update the canonical text in this file first.
 2. Update the corresponding fenced region in each of the three agent files

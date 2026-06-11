@@ -4,7 +4,7 @@ A personalized Claude Code harness, published as a portfolio artifact.
 
 Agents, skills, hooks, dispatch heuristics, and memory scaffolding accumulated through months of daily use, with AI-authored commentary explaining why each component exists and what failure mode it prevents.
 
-> **Status: V1.** Per-component AI-authored commentary (`WORLDMAP.md` in each directory) is complete. `project-tier/` mirrors 6 promoted artifacts; `evidence/` has 3 entries (one third-party, two own-loop); `learnings/` has 11 of 12 pages lifted from the original Confluence corpus with editorial scrubbing applied. `graveyard/` may grow as more historical context is reconstructed.
+> **Status: V2.** Per-component AI-authored commentary (`WORLDMAP.md` in each directory) is complete. `project-tier/` mirrors 7 promoted artifacts (3 agents, 3 skills, 1 rule); `evidence/` now has 7 entries (one third-party, six own-loop); the `dotclaude/` mirror was refreshed to current personal-tier state; one agent was renamed (`mx2-tenth-man` -> `mx2-skeptic`, recorded in `graveyard/`); `learnings/` has 11 of 12 pages lifted from the original Confluence corpus with editorial scrubbing applied. `graveyard/` may grow as more historical context is reconstructed.
 
 ## Thesis
 
@@ -14,14 +14,14 @@ The claim this repo carries is not "I use AI well." It is "I built scaffolding f
 
 | Directory | Contents | State |
 |---|---|---|
-| `patterns/` | Tool-agnostic philosophy. The parts that survive the boundary between Claude Code and any other AI tool. | 11 docs + WORLDMAP commentary |
+| `patterns/` | Tool-agnostic philosophy. The parts that survive the boundary between Claude Code and any other AI tool. | 12 docs + WORLDMAP commentary |
 | `dispatch/` | Routing logic: which specialist runs when, model selection rules, PR review routing. | 4 docs + WORLDMAP commentary |
 | `scaffolding/` | Memory architecture: two-tier doctrine, key namespace, dating conventions. | 7 docs + WORLDMAP commentary |
-| `dotclaude/` | Scrubbed mirror of `~/.claude/`. Drop-in install via `sync/install.sh`. | 21 agents, 22 skills, hooks catalog, all with WORLDMAP commentary |
+| `dotclaude/` | Scrubbed mirror of `~/.claude/`. Drop-in install via `sync/install.sh`. | 21 agents, 27 skills, hooks catalog, all with WORLDMAP commentary |
 | `learnings/` | AI Learning Track corpus. Originally authored as an internal Confluence series, migrated here with editorial scrubbing. | 11 of 12 pages lifted; 12th (PM workflows) deferred |
-| `evidence/` | Empirical anecdata: before-after entries demonstrating compression of human-only work. | Salesforce-dedup (third-party) + PR-review observability calibration (own-loop); more entries accumulate as instances surface |
-| `project-tier/` | Promoted artifacts. Demonstrates the lab-to-production pattern (personal-tier sandbox to team-reviewed PR). | 3 agents + 3 skills mirrored from team-reviewed PR promotions, with internal identifiers genericized |
-| `graveyard/` | Perma-deleted components with the Keymaker principle (build for a need, retire when the need is met by something else). | Keymaker principle + 4 entries |
+| `evidence/` | Empirical anecdata: before-after entries demonstrating compression of human-only work. | 7 entries: Salesforce-dedup (third-party) + 6 own-loop (PR-review observability calibration, cross-session handoff, enforcement ladder, agent-tier eval, guardrail self-protection, rules-as-executable-specs); more accumulate as instances surface |
+| `project-tier/` | Promoted artifacts. Demonstrates the lab-to-production pattern (personal-tier sandbox to team-reviewed PR). | 3 agents + 3 skills + 1 rule mirrored from team-reviewed PR promotions, with internal identifiers genericized |
+| `graveyard/` | Perma-deleted components with the Keymaker principle (build for a need, retire when the need is met by something else). | Keymaker principle + 5 entries |
 | `sync/` | Install scripts, CI guardrails, scrub-check tooling. | install.sh, uninstall.sh, scrub-check.sh |
 
 For the system-level view (what each part contributes, where the harness has limits), read `WORLDMAP.md` at the top of the repo. For per-component commentary, read the `WORLDMAP.md` inside each directory.
@@ -31,7 +31,7 @@ For the system-level view (what each part contributes, where the harness has lim
 A few entry points depending on intent:
 
 - **"What is the meta-game?"** Read `WORLDMAP.md` (top-level), then `patterns/` (reflection-trigger, lab-to-production, self-review-protocol, multi-window-discipline are the load-bearing pieces).
-- **"What did the author actually configure?"** Read `dotclaude/CLAUDE.md` for the global instructions, then sample a few agents in `dotclaude/agents/` (mx2-tech-lead, mx2-decision-maker, mx2-tenth-man, bot-review, prompt-refiner cover the interesting design space).
+- **"What did the author actually configure?"** Read `dotclaude/CLAUDE.md` for the global instructions, then sample a few agents in `dotclaude/agents/` (mx2-tech-lead, mx2-decision-maker, mx2-skeptic, bot-review, prompt-refiner cover the interesting design space).
 - **"How do I adopt this?"** Read `sync/README.md` for the install script; it symlinks `dotclaude/` into `~/.claude/`. Then read the per-directory `WORLDMAP.md` files to understand which components are personal-specific and which port cleanly.
 - **"What got deleted along the way?"** Read `graveyard/` for the Keymaker principle and the components that lost their purpose.
 

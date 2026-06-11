@@ -33,6 +33,11 @@ memory/
 *_token*
 *_secret*
 
+# Tier 1 real-name patterns for scrub-check.sh. Local-only by design: the
+# committed repo stays name-free, including its own detector. See
+# sync/SCRUB-SPEC.md Tier 1.
+sync/scrub-names.local
+
 # Lockfile noise (none expected here, but pre-empt)
 .DS_Store
 Thumbs.db

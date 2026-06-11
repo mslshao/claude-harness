@@ -1,42 +1,46 @@
 ---
 name: compound
-description: "Proactively extract reusable workflow patterns from a substantial work unit that just completed, staging them as habit memories that drain into codified rules over time. Use after a PR merges, a /launch ships, a bead closes, or a multi-step investigation wraps and the work involved a non-obvious technique worth repeating. The proactive sibling to /reflect (which is reactive and correction-triggered). Trigger phrases: '/compound', 'extract patterns', 'what did we learn from that', 'capture this workflow', 'compound that', 'what was reusable here', 'pattern-capture'. Also invoke proactively at substantial-completion signals (PR merged, /launch finished, bead closed) when the conversation contains a novel approach not yet captured as a habit:* memory. Distinct from /handoff (cold-start prompt for the NEXT session) and direct `bd remember` (no synthesis, no dedup, no promotion-gate awareness). Invokes /bead-forge memory mode internally for Routes 1 and 3."
-argument-hint: "[optional: short hint about what just finished, e.g. 'launch of docr-XXXX' or 'PR #YYYY merged']"
+description: "Improvement loop: scan a just-completed work unit for session friction signals (blocked tool calls, redo edits, manual user actions a skill could automate, round-trip confirms), generate concrete buildable improvements grounded in those signals, and build the change directly (with present-and-confirm gate) or dispatch a build subagent. Falls back to habit-memory capture only when no buildable improvement exists. Use after a PR merges, a /launch ships, a bead closes, a multi-step investigation wraps, or a substantial work unit just shipped. The proactive sibling to /reflect (correction-triggered). Trigger phrases: '/compound', 'extract patterns', 'what did we learn from that', 'identify improvements', 'capture this workflow', 'compound that', 'what was friction here', 'pattern-capture'. Distinct from /handoff (cold-start prompt for the NEXT session) and direct `bd remember` (no synthesis, no dedup, no build path)."
+argument-hint: "[optional: short hint about what just finished, e.g. 'launch of docr-XXXX' or 'PR #YYYY merged' or 'early' if mid-session]"
 ---
 
 # Compound
 
-Extract reusable workflow patterns from a substantial work unit, dedup against the existing habit:* corpus, and route the finding to the right durable surface (habit memory, workflow.md, or a topic file). Always present for accept before writing.
+Improvement loop: identify concrete buildable changes that would reduce future friction, then build them. The previous version of this skill captured generic patterns into habit memories that drained slowly; the new version drives toward an actual edit on a real surface (hook, skill, agent, rule file, settings.json, memory section). Habit-memory capture remains as a fallback when no buildable improvement exists, so soft-signal patterns are not lost.
 
-This skill is the **proactive** half of pattern capture. Its reactive sibling is `/reflect`, which fires on user corrections (CLAUDE.md Reflection Trigger). `/compound` fires after **successful** work that produced a novel technique, work where nothing went wrong, so /reflect never triggered, but where a future session would benefit from knowing what the current session figured out.
+This skill is the **proactive** half of pattern capture. Its reactive sibling is `/reflect`, which fires on user corrections (CLAUDE.md Reflection Trigger). `/compound` fires after work where things went smoothly enough that /reflect did not trigger, but where friction signals from the session reveal a specific improvement the next instance would benefit from.
 
 ## Why this exists
 
-The pattern-capture pipeline has a coverage gap. `/reflect` catches mistakes (correction-triggered, writes to `correction:*` memories and rule files). `/bead-forge` checkpoint mode preserves in-flight conversation context against compaction. `/handoff` produces a cold-start prompt for ONE specific next session. None of these capture: "this work just shipped, the approach was novel, and a future session would benefit from knowing what we figured out."
+The pattern-capture pipeline had a coverage gap. `/reflect` catches mistakes (correction-triggered, writes to `correction:*` memories and rule files). `/bead-forge` checkpoint mode preserves in-flight conversation context against compaction. `/handoff` produces a cold-start prompt for ONE specific next session.
 
-That gap is real. `memory/workflow.md` has documented the promotion gate ("second observed application + generalization beyond originating context") since 2026-05-13, and 9 `habit:*` bd memories have accumulated since, but each first-observation moment has been hand-noticed under multi-window operational reality. `/compound` automates the noticing.
+The previous `/compound` tried to fill the rest of the gap with three static socratic questions ("what was non-obvious?", "would you repeat it?", "what would speed it up?"). In practice this produced habit memories that captured "something" without a goal, drained into workflow.md slowly, and rarely changed behavior. The promotion gate worked; the input signal did not.
+
+The new shape: scan the session transcript for actual friction signals, ground every improvement candidate in a specific observed event, and drive toward a buildable edit. The corpus of habit memories still exists as a fallback, but the primary output is a concrete artifact change.
 
 ## When to invoke
 
 Manual only in v1. Triggers:
 
-- User explicitly types `/compound` or asks to "extract the pattern", "capture this workflow", "what's reusable here".
-- After a substantial completion signal (a draft PR was published, `/launch` returned, a bead got closed, or a multi-step investigation wrapped) AND the work surfaced a non-obvious approach not already captured as a `habit:*` memory.
-- After 3+ exchanges of decision-making where the user landed on a deliberate technique (not just an outcome), and that technique would replicate to future work.
+- User explicitly types `/compound` or asks "identify improvements", "what was friction here", "extract the pattern", "what's reusable".
+- After a substantial completion signal (draft PR published, `/launch` returned, bead closed, multi-step investigation wrapped) AND the session contains observable friction (hook fires, redo edits, manual user actions, round-trip confirms).
+- After a multi-exchange session where the user deliberately landed on a non-obvious technique that would replicate.
+
+The "early" arg signals the work is mid-flight but the current sub-unit just shipped; that is a valid invocation point.
 
 ## When NOT to use
 
-- **Every PR or bead close.** Routine work captures the pattern in the code itself; no extraction needed.
-- **The work was a correction.** Use `/reflect`. /compound is for what worked; /reflect is for what failed.
-- **The work is mid-flight, not done.** Use `/bead-forge` checkpoint mode to preserve the in-progress synthesis against compaction. Once the work is done, `/compound` extracts the durable pattern.
-- **The next-session handoff is what is needed.** Use `/handoff`. That produces a cold-start prompt; /compound produces patterns reusable across many future sessions.
-- **A specific fact, not a pattern.** Use `bd remember` directly. /compound is for techniques that generalize; a one-off fact about a service endpoint goes straight to memory without the workflow.
+- **Every PR or bead close.** Routine work without friction signals has nothing to compound.
+- **The work was a correction.** Use `/reflect`. /compound captures what worked or what could work better; /reflect captures what failed and codifies the avoidance.
+- **The next-session handoff is what is needed.** Use `/handoff`. /handoff produces a cold-start prompt for one specific successor; /compound produces edits to durable surfaces that affect many future sessions.
+- **A specific fact, not a pattern or improvement.** Use `bd remember` directly.
+- **Mid-flight checkpoint of conversation context.** Use `/bead-forge` in memory checkpoint mode. /compound is for shipped work, not in-progress analysis.
 
 ## Workflow
 
 ### 1. Scope detection
 
-Determine what work unit just completed. Substantial work often produces non-git artifacts (a Confluence design doc, a Jira state change, a Slack thread where a design discussion or bugfix approach got worked through), so pull from every surface where a completion signal could live. Run these in parallel:
+Determine what work unit just completed. Pull from every surface where a completion signal could live. Run these in parallel:
 
 **Local (bash)**:
 
@@ -48,230 +52,195 @@ gh pr list --author @me --state all --limit 5 --json number,title,state,updatedA
 
 **External (MCP)**:
 
-- **Jira**: tickets I transitioned or commented on recently. JQL: `assignee = currentUser() AND updated >= -1d`. Tool: `mcp__atlassian__searchJiraIssuesUsingJql`. Fetch comments on hits to see what changed.
-- **Confluence**: pages I edited in the last day. CQL: `contributor = currentUser() AND lastmodified > now("-1d")`. Tool: `mcp__atlassian__searchConfluenceUsingCql`. A newly-published design doc is a substantial work unit even when no PR exists.
-- **Slack**: my recent messages where a technique, design, or bugfix approach got worked out (person-to-person discussions that landed somewhere worth keeping). Query: `from:me` over the last 6 hours; keyword narrowing is leaky (skip it unless results are noisy). Tool: `mcp__plugin_slack_slack__slack_search_public_and_private`. Also check threads where I posted a "here's what we landed on" wrap. **Incidents (what went wrong) are not /compound-shaped**; those go to /reflect. /compound captures what worked, not what failed.
+- **Jira**: tickets I created, edited, or commented on recently. JQL: `assignee = currentUser() AND updated >= -1d`. Tool: `mcp__atlassian__searchJiraIssuesUsingJql`.
+- **Confluence**: pages I edited in the last day. CQL: `contributor = currentUser() AND lastmodified > now("-1d")`. Tool: `mcp__atlassian__searchConfluenceUsingCql`.
+- **Slack**: my recent messages where a technique, design, or bugfix approach got worked out. Query: `from:me` over the last 6 hours. Tool: `mcp__plugin_slack_slack__slack_search_public_and_private`.
 
-Not every source will surface a signal, and that is fine. Empty results just narrow the candidate work unit.
+Cross-reference against conversation context. If the user passed an anchor in the argument hint, take it and skip detection.
 
-Cross-reference against conversation context. If a `/launch` just shipped, the worktree path and PR URL are the anchor. If a bead just closed, `bd show <id>` carries the design notes. If a Confluence page was just published, the page URL plus its inline comments are the anchor. If a Slack thread just resolved, the thread is the anchor. If the user passed a hint in the argument, take that as the anchor and skip detection.
+If signals are empty OR multiple candidate work units surface with no clear anchor, ask ONE focused question: "What just finished?" Do not invent a work unit.
 
-If signals are empty OR multiple signals surface with no clear anchor in conversation context, ask the user "What just finished?" One focused question, not a menu; do not invent a work unit to justify continuing.
+### 2. Friction scan (REPLACES the previous static socratic questions)
 
-**Bias-stripping**: if the user's invocation hint pre-frames the route ("this should be a workflow.md entry", "this is heavy-synthesis"), note the leaning as input but do NOT skip dedup or the socratic step. Let the gate run; convergence with the leaning is a positive signal, divergence means the leaning was wrong. Pre-loading the user's answer into the workflow defeats the gate's purpose.
+Inspect the session transcript for observable friction signals. These are the ground truth for the improvement candidates that follow. Look for:
 
-### 2. Socratic questions
+| Signal class | What to look for | Buildable shape |
+|---|---|---|
+| **Hook fire** | A PreToolUse hook blocked a tool call; I re-issued with a fix. Look for "BLOCKED:" stderr in tool results, Stop hook feedback messages. | Pre-output check earlier in the flow (a lint script invoked before the tool call); or a wordlist consolidation; or a skill update that teaches me the rule before drafting. |
+| **Redo edit** | I edited a file, then immediately edited it again to fix something I should have gotten right the first time. Look for two Edits to the same file path within a few turns. | A linter, a template, or a skill section that teaches the gotcha. |
+| **Field-nulling gotcha** | An MCP edit operation cleared a field I did not intend to clear (assignee, parent, link, custom field). Visible as a follow-up "fix the field" call after the main edit. | Documented "preserve" list in the relevant memory file or skill; optional MCP wrapper that auto-includes the preservation set. |
+| **Manual user action** | The user said "go verify", "I updated the doc, check it", "I'll handle X", "go check that I did this right". | Automation: do the verification automatically, or make the next-step a skill action. |
+| **Round-trip confirm** | I asked the user to confirm something I could have predicted from conversation context (e.g., "should I use the same convention?", "is this the right naming?"). | Add the convention to the relevant memory file or skill so the next instance does not have to ask. |
+| **Tool retry** | A tool call failed, I retried with a fix. Look for error responses followed by a corrected call. | Validate the input shape before calling; or document the schema gotcha. |
+| **Recurring memory hit** | Same `correction:*` or `habit:*` memory referenced multiple times in the session. | Promote the memory: codify as a rule (if correction), promote to workflow.md (if habit with 2nd observation). |
+| **Skill gap** | I worked around a missing skill capability (e.g., batched calls manually because the skill is single-item). | Extend the skill; or mirror as a personal-tier override that adds the capability. |
+| **Manual cross-reference** | I built a cross-link by hand (Jira issue links, design-doc-to-ticket map, parent-child structure). | Automate as part of the originating skill (e.g., file Blocks links when creating sibling tickets). |
 
-Ask 2-3 terse questions to surface the pattern. The technique is the gap between what the bead/PR said and what the work actually required.
+For each signal observed, name it specifically: cite the turn or tool call where it appeared, what the round-trip cost was, what the buildable fix is. The output of step 2 is a list of grounded candidates, not generic questions.
 
-- **"What did you have to figure out that was not obvious from the bead/PR?"** Surfaces undocumented insight.
-- **"Is this a pattern you'd want repeated next time, or a one-off?"** Surfaces generalization; one-offs do not warrant capture.
-- **"What would have made the next person doing this faster?"** Surfaces the workflow shape.
+**Empty signal case**: if the scan finds no friction signals OR all signals are duplicates of existing rules/memories, the session was routine and no improvement is captureable. Stop the workflow, OR fall through to step 5b (habit-memory fallback) if conversation context surfaces a pattern worth recording as a soft signal.
 
-Keep questions scannable. Do not lecture; do not pre-answer. The user's answer IS the raw material.
+**Misroute check**: if the signal is correction-shaped (user explicitly corrected something the agent did wrong) and the umbrella memory already exists with structural enforcement (hook, linter, gate), do NOT compound it. The hook is the enforcement; tallying another instance is not a corrective action. This mirrors CLAUDE.md Reflection Trigger Step 5.
 
-**Confidence calibration**: if the user's answers do not surface a pattern sharper than "I just did the work" or "it was straightforward", stop the workflow. A captureable pattern names a technique, sequence, or insight that would replicate. If none of the three questions surfaces one, the work was routine; routine work does not need /compound.
+### 3. Triage and dedup
 
-**Misroute check**: if the answers reveal the pattern is correction-shaped ("we should never do X again", "X went wrong because Y", "the lesson is don't do Z"), this is `/reflect` territory, not `/compound`. Stop and surface: "this looks like a correction-shaped insight. /compound captures techniques that worked; corrections route through /reflect. Want to switch?" Do not auto-route; let the user adjudicate the surface choice.
+For each candidate from step 2, score on two axes:
 
-### 3. Dedup
+- **Build feasibility**: how big is the edit? One-line hook tweak, paragraph addition to a memory file, new section in a skill, new skill, new agent. Small surfaces (< ~30 lines) can be built directly; larger surfaces dispatch a build subagent.
+- **Blast radius**: personal-tier (hook, skill, memory) vs. project-tier (`.claude/rules/`, project skill, CLAUDE.md). Personal-tier changes ship without review; project-tier go through the lab-to-production promotion path.
 
-Before proposing, check the existing corpus at every tier. The pattern may already be codified at a higher tier than `habit:*`; the goal is to catch it whatever surface it lives on. A habit-only dedup misses patterns already promoted to workflow.md or codified as rules, and re-capture would create silent duplicates.
-
-Before running the queries, derive 2-3 distinctive keywords from the candidate pattern (verbs and noun phrases; avoid stop-words; multi-word phrases beat single nouns). Example: for the pattern "deploy watch via /loop", `KW_TEXT="deploy watch loop"` and `KW_GREP="deploy|watch|loop"`. Set both vars before running the block; the agent must NOT run with literal placeholders.
+Then dedup at every tier so we do not double-write or duplicate existing coverage. Derive 2-3 distinctive keywords per candidate; set both vars before running:
 
 ```bash
-KW_TEXT="<2-3 keywords as a space-separated phrase>"     # for domain-matcher
-KW_GREP="<same keywords as a pipe-separated regex>"      # for grep -E
+KW_TEXT="<2-3 keywords as a space-separated phrase>"
+KW_GREP="<same keywords as a pipe-separated regex>"
 
-bd memories habit:                                                                    # habit-tier memories
-bd list --label=memory --status=open --json | jq -r '.[] | "\(.id) \(.title)"'        # forge memory beads (open only; retired ones are auto-closed by the drain hook)
-grep -iE "$KW_GREP" ~/.claude/projects/-workspaces-main/memory/workflow.md             # promoted patterns
-grep -riE "$KW_GREP" ~/.claude/projects/-workspaces-main/memory/*.md                   # topic files
-grep -riE "$KW_GREP" /workspaces/main/.claude/rules/                                   # project rules
-bash /home/vscode/.claude/scratch/domain-matcher/match.sh "$KW_TEXT" | head -10        # related terminology (best-effort; skip on missing script or noise)
+bd memories habit:                                                                    # habit-tier
+bd memories correction:                                                                # correction-tier (recurring slips)
+bd list --label=memory --status=open --json | jq -r '.[] | "\(.id) \(.title)"'        # forge memory beads
+grep -iE "$KW_GREP" ~/.claude/projects/-workspaces-main/memory/workflow.md
+grep -riE "$KW_GREP" ~/.claude/projects/-workspaces-main/memory/*.md
+grep -riE "$KW_GREP" /workspaces/main/.claude/rules/
+grep -riE "$KW_GREP" /workspaces/main/CLAUDE.md ~/.claude/CLAUDE.md
+bash /home/vscode/.claude/scratch/domain-matcher/match.sh "$KW_TEXT" | head -10        # optional related terminology
 ```
-
-The domain-matcher surfaces prior terminology you may not have phrased the same way (calibration ~79% recall; misfires are expected, don't block on them). If the script is missing, skip that line entirely.
 
 Adjudication on match:
 
-- **Match in `.claude/rules/` or `workflow.md`**: pattern is already codified at a higher tier than habit. Do NOT capture as habit. Surface: "this is already in `<file:line>`. Did you mean to refine that rule via /reflect, or is this a distinct instance?" Let the user route.
-- **Match in a topic file or memory-labeled bead**: surface as near-duplicate. "Closest existing capture: `<bead-id or file>`. Is this a refinement of that, or a new entry under a different key?"
-- **Match in habit-tier `bd memories`, aged 30+ days without a second observation**: surface a fold option in addition to the standard three-way. "This habit has aged. Options: (a) treat as second observation (promote to workflow.md), (b) refine the existing habit, (c) capture as distinct, or (d) **fold both into a rule via /reflect** so the pattern becomes always-loaded behavior instead of dormant memory." Option (d) is the in-flow drain path; it converts two soft habits into one durable rule at capture-time.
-- **Match in habit-tier `bd memories`, recent (under 30 days)**: original three-way (second observation, refinement, or distinct).
-- **No match at any tier**: novel. Continue to Route.
+- **Match in `.claude/rules/` or CLAUDE.md**: the rule exists. If the friction shows the rule is being violated by another path, the build target is a NEW enforcement layer (hook, lint, gate), NOT another memory. Surface: "rule exists at `<file:line>`; build a structural enforcement that catches the same violation at a different point in the flow."
+- **Match in `workflow.md`**: pattern is codified. If the candidate is a refinement or extension, edit the workflow.md row. If it is a distinct surface, file separately.
+- **Match in topic file or memory bead**: surface as near-duplicate. Offer: refine, extend, or distinct entry.
+- **Match in habit-tier `bd memories`, aged 30+ days**: this is a second observation. Two options: (a) promote to workflow.md row citing the original bead, OR (b) fold both into a rule via /reflect so the pattern becomes always-loaded behavior. Option (b) is the in-flow drain path.
+- **Match in habit-tier `bd memories`, recent (<30 days)**: refine or extend; do not create a new sibling.
+- **No match anywhere**: novel. Continue to Route.
 
-The user adjudicates; the skill never auto-decides. Skipping any tier risks duplicating a pattern that already lives somewhere, and that erodes the discoverability of every existing surface.
+### 4. Route to surface
 
-### 4. Route
+The improvement determines its own destination. Match the friction shape to the right artifact:
 
-Three possible destinations, decided by what dedup surfaced. **Routes 1 and 3 both invoke `/bead-forge` in memory checkpoint mode** so the habit gets a real `docr-XXXX` bead ID, structured fields, automatic topic-file indexing (forge Phase 2b), and a chronological log entry (forge Phase 5). The lightweight `bd remember` key becomes a pointer to the bead, not the primary record.
+| Friction shape | Destination | Notes |
+|---|---|---|
+| PreToolUse hook fires for stakeholder-facing text | A pre-output lint script (callable, not a hook) at `~/.claude/scratch/scripts/` or similar. Hook stays as backstop. | Single source of truth on the wordlist between hook and pre-check. |
+| Recurring MCP-edit gotcha (field nulled, link missed) | New section in the relevant memory file (`memory/jira.md`, `memory/github-api.md`, etc.) | Reference the section from the relevant `/jira` or `/pr` skill so future invocations load the gotcha. |
+| Skill missing a capability the work needed | Mirror as personal-tier override (`~/.claude/commands/<skill>.md`) with the addition; project version stays untouched. | Name-overlap convention from CLAUDE.md. |
+| Recurring convention question I had to ask | Section addition to the topic file or skill so the next instance does not ask. | Update MEMORY.md index if a new topic file is created. |
+| Project-wide rule violation pattern | Project rule file (`.claude/rules/<topic>.md`) | Larger blast radius; gets a PR per the lab-to-production rule. |
+| Automation that could replace a manual user step | New skill, hook, or agent. | Larger build; dispatch a subagent unless the surface is tiny. |
+| No buildable improvement, but the work surfaced a pattern worth recording as soft signal | Step 5b fallback: habit-memory bead via /bead-forge memory mode. | Same as the previous /compound primary path. |
 
-| Situation | Destination | Persist mechanism |
-|-----------|-------------|-------------------|
-| **First observation, atomic** (single-paragraph bead body) | New `memory`-labeled bead + `habit:<topic>` key pointing to bead ID | Invoke `/bead-forge` in memory checkpoint mode with the captured pattern. After it returns the bead ID, run `bd remember --key='habit:<topic>' '<date>: <one-line summary> (see docr-XXXX)'` so future dedup queries find both surfaces. |
-| **Second observation** of an existing `habit:*` (user confirms validated in a second concrete instance) | `memory/workflow.md` row citing the original bead | Edit `memory/workflow.md` Entries table; add a new row with three cells: (1) pattern title, (2) the originating bead ID (`docr-XXXX`), (3) one-line description that names both observed contexts. Use the existing rows in workflow.md as the formatting reference. Optionally `bd update <id>` on the original bead to note the second instance. |
-| **Heavy synthesis** (multi-domain, multi-paragraph, generalizes a whole class of work) | New `memory`-labeled bead with long description + topic file (auto-created by forge Phase 2b) | Invoke `/bead-forge` in memory checkpoint mode with the multi-paragraph synthesis. Forge Phase 2b will check for an existing topic file under the bead's domain label; if none, create one with frontmatter and add the MEMORY.md index entry. Same `habit:<topic>` pointer key as Route 1. |
+The user adjudicates the destination if multiple are plausible. The skill never auto-decides between surfaces.
 
-**Why /bead-forge instead of direct `bd remember`**: forge memory mode runs a self-check gate (`Phase 3`), enforces title and acceptance conventions, applies the `memory` category label, updates the per-domain index automatically (`Phase 2b`), and appends to chronological `log.md` (`Phase 5`). Doing this manually was the prior pattern; it accumulated drift (some habits had topic files, some didn't; none had bead IDs that workflow.md could cite). Routing through forge inherits the discipline.
+### 5. Build
 
-**The existing 9 `habit:*` bd memories stay as-is.** No backfill; treat them as a legacy lightweight tier. Future habits get the forge-bead treatment.
+For each candidate that passed dedup, propose the concrete edit:
 
-**Habit-key convention**: use `habit:<topic>` for general patterns and `habit:<domain>:<topic>` when the topic is service-specific or surface-specific (e.g., `habit:workflow:plan-second-session-gate`, `habit:slack:save-thread-verbatim`). The colon-namespaced form scopes future dedup queries (`bd memories habit:workflow:` finds all workflow-class habits without false-matching other domains). When in doubt, namespace; flat keys are harder to dedup later.
+- **Small surface (under ~30 lines)**: present the exact file write or edit diff. On accept, apply directly.
+- **Medium surface (30-150 lines, single file)**: present a sketch. On accept, write the full content via Write tool. Re-present the diff if the result deviates from sketch.
+- **Large surface (multi-file, new skill, new agent)**: dispatch a build subagent (`mx2-executor` for pattern-matching tasks, or a launch-flex agent for larger work) with explicit acceptance criteria. Present the agent's diff before commit.
 
-**Domain label for the forge bead**: pick a single domain that matches an existing topic file in `~/.claude/projects/-workspaces-main/memory/` if one exists; otherwise pick a fresh one that names the surface (`launch`, `slack`, `workflow`, `pr-review`, etc.). Forge Phase 2b creates the topic file under that label if needed, so the domain choice is the steering signal for auto-indexing.
-
-If none of the three routes feels right, the pattern probably isn't ready; say so and stop. Not every conversation yields a captureable pattern, and that is the correct outcome.
-
-### 5. Present
-
-Show the proposed write (full text, exact key/path) and wait for accept/reject/edit:
+**Present format**:
 
 ```
-## Proposed pattern capture
+## Proposed improvement [<n> of <total>]
 
-**Source**: <bead-id | PR # | Jira ticket | Confluence page | Slack thread | conversation segment>
-**Route**: <Route 1: forge memory bead + habit:* pointer | Route 2: workflow.md row citing original bead | Route 3: forge memory bead + auto-topic-file + habit:* pointer>
-**Dedup**: <"novel, no match at any tier" | "match at <tier>: <action user chose>">
+**Source signal**: <citation of friction signal from step 2: turn number, tool call, what blocked>
+**Destination**: <file path, hook name, or skill name>
+**Build size**: <S/M/L>
+**Dedup**: <novel | refines existing match at <path>>
 
-### Write
+### Edit
 
-<exact persist call OR exact diff>
+<exact diff, file content, or subagent prompt>
 
-**Apply? (y/n/edit)**
+**Apply? (y/n/edit/skip)**
 ```
 
-On `y`: run the persist call, confirm. On `edit`: incorporate user's wording, re-present. On `n`: stop. **No silent writes.** The promotion gate is operator-controlled, not skill-controlled.
+On `y`: apply. On `edit`: incorporate user wording, re-present. On `skip`: move to next candidate without writing. On `n`: stop the workflow.
 
-**On /bead-forge failure**: if forge fails to create the bead (DB conflict, validation reject, transient error), do NOT silently drop the capture. Surface the failure with the proposed bead body intact and offer two fallbacks:
-1. Retry forge once.
-2. Capture as lightweight `bd remember --key='habit:<topic>' '[REFORGE-PENDING <date>] <one-line summary>'` directly. The `[REFORGE-PENDING ...]` marker tags the entry for the SessionStart drain hook to automatically re-forge into a memory bead on a future session (via `~/.claude/hooks/reforge-pending-habits.py`). No manual follow-up needed; the hook upgrades the entry once it runs, restoring drainability.
+When multiple candidates exist, present them sequentially (not bundled) so the user can accept some and skip others. The cost of presenting separately is small; the cost of an all-or-nothing decision is friction.
 
-The cost of dropping a captured pattern silently is high: the next dedup query won't find a memory that doesn't exist, and the same insight will be re-derived from scratch.
+### 5b. Habit-memory fallback
+
+When no buildable improvement exists at the end of step 4 OR all candidates were skipped, AND the session surfaced a pattern worth recording, fall through to the previous /compound primary path:
+
+- Invoke `/bead-forge` in memory checkpoint mode with the pattern as a memory-labeled bead.
+- After forge returns the bead ID, run `bd remember --key='habit:<topic>' '<date>: <one-line summary> (see docr-XXXX)'`.
+- Forge Phase 2b auto-creates the topic file under the bead's domain label if needed.
+- Forge Phase 5 appends to chronological log.md.
+
+The fallback exists so soft-signal patterns are not lost when the friction-scan finds nothing buildable. The promotion gate (second observation, workflow.md row) still applies.
+
+On `/bead-forge` failure: capture as lightweight `bd remember --key='habit:<topic>' '[REFORGE-PENDING <date>] <one-line summary>'`. The SessionStart drain hook upgrades the entry on a future session.
 
 ## Distinctions
 
-| Skill | Trigger | Target | What it preserves |
-|-------|---------|--------|-------------------|
-| `/compound` (this skill) | Manual, after successful work | Memory bead (via /bead-forge memory mode) + `habit:*` pointer + `workflow.md` row on second observation | Reusable patterns for many future sessions |
-| `/reflect` | Behavioral, on user correction matching prior `correction:*` memory | `correction:*` memory + rule files in `.claude/rules/` or skill/agent definitions | Lessons from mistakes |
-| `/bead-forge` checkpoint mode (direct) | Manual or proactive, during in-flight deep analysis | Memory-labeled bead capturing conversation context | Conversation context against compaction. Note: /compound invokes this skill internally for Routes 1 and 3, but you can also invoke it directly when the work is mid-flight and not yet a captureable pattern. |
-| `/handoff` | Session winding down | A copy-paste prompt for the next session | Cold-start continuity for one specific successor session |
-| `bd remember` direct | Anywhere | A single `bd memory` key | A single fact, no synthesis, no dedup. Useful for the pointer key that /compound creates after a forge-bead exists; not appropriate for first-class pattern capture. |
+| Skill | Trigger | Primary output | Fallback output |
+|---|---|---|---|
+| `/compound` (this skill) | Manual, after successful work with observable friction signals | Concrete edit to a durable surface (hook, skill, memory, rule) | Habit-memory bead via /bead-forge |
+| `/reflect` | Behavioral, on user correction matching prior `correction:*` memory | `correction:*` memory + rule files in `.claude/rules/` | (none; correction always produces an edit) |
+| `/bead-forge` checkpoint mode (direct) | Manual or proactive, during in-flight deep analysis | Memory-labeled bead capturing conversation context | (none; this IS the capture) |
+| `/handoff` | Session winding down | A copy-paste cold-start prompt for the NEXT session | (none) |
+| `bd remember` direct | Anywhere | A single `bd memory` key | (none; lightweight, no synthesis) |
 
-The distinguishing question for `/compound` vs everything else: **"Is this a pattern that would help many future sessions, not just the next one or this one's debugging?"** If yes, /compound. If "just the next session", /handoff. If "this session's debrief", /bead-forge checkpoint. If "the rule was wrong", /reflect.
+The distinguishing question for `/compound` vs everything else: **"What buildable change would reduce friction in a future instance of work like this?"** If a buildable answer exists, /compound builds it. If only a soft-signal pattern emerges, fall back to habit memory. If the answer is "the rule was wrong", route to /reflect.
 
-## Promotion gate
+## Promotion gate (unchanged from previous version)
 
-`memory/workflow.md` documents the promotion criterion: **second observed application + generalization beyond originating context**. Do not bypass it.
+`memory/workflow.md` documents the promotion criterion for habit-tier entries: **second observed application + generalization beyond originating context**. /compound does NOT bypass this for fallback habit-memory captures.
 
-- A first observation of a pattern is a `habit:*` memory, never a direct workflow.md row.
-- A workflow.md row requires user confirmation that the pattern has now been observed in a **second concrete instance**, in a **different originating context** than the habit memory recorded.
-- The promotion is a user decision, not a skill decision. The skill surfaces the option; the user adjudicates whether the second observation truly generalizes.
+A first observation of a soft-signal pattern is a `habit:*` memory, never a direct workflow.md row. A workflow.md row requires user confirmation of a second concrete instance, in a different originating context.
 
-This gate exists because workflow.md is the canonical reusable-pattern surface. Premature promotion floods it with single-instance ideas that turn out to be one-offs. The habit:* layer is the proving ground.
+The new build-route candidates (steps 4 and 5) do NOT go through this gate. Building a hook, skill, or memory section is the improvement itself; no two-observation rule applies. The gate exists for the habit-tier soft-signal layer, which the new flow uses only as fallback.
 
 ## Calibration soak
 
-The first 5-10 `/compound` invocations are calibration soak. False positives (capturing a one-off that never recurs) and false negatives (stopping at the socratic step when a real pattern was there) are both expected. Trust the gate's no's during soak; the drain hook (see Drain mechanism below) handles false-positive cleanup silently in the background. Do not retune the socratic questions until you have 10+ invocations of data.
+First 10 invocations of the new shape are calibration soak. Expected modes:
 
-## Drain mechanism
+- **False positive on friction signals**: scan flags noise that does not generalize. User skips the candidate; no harm, signal cost is low.
+- **False negative on friction signals**: scan misses a real signal the user would have caught. The /reflect path remains as backstop (the user's next session will surface it as a correction).
+- **Wrong surface routing**: the build lands in the wrong artifact. Easy to move post-hoc; the durable surfaces are designed to be edited.
 
-Captures without a drain become stagnant inventory: the habit stack grows, dedup gets noisier, and codified rules never form. The drain has two surfaces, neither of which requires the user to invoke a separate skill:
+Do not retune the scan heuristics until 10+ invocations of data are in. The drain hook handles stale habit-memory cleanup silently in the background.
 
-1. **SessionStart auto-retire hook** (`~/.claude/hooks/auto-retire-stale-habits.sh`). Runs at most once per UTC day. For every `docr-XXXX` referenced from a `habit:*` bd memory body, the hook checks: is the bead open, created 90+ days ago, AND not cited at any higher tier (workflow.md, topic files, `.claude/rules/`, CLAUDE.md)? If all true, `bd close` it with a reason. Logs every action to `~/.claude/scratch/compound-drain-log.jsonl`. Reversible via `bd reopen <id>`. Other memory-labeled beads (cutover handoffs, audit notes, meeting prep) are EXCLUDED because they are not referenced from a `habit:*` key.
+## Drain mechanism (unchanged)
 
-2. **In-flow folding during Step 3 dedup**. When dedup surfaces a matching habit that has aged (created > 30 days ago without a second observation), Step 3 offers a fold option in addition to the three existing adjudications: route both the existing habit and the new capture through `/reflect` to codify as a rule. This converts two soft habits into one always-loaded rule, organically draining the stack at capture-time without requiring a separate user invocation.
+Habit-tier captures from step 5b without a drain become stagnant inventory. Two drain surfaces, both unchanged from the previous version:
 
-Promotion to workflow.md (the second-observation path) remains as Route 2 in Step 4. That is the third drain surface, and it stays user-gated as before.
+1. **SessionStart auto-retire hook** (`~/.claude/hooks/auto-retire-stale-habits.sh`). Runs at most once per UTC day. Closes `habit:*`-referenced beads aged 90+ days without higher-tier citation.
+2. **In-flow folding during step 3 dedup**. When dedup surfaces an aged habit match, offer the fold-to-rule option in addition to refine/distinct.
 
-Net effect: the habit stack stays small. The SessionStart retire runs silently; the in-flow fold surfaces during dedup so the user adjudicates the consolidation decision, but never needs to run a separate skill or remember to drain.
+The new flow generates fewer habit-memory entries because the primary route is buildable changes, so drain pressure is lower than the previous version.
 
 ## Anti-patterns
 
-Operational mistakes to avoid. For absolute non-negotiables, see Hard constraint below.
-
-- **Habit-only dedup.** Checking just `bd memories habit:` misses patterns already promoted to workflow.md or codified in `.claude/rules/`. The dedup step must span every tier; see Step 3.
-- **Capturing one-offs.** If the user's answer to "would you want this repeated" is no, stop. Not every conversation yields a pattern.
-- **Auto-fire ambition.** v1 is manual-only. Auto-fire on /launch completion or /pr-intel post-publish was deferred: the drain hook handles stale-habit cleanup, but auto-fire would still capture trivial work as noteworthy and dilute the soak signal. Re-evaluate after manual usage produces 10+ entries and the completion-signal heuristics prove reliable.
-- **Overlap with /handoff.** Do not produce cold-start prompts here. /handoff owns the next-session surface; /compound owns the many-future-sessions surface.
+- **Generic questions instead of grounded signals.** The new flow REQUIRES citing the specific tool call, turn number, or hook fire that motivates each candidate. No "what was non-obvious?" prompts.
+- **Building without dedup.** Step 3 is non-skippable. Building on top of existing coverage produces silent duplicates.
+- **Bundled accept gate.** Present candidates sequentially. All-or-nothing forces the user to accept low-value items to get high-value ones.
+- **Auto-routing between surfaces.** If multiple destinations are plausible, the user adjudicates. The skill never picks for the user.
+- **Skipping the fallback when no buildable improvement exists.** A soft-signal pattern with no concrete build target is still worth recording as habit memory, so the dedup query catches it next time.
+- **Auto-fire on /launch completion.** v1 stays manual-only. Auto-fire would scan every completion and dilute the signal.
 
 ## Output format
 
-Run the workflow inline. The visible artifacts are:
+Run the workflow inline. Visible artifacts:
 
-1. Brief scope-detection summary (one line: "Detected work unit: <thing>").
-2. The 2-3 socratic questions, asked one at a time or as a numbered list, match the user's response cadence.
-3. Dedup result (one line: overlap or no overlap, with the matched memory key if any).
-4. The "Proposed pattern capture" block (template above) with the exact persist call or diff.
-5. On accept: confirmation of the write with the resulting memory key or file path.
+1. Scope-detection summary (one line: "Detected work unit: <thing>").
+2. Friction scan output (a table or numbered list of grounded candidates with citations).
+3. Dedup result for each candidate (one line per: novel, near-dup at `<path>`, or fold-candidate).
+4. Sequential "Proposed improvement" blocks with exact edit + accept gate.
+5. On each accept: confirmation of the write with the resulting file path or memory key.
+6. On final candidate: brief end-of-session summary (1-2 sentences) of what was built.
 
-Do not produce a long summary. The value is in the durable artifact, not the conversation.
-
-## Dry-run walkthrough
-
-Scenario: A `/launch` just finished building a small personal-tier skill (single-file, ~120 lines), and during the conversation the user pointed out that subagents cannot write to `~/.claude/` because of the sandbox, so the work shipped via main-thread writes instead of the standard worktree+PR flow.
-
-**Step 1 (scope detection)**: `gh pr list` returns nothing (no PR, this was a personal-tier deliverable). `git log` shows no commits in `/workspaces/main`. `bd list --status=in_progress` shows the bead I just claimed. Jira/Confluence/Slack queries return nothing relevant (this work was bead-tracked only, no ticket, no doc, no Slack thread). User's hint: "the /launch for the compound skill". The work unit is clear.
-
-**Step 2 (socratic)**:
-- "What did you have to figure out that was not obvious from the bead?" → "The /launch flow assumed a worktree+PR. The deliverable lives in ~/.claude/ which subagents can't write to. Had to swap to skill-creator + main-thread write."
-- "Is this a pattern you'd want repeated?" → "Yes, anytime a /launch target is personal-tier, the worktree path is wrong."
-- "What would have made the next person faster?" → "A check at /launch entry that asks 'is the target inside /workspaces/main or in ~/.claude/?' and routes accordingly."
-
-**Step 3 (dedup)**: Derive keywords `KW_TEXT="launch personal-tier worktree skill-creator"` and `KW_GREP="launch|personal-tier|worktree|skill-creator"`. Run the 5-tier parallel check:
-- `bd memories habit:` returns no overlap. Closest neighbor `habit:workflow:plan-second-session-gate` is unrelated.
-- `bd list --label=memory --status=open` shows existing checkpoint beads (cutover, audit, meeting prep) but no forge habit beads yet (this would be the first one).
-- workflow.md grep: no matches.
-- topic-file grep: no matches.
-- `.claude/rules/` grep: no matches (the /launch invariant is not codified anywhere).
-- domain-matcher: returns nothing useful for this novel topic.
-
-Verdict: novel at every tier. Continue to Route.
-
-**Step 4 (route)**: First observation, atomic shape → Route 1: /bead-forge memory mode + `habit:*` pointer key.
-
-**Step 5 (present)**:
-
-```
-## Proposed pattern capture
-
-**Source**: docr-hnaa (/launch of compound skill)
-**Route**: Route 1 (new memory bead via /bead-forge + habit:* pointer)
-**Dedup**: no overlap with existing habit:* corpus
-
-### Write (two steps)
-
-Step A: Invoke /bead-forge in memory checkpoint mode with this content:
-
-  Title: /launch target in ~/.claude/ requires non-worktree path
-  Category: memory
-  Domain: launch
-  Body: When /launch target is in ~/.claude/ (not /workspaces/main), the
-    standard worktree+PR flow is wrong because subagents are sandboxed
-    to /workspaces/main and cannot write to ~/.claude/. Route via
-    skill-creator or main-thread write instead. First observed building
-    the /compound skill itself.
-  Acceptance: A future /launch invocation targeting ~/.claude/ should
-    route through skill-creator or main-thread write, not worktree+PR.
-
-Step B: After forge returns the bead ID, run:
-
-  bd remember --key='habit:launch-personal-tier-target' \
-    '2026-05-20: When /launch target is in ~/.claude/, worktree+PR flow is wrong; subagents cannot write to ~/.claude/. See docr-XXXX.'
-
-**Apply? (y/n/edit)**
-```
-
-If the user says `y`: invoke /bead-forge memory mode (which itself runs Phase 4 present + Phase 5 create, so the user sees the forged bead before persist). After the bead is created, run the `bd remember` pointer. If a second concrete instance shows up later (e.g., building a personal-tier agent via /launch), the future /compound invocation will dedup against this habit, find the bead ID, and surface Route 2 (workflow.md promotion citing the original bead).
+Do not produce a long summary. The value is in the edits, not the conversation.
 
 ## Hard constraint
 
-Do not write to durable surfaces (`bd remember`, `memory/workflow.md`, `memory/<topic>.md`, `MEMORY.md`, beads via `/bead-forge`) without explicit user accept. The presented "Proposed pattern capture" block in Step 5 is the only gate; if the user says no or edits without explicit accept, the workflow stops.
+Do not write to durable surfaces (hooks, skills, memory files, rule files, settings.json, bead memory keys) without explicit user accept. Each "Proposed improvement" block is the gate; no silent writes.
 
-Do not write to `correction:*` keys or any file under `.claude/rules/`. That surface is `/reflect`-owned. If the pattern emerged from a mistake, the correct skill is `/reflect`, not this one. If unsure, ask before persisting.
+Do not write to `correction:*` keys or any file under `.claude/rules/`. Both surfaces are `/reflect`-owned. If the friction signal is correction-shaped (user explicitly corrected the agent), the correct skill is `/reflect`, not this one.
 
-Do not bypass the workflow.md promotion gate. A first observation is always a `habit:*` (Route 1 or Route 3 via /bead-forge memory bead), never a direct workflow.md row. Promotion requires a confirmed second concrete instance and user adjudication.
+Do not bypass the workflow.md promotion gate for fallback habit-memory captures (step 5b). A first observation is always a `habit:*`, never a direct workflow.md row.
 
-The reason these are hard constraints: the durable surfaces are the canonical record across sessions. Silent writes, surface confusion with /reflect, and bypassed promotion gates accumulate over many invocations and erode the memory architecture. A skill that occasionally fails to capture is recoverable; a skill that occasionally writes the wrong thing to the wrong surface is not.
+Do not auto-fire. v1 is manual-only.
+
+The reason these are hard constraints: the durable surfaces are the canonical record across sessions. Silent writes, surface confusion with /reflect, and bypassed gates accumulate and erode the memory architecture.

@@ -16,6 +16,7 @@ V0 scaffolding. Content arrives progressively as the WORLDMAP authoring sweep pr
 - `lab-to-production.md` (personal-tier sandbox to team-reviewed promotion)
 - `reflection-trigger.md` (two-strike pattern, mid-conversation correction to durable rule)
 - `self-review-protocol.md` (2-pass small, 4-pass large)
+- `contrapositive-proof.md` (author principles unconditionally; mark thresholds as one-way triggers)
 - `multi-window-discipline.md` (designing for fragmented attention)
 - `cost-via-delegation.md` (Opus retains oversight, Sonnet executes)
 - `prompt-interpretation.md` (terse-input handling, scope-probe pattern)

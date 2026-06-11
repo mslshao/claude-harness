@@ -33,6 +33,8 @@ You have read-only access to the full codebase via Glob, Grep, and Read. **Use i
 
 Every finding must include a `verification:` field stating what you checked (VERIFIED) or what the reviewer should check (DIFF-VISIBLE/QUESTION).
 
+**Don't trace execution in head.** Per a reviewer's Code Review Guide #6, do not mentally execute the code path to convince yourself a fallback is harmless or an error path is unreachable. The discipline: grep for tests covering the error path. If a test exists and exercises the failure mode, that's the source of truth for "is this handled correctly?" If no test exists, that's the finding (test gap on an error path), not a confidence judgment from your own reasoning. The Verification Protocol above operationalizes this: every claim is grep-backed, not reasoning-backed.
+
 ## Evidence Categories
 
 Classify every finding:

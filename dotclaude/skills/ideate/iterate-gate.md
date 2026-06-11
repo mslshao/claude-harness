@@ -5,7 +5,7 @@ SKILL.md references this file; do not duplicate content.
 
 ## Why Phase 4 Exists
 
-Phase 3 produces a ranked top-3 with tenth-man findings, but a high
+Phase 3 produces a ranked top-3 with skeptic findings, but a high
 absolute Score does not guarantee a defensible recommendation. The
 top-1 might score well yet still fail a decision-maker's "would you
 bet on this" check. Phase 4 is the calibration layer.
@@ -14,9 +14,9 @@ bet on this" check. Phase 4 is the calibration layer.
 
 The gate receives the top-K candidates (K = 3 normally, fewer if Phase 2
 produced fewer surviving approaches; the dispatch prompt below handles
-both cases). It also receives the tenth-man findings OR the
-unavailable-reason if Phase 3c's tenth-man pass failed. A missing
-tenth-man pass is itself a signal: PROCEED carries lower confidence
+both cases). It also receives the skeptic findings OR the
+unavailable-reason if Phase 3c's skeptic pass failed. A missing
+skeptic pass is itself a signal: PROCEED carries lower confidence
 when adversarial check did not run.
 
 ```
@@ -29,7 +29,7 @@ Agent(
   ideation: candidates are still-being-evaluated approaches, not
   built artifacts. The Evidence Trail input contract does not apply
   here; the artifact you are gating is a multi-approach scoring
-  matrix plus a tenth-man stress-test (or its unavailable-reason),
+  matrix plus a skeptic stress-test (or its unavailable-reason),
   described below.
 
   If you detect calibration drift during this invocation (your
@@ -42,15 +42,15 @@ Agent(
 
   The user has not yet seen any of this. Your job is to call PROCEED,
   ITERATE, ESCALATE-QUESTIONS, or ESCALATE-ROUTE on the top-1, given
-  the top-3 context, the tenth-man stress-test findings, and the
+  the top-3 context, the skeptic stress-test findings, and the
   consequence-of-wrong / verifiability columns.
 
   PROCEED if the top-1 is a defensible recommendation: rationale holds
-  under tenth-man scrutiny, Consequence-of-wrong is acceptable for its
+  under skeptic scrutiny, Consequence-of-wrong is acceptable for its
   Verifiability, and the gap to top-2 is meaningful (clear winner).
 
   ITERATE if the top-1 is uncertain BUT another Diverge pass with a
-  focused weak-dimension target would plausibly resolve it: tenth-man
+  focused weak-dimension target would plausibly resolve it: skeptic
   surfaced an unaddressed high-impact concern, OR all top-3 cluster at
   similar Score with no clear winner, OR all top-3 share a weakness
   (e.g., all low-Verifiability with med+ Consequence). Specify which
@@ -78,9 +78,9 @@ Agent(
   produced fewer):
   <top-K block>
 
-  Tenth-man findings (or "Tenth-Man Lens unavailable: <reason>" if
+  Skeptic findings (or "Skeptic Lens unavailable: <reason>" if
   the Phase 3c dispatch failed):
-  <tenth-man block>
+  <skeptic block>
 
   Return VERDICT (PROCEED / ITERATE / ESCALATE-QUESTIONS /
   ESCALATE-ROUTE), REASON (1-3 sentences), and:
@@ -105,7 +105,7 @@ iteration log.
 Run another Diverge pass focused on the WEAK_DIMENSION (see
 `specialists.md` ITERATE Re-dispatch section for the prompt
 modifications per dimension). Merge new approaches into the candidate
-pool. Re-score in Phase 3a-b. Re-run tenth-man (Phase 3c). Re-gate
+pool. Re-score in Phase 3a-b. Re-run skeptic (Phase 3c). Re-gate
 (Phase 4a).
 
 ### ESCALATE-QUESTIONS
@@ -120,6 +120,11 @@ ideation pass would be productive. If you don't want to answer, reply
 'you decide' or 'help me find it' and I'll commit to the top-1 with a
 low-confidence annotation."
 
+Non-interactive callers (agent dispatch, pipelines, any context where
+no human can answer): do NOT block on AskUserQuestion. Treat as the
+'you decide' opt-out: commit to the top-1 with the low-confidence
+annotation and carry the unanswered questions into Open Assumptions.
+
 Constraints on questions:
 - Max 3. One focused question is usually better than three.
 - Each must name what specifically gets unblocked by the answer (the
@@ -132,7 +137,7 @@ Constraints on questions:
 
 After the user answers (or opts out): fold answers into the refined
 problem (Phase 1), re-run Phase 2 (Diverge) with the narrowed scope,
-re-run Phase 3 (Evaluate + tenth-man), and re-gate (Phase 4a). If the
+re-run Phase 3 (Evaluate + skeptic), and re-gate (Phase 4a). If the
 user opted out, treat as a forced PROCEED with low-confidence
 annotation.
 
@@ -177,6 +182,6 @@ Iteration log:
   retrofit. Re-ran Diverge with retrofit constraint.
 - Round 2: ITERATE (weak dimension: verifiability). Added 2
   approaches with verification paths.
-- Round 3: PROCEED. Top-1 verifiability rose to high; tenth-man clean.
+- Round 3: PROCEED. Top-1 verifiability rose to high; skeptic clean.
 - Final verdict: PROCEED.
 ```

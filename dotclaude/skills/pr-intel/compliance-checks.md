@@ -72,7 +72,7 @@ amount of code-level analysis would surface.
 **Empty ticket detection (blocking).** Before checking AC, verify the ticket has
 real content. Per project convention (see
 [/workspaces/main/.claude/commands/jira.md](/workspaces/main/.claude/commands/jira.md),
-<jira-ticket>): non-Salesforce issue types put canonical content in `description`
+MX2-XXXXX): non-Salesforce issue types put canonical content in `description`
 with `customfield_11220` blanked to empty ADF; SF-specific issue types mirror
 content in both fields. Determine which field to check by issue type. If the
 canonical field contains only the default Jira template boilerplate

@@ -1,5 +1,22 @@
 # Specialist Dispatch
 
+In `--mine` mode, the Review-Cache Reuse step (see
+[dispatch-mechanics.md](dispatch-mechanics.md)) may have already
+populated findings for the overlapping roster from a recent `/review` run on an
+unchanged diff (bead `docr-xvnr`). When that happens, only `mx2-pr-precedent`
+dispatches here; the reused findings flow into Synthesis as if the agents had
+just returned. The triggers below still apply on a cache MISS or in default mode.
+
+## Provenance Classification
+
+Each specialist's findings carry a default provenance classification (`speed-amplified`
+or `bot-surfaced`) consumed by `synthesis.md` step 5d. The classification determines
+whether the posted inline comment opens with an attribution prefix (bot-surfaced) or
+uses Michael's voice directly (speed-amplified). The full classifier table lives in
+`synthesis.md` step 5d; specialists do NOT classify their own findings, the synthesizer
+does it from source + verification-path signals. Override at synthesis time when a
+specific finding's verification path contradicts the default.
+
 ## Dispatch Triggers
 
 When pre-loaded context is available, triggers are pre-evaluated in
@@ -10,7 +27,7 @@ When pre-loaded context is available, triggers are pre-evaluated in
 | `has_try_except_raise: true` OR `structural_risk_size: true` | Structural risks |
 | `has_security_patterns: true` OR `security_files` non-empty | Security & compliance |
 | `has_test_files: true` | Test quality |
-| `has_terraform_files: true` | Infrastructure review |
+| `has_terraform: true` | Infrastructure review |
 | `has_typescript_files: true` | TypeScript review |
 | `structural_risk_size: true` AND `has_file_history: true` | Git history regression |
 | `structural_risk_size: true` AND `has_pattern_precedent: true` | Prior PR precedent |
@@ -69,10 +86,10 @@ Trigger: `has_pydantic_settings_signal: true`. The signal is true when ANY of th
 
 Focuses on configuration-management patterns: required fields with empty-string defaults (silent misbehavior), cross-service `AppSettings` imports (architecture violation per `architecture.md`), missing `__table_name__()` cross-service patterns, and `os.environ` usage that should be a Settings field. Different from `mx2-code-reviewer` (general structural review) and `mx2-security-auditor` (secrets handling).
 
-**Adversarial dissent** → `mx2-tenth-man`
+**Adversarial dissent** → `mx2-skeptic`
 Trigger: `structural_risk_size: true` (M+ PR: > 200 lines OR > 5 files). Surfaces naive-but-unasked questions about scope, assumptions, and risk that other specialists miss because they are focused on their own domain. Advisory only; severity vocabulary limited to QUESTION (never BLOCKING/CRITICAL/COMMENT). Findings appear in their own subsection of the synthesis report under "Open questions", not folded into the main severity buckets. Designed as a safety net for fragmented attention (multi-window operational reality).
 
-Different from `bot-review` (cross-file consumer-invariant articulation; both are advisory but tenth-man asks "what did you not consider" while bot-review asks "what does X consumer assume that breaks"). Different from `mx2-code-reviewer` (structural verdicts) and `mx2-silent-failure-hunter` (error-propagation verdicts) which produce judgments rather than questions.
+Different from `bot-review` (cross-file consumer-invariant articulation; both are advisory but skeptic asks "what did you not consider" while bot-review asks "what does X consumer assume that breaks"). Different from `mx2-code-reviewer` (structural verdicts) and `mx2-silent-failure-hunter` (error-propagation verdicts) which produce judgments rather than questions.
 
 **Inline IaC analysis** → `checkov` (tool call, not subagent)
 Trigger: `has_terraform: true` AND at least one net-new `*.tf` file exists.
@@ -98,7 +115,7 @@ Do NOT send the full diff to every specialist. Filter by relevance:
 - **mx2-pr-precedent**: file path list only (the agent queries gh API server-side; no diff content needed)
 - **observability-reviewer**: only files matching the observability sub-rules above (exception-class diffs, metric-emission hunks, observability `*.tf` files, enum/Literal additions) PLUS any sibling `*.tf` in the same service directory PLUS the PR description (for alert references)
 - **bot-review**: changed public-symbol declarations only (lines matching the `changes_public_surface` regex from `SKILL.md` Dispatch Signals) PLUS the full file path list. Mirrors `mx2-pr-precedent`'s "file path list only" filter shape, NOT the full diff. The agent fetches consumers itself via Grep/Read on the worktree; sending the full diff saturates context on the M+ PRs the agent is most useful for.
-- **mx2-tenth-man**: PR description + file path list + summarized diff overview (first 50 lines of each file's diff). The agent asks questions about intent and assumptions; it does not need exhaustive code context. Sending the full diff saturates without improving question quality. Include the Jira ticket AC if available.
+- **mx2-skeptic**: PR description + file path list + summarized diff overview (first 50 lines of each file's diff). The agent asks questions about intent and assumptions; it does not need exhaustive code context. Sending the full diff saturates without improving question quality. Include the Jira ticket AC if available.
 - **mx2-pydantic-reviewer**: only files matching the pydantic_settings sub-rules above (Settings class diffs, os.environ patterns, *settings* / *config* filename diffs) PLUS sibling settings files in the same service directory (to detect duplicate field declarations or cross-service `AppSettings` import attempts).
 
 ## Specialist Prompt Preamble
@@ -165,6 +182,29 @@ Return findings in structured FINDING format with evidence categories.
 Use Grep/Read to verify structural claims against the full file, not just
 the diff hunk. Focus on production impact and maintenance risk.
 
+Surface findings in a reviewer's priority order (Code Review Guide for Humans,
+https://<company>.atlassian.net/wiki/spaces/PPET/pages/5684789249):
+1. Description / intent (already checked at Phase 0; surface only if you see
+   intent drift between description and diff)
+2. Data models / types (Type System Subversion check: untyped dicts as
+   record stand-ins, `dict[str, Any]`, model representing multiple
+   independent concepts, None-Abuse on collections)
+3. Complexity / organization / naming (call-site test, SRP)
+4. Boolean / behavior-switching parameters
+5. Tests (delegate to test-quality-reviewer if dispatched; flag missing
+   coverage on new branches)
+6. Correctness via tests, NOT in-head execution (if tests missing, flag the
+   gap; do not trace control flow to convince yourself it works)
+7. Static analyzer findings (SonarCloud + Datadog code analysis pre-checks ride on this; Sentry static patterns ride in mx2-code-reviewer)
+8. Pragma / override justification (Pragma Justification check)
+9. Exception design (raise the condition, not the handling)
+10. Large-refactor methodology (was the methodology stated?)
+
+Tag findings as `front_door: true` when they match item 2 (type/model
+smells) or item 10 (large-refactor methodology gap). Front Door findings
+shift the review recommendation to Comment with back-to-author framing
+(synthesis.md step 7b and Recommendation Table).
+
 PR context: <body>
 
 Files changed (diff):
@@ -181,6 +221,26 @@ Use Grep to check call sites before claiming error propagation issues.
 Use Read to see the full function context, not just the diff hunk.
 If the PR touches both Python and TypeScript files, check the boundary
 error handling between them.
+
+PROBE: module-level initialization paths for new external dependencies.
+When a PR introduces a new client/SDK/secret-fetch at module scope (e.g.,
+`_client = SomeSDK(...)` or `_settings = get_secret_value(...)` at the top
+of a Lambda handler module), check explicitly:
+- Is the init wrapped in try/except, or does a cold-start failure of the
+  external dependency kill every invocation on the worker until the container
+  recycles?
+- Is there a no-op fallback for "dependency unavailable, keep processing,"
+  or is the dependency a hard requirement?
+- Does the init path run BEFORE any feature-flag / `_should_enable_X` check,
+  such that the flag can't disable the failure surface it gates?
+
+PROBE: new external-dependency calls inside retry loops. When a PR adds a
+retry/fallback loop around an external call, check whether OTHER new external
+calls in the same function (e.g., prompt fetch, config fetch, credential
+refresh) are inside or outside the retry. A common defect shape is "retry
+covers the OpenAI call but not the prompt fetch that happens one line above
+the loop" - the new dependency's failure mode bypasses the safety net the PR
+believes it has.
 
 Files changed (diff):
 <files containing try/except/raise>
@@ -210,6 +270,24 @@ Assess test quality in PR #<number>. Do tests verify domain behavior or
 just exercise framework mechanics? Return structured FINDING format with
 evidence categories. Use Grep/Read to examine the source files under test
 in the codebase, not just the diff excerpt.
+
+PROBE: symmetric-path coverage. When the source contains two or more
+structurally identical methods (e.g., parallel LLM call sites with the same
+retry shape, parallel handlers for related entity types, parallel mapping
+functions), and a test exists for one path, check whether the symmetric test
+exists for the other. Asymmetric coverage is a common defect shape: one
+function gets a retry-exhaustion test because the author hit the failure
+once, the symmetric function ships untested. Cite both function names and
+whether each has coverage.
+
+PROBE: positive-assertion of new wiring. When the PR's headline change is
+"wire X into Y" (new tracer, new client, new instrumentation), check whether
+ANY test asserts the wiring was exercised. A test that passes whether or
+not the new `with X(...)` block is present does not verify the change. The
+no-op fixture pattern (NoOpTracerProvider, null clients) correctly runs the
+production code path but does NOT, by itself, prove the wiring is reached;
+that requires an explicit `verify(mock, called).method(...)` or equivalent
+assertion at the wiring boundary.
 
 Source files under test (diff):
 <filtered source diff>
@@ -291,6 +369,17 @@ SNS/SQS/EventBridge boundaries; new Lambda/ECS without CloudWatch log retention.
 Demote to QUESTION-tier any finding requiring Datadog/CloudWatch UI access
 (dashboard breakdowns, alert applicability, log-filter impact).
 
+PROBE: reference-implementation comparison. When the PR introduces a new
+instrumentation pattern (LLM span wiring, tracer init, metric emission for a
+service that previously had none), locate the closest sibling implementation
+in the codebase via Grep on the SDK/library imports and compare the call shape
+end-to-end. Specifically check: are context manager handles captured and
+populated (`as handle:` then `handle.set_attributes(...)`), is
+`suppress_instrumentation()` wrapping SDK calls that would otherwise be
+double-captured by ddtrace + the new tracer, are attribute keys consistent
+with the reference impl. Divergence from the reference pattern is a
+DIFF-VISIBLE finding worth surfacing even when the diff alone looks correct.
+
 Return findings in structured FINDING format with evidence categories. Use Grep
 to verify exception-class references against infra/ Terraform; use Read to
 confirm trace propagation calls at queue boundaries. Do NOT flag log-only
@@ -369,7 +458,7 @@ Files changed (filtered to Settings/config patterns):
 <filtered diff>
 ```
 
-### mx2-tenth-man
+### mx2-skeptic
 ```
 <scope preamble>
 

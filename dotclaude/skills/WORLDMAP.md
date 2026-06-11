@@ -1,7 +1,7 @@
 ---
 component: dotclaude/skills
 type: directory-map
-status: V0 complete (all 24 skills have entries)
+status: V0 complete (all 27 skills have entries)
 authored_by: Claude Opus 4.7
 ---
 
@@ -9,7 +9,7 @@ authored_by: Claude Opus 4.7
 
 AI-authored commentary on each personal-tier skill in `~/.claude/skills/`. When I invoke the skill, what failure mode it prevents, how it compounds, and where it has limits. Entries follow the format documented in the top-level `WORLDMAP.md`.
 
-Skills fall into four loose buckets: planning / decomposition (converge, bead-forge, refine, synthesize, challenge, consult, enrich), execution and review (launch, pr-intel, review, post-review, babysit-pr, test-forge, autopilot), investigation and memory (investigate, handoff, reflect, calibrate, snapshot-system-prompt), and tactical chores (audit-worktrees, codility-review, skill-catalog). The boundaries blur (autopilot is execution but also planning; reflect is memory but also rule-enforcement); the buckets are reading aids, not strict taxonomy.
+Skills fall into four loose buckets: planning / decomposition (converge, bead-forge, ideate, refine, synthesize, challenge, consult, enrich), execution and review (launch, pr-intel, review, post-review, babysit-pr, test-forge, autopilot), investigation and memory (investigate, handoff, reflect, compound, calibrate, snapshot-system-prompt, recall, bd-related, capture-transcript), and tactical chores (audit-worktrees, codility-review, skill-catalog). The boundaries blur (autopilot is execution but also planning; reflect is memory but also rule-enforcement); the buckets are reading aids, not strict taxonomy.
 
 ---
 
@@ -234,7 +234,7 @@ trigger_signals:
 prevents:
   - "plans that proceed on fragile assumptions"
   - "implementation work blocked by an assumption that turns out wrong"
-related: [converge (uses challenge as a phase), tenth-man (adversarial sibling)]
+related: [converge (uses challenge as a phase), skeptic (adversarial sibling)]
 ---
 ```
 
@@ -314,7 +314,7 @@ trigger_signals:
 prevents:
   - "long-running work blocked on human availability at routine approval gates"
   - "decision-quality drop when the user must gate decisions they lack context for"
-related: [converge, launch, decision-maker, tenth-man]
+related: [converge, launch, decision-maker, skeptic]
 ---
 ```
 
@@ -322,7 +322,7 @@ When I reach for this: well-scoped work where the gating decisions are routine a
 
 What it prevents: the failure mode where well-scoped work waits hours or days because the user wasn't around to approve a routine gate. The decision-maker handles the routine calls; the user gates only ESCALATE outcomes.
 
-How it compounds: with decision-maker (quality gate at each checkpoint) and tenth-man (adversarial advisor on borderline calls). The decision-maker makes calls; the tenth-man surfaces what the decision-maker might have missed.
+How it compounds: with decision-maker (quality gate at each checkpoint) and skeptic (adversarial advisor on borderline calls). The decision-maker makes calls; the skeptic surfaces what the decision-maker might have missed.
 
 Limits: only as good as the decision-maker's calibration. Domains where calibration is thin produce uncertain decisions; the ESCALATE escape valve is load-bearing. The author's discipline: invoke autopilot in well-calibrated domains, prefer `/launch` with human gates in newer domains.
 
@@ -658,8 +658,90 @@ related: [converge, consult, challenge]
 
 When I reach for this: the user has a problem but does not yet know which of N approaches to pursue. `/converge` starts from a refined approach and stress-tests it; `/consult` is multi-specialist review on the SAME code; `/challenge` is adversarial assumption extraction on an EXISTING plan. None of those answer "I have a problem, I do not yet know what to do." Ideate is that upstream entry point.
 
-What it prevents: the single-approach trap. When the agent jumps to the first plausible approach, the rejected alternatives are not just lost; they were never considered. The structured ideate pass forces divergent generation, ranking, and a tenth-man pass before handing the winner to `/converge`. The rejected alternatives are preserved in the output for later reference (a later session may find the rejected option was actually right under changed constraints).
+What it prevents: the single-approach trap. When the agent jumps to the first plausible approach, the rejected alternatives are not just lost; they were never considered. The structured ideate pass forces divergent generation, ranking, and a skeptic pass before handing the winner to `/converge`. The rejected alternatives are preserved in the output for later reference (a later session may find the rejected option was actually right under changed constraints).
 
-How it compounds: with `converge` (the downstream stress-test on the chosen approach), `consult` (specialists weigh in on borderline rankings during ideate's evaluative phase), and `challenge` (adversarial pressure on the winner's assumptions inside ideate's tenth-man pass). The four skills compose into a planning pipeline: ideate (divergent) → converge (stress-test the winner) → launch (build it) → babysit-pr (watch the rollout).
+How it compounds: with `converge` (the downstream stress-test on the chosen approach), `consult` (specialists weigh in on borderline rankings during ideate's evaluative phase), and `challenge` (adversarial pressure on the winner's assumptions inside ideate's skeptic pass). The four skills compose into a planning pipeline: ideate (divergent) → converge (stress-test the winner) → launch (build it) → babysit-pr (watch the rollout).
 
 Limits: the ranked-approach output is the artifact; the user decides whether to accept the recommended winner. The decision-maker iterate gate at the end of ideate flags low-confidence calls for escalation, but the human still owns the final approach choice. Ideate is a structured thinker, not a decider.
+
+---
+
+```yaml
+---
+component: recall
+type: skill
+status: active
+trigger_signals:
+  - "user references past work without a current-session referent ('the thing with X', 'what we discussed about Y')"
+  - "vague pronouns ('that bug', 'the doc') with no in-session antecedent"
+  - "cold-start session where the user assumes context this session does not have"
+prevents:
+  - "answering from thin context when the real answer lives in another session's beads, memories, or topic files"
+  - "fabricating a plausible-but-wrong referent for a vague reference"
+  - "deep-reading the wrong artifact because the search was single-corpus (beads only, or memories only)"
+related: [enrich, bd-related, investigate]
+---
+```
+
+When I reach for this: the user references work I have no current-session memory of. Phrases like "what we landed on for X", "remind me about Y", or a bare named entity that was never introduced this turn. The skill runs a breadth-first search across all three persistent corpora (beads titles + descriptions, memory keys + values, topic files) in parallel and returns one-line previews with IDs and recency, then stops; the agent decides which hits warrant a deep read.
+
+What it prevents: the failure mode where a vague back-reference gets answered from the shallow current context, producing a confident-but-wrong answer because the actual decision lives in a closed bead from three sessions ago. The BFS-only discipline is the safeguard against the opposite failure too: pulling full content for every hit blows the context budget before the right artifact is even identified. Recall surfaces the map; DFS into the territory is a separate, agent-initiated step.
+
+How it compounds: with `enrich` (recall finds the ID when it is unknown; enrich loads full context once the ID is known, so recall feeds enrich) and with `bd-related` (recall calls `bd_related.py` for the memory-graph leg of its parallel search). It is the consumer-side complement to the producer-side `bd-recency-surface` hook: the hook surfaces what is in the corpus at write time, recall queries it at read time.
+
+Limits: coverage is bounded by what the search corpora hold. There is no comment-search flag, so bead comments are invisible to recall; and the `--status all` requirement is load-bearing precisely because the target work usually lives in closed beads that `bd` excludes by default. When recall returns nothing and the user is certain the info exists, the escape valve is the external surfaces (Slack, Jira, Confluence) the skill names explicitly.
+
+---
+
+```yaml
+---
+component: bd-related
+type: skill
+status: active
+user_invokable: false
+trigger_signals:
+  - "about to write a plan / review / fix in a known domain AND the load-time preload hook has not fired for this task"
+  - "user names a topic, bead, or memory key and wider corpus context is wanted before responding"
+  - "a subagent's findings need cross-checking against prior correction memories in the same domain"
+prevents:
+  - "forming a response in a domain without seeing the prior corrections that govern it"
+  - "missing a ratified decision living in a sibling bead under a different epic"
+  - "the load-time preload hook being the only graph walk, when it did not cover the mid-conversation domain shift"
+related: [recall, enrich]
+---
+```
+
+When I reach for this: never via the user (`user_invokable: false`); it is a model-only subroutine. I invoke it when entering a domain mid-conversation that the most recent /enrich, /converge, or /pr-intel did not cover, or when I want the wider neighborhood of a seed (memory key, bead ID, or free-text keyword) before forming a response. It walks the personal memory graph: matches, bridges (co-mentioned cross-tree neighbors), and namespace siblings/cousins.
+
+What it prevents: the specific failure the harness keeps relitigating, where the ratified decision lives in a sibling bead under a different epic and a parent-only check misses it. The walker surfaces those cross-tree neighbors (the `bridge` kind ranks first for exactly this reason) so a review or plan does not proceed in ignorance of a correction or decision that already governs the case. It is the deliberate, on-demand graph walk that backstops the load-time `preload-sibling-beads.sh` hook when that hook did not fire for the current task.
+
+How it compounds: it is the graph engine underneath `recall` (recall calls `bd_related.py` for its memory-graph leg) and a precursor to `enrich` (the walker names what is relevant; enrich loads it). Three layers of context retrieval at different granularities: the load-time hook (automatic, allowlist-gated), bd-related (on-demand, model-invoked), and recall (user-facing, multi-corpus).
+
+Limits: output is informational, not directive: a surfaced neighbor does not mean the user wants action on it, and treating it as a to-do list is the misread to avoid. Quality also depends on the namespace index and bridges file being fresh; both regenerate in under two seconds, but a stale graph (corpus changed substantially since the last build) silently undercovers.
+
+---
+
+```yaml
+---
+component: capture-transcript
+type: skill
+status: active
+trigger_signals:
+  - "user pastes a standup / sync / 1:1 transcript with capture intent ('capture this standup', 'here is the transcript')"
+  - "explicit /capture-transcript invocation, optionally with a standup | sync | 1:1 hint"
+  - "a meeting transcript streamed in chunks across turns ('continuation', 'last chunk')"
+prevents:
+  - "high-value transcript signal lost to compaction because nothing wrote it to a durable file"
+  - "each capture re-deriving the two-tier memory conventions and slipping on identity, sensitivity, or length discipline"
+  - "candid 1:1 people-content leaking into Dolt-synced beads or shared surfaces"
+related: [handoff, bead-forge, recall]
+---
+```
+
+When I reach for this: a meeting, standup, or 1:1 transcript is pasted with capture intent. The skill is the INBOUND complement to the slack plugin's `/standup` (which generates an OUTBOUND status from the author's own activity). It classifies the transcript into one type, then routes: an ephemeral scannable action breakdown for a standup, or a durable `memory/` file plus recall bead plus log entry plus index row for a sync or 1:1.
+
+What it prevents: pasted transcripts are high-value and high-loss; they carry decisions and org signals but arrive garbled (names mangled by transcription) and evaporate at compaction. The two-tier architecture has exact conventions for where each capture lands, and without a skill every capture re-derives them and slips on one of the three disciplines: identity (resolve names against org-context, mark unresolved ones tentative, never fabricate), sensitivity (a 1:1's candid people-content stays in the local file, never in a Dolt-synced bead title), and length (index rows under the lint cap). It encodes all three once.
+
+How it compounds: it shares the durable-capture machinery with `bead-forge` (the recall bead, the `log-append.py` chronological entry) and is the meeting-transcript-shaped sibling of the other capture primitives. `/handoff` produces a cold-start prompt for the next session; `/bead-forge` checkpoint preserves in-flight conversation analysis; `bd remember` stores one fact; this skill captures a meeting that already happened. Its durable output then becomes discoverable through `recall`.
+
+Limits: classification and routing are only as good as the transcript and the org-context source of truth. A name that will not resolve gets marked tentative rather than guessed, and a misrouted decision-bearing standup (sent to ephemeral output because its form is a standup) is the named anti-pattern the skill guards against but still depends on the model recognizing the decision content. The chunked-streaming path adds a finalization discipline (one PARTIAL banner, defer the log append to the closing chunk) that a careless re-run per chunk would violate.

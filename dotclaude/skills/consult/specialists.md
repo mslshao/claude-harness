@@ -51,7 +51,7 @@ for service names).
   ("what production concerns - rollback, observability, migration - does this plan omit?")
 - **Reviewer feedback iteration**: Do NOT dispatch to `mx2-tech-lead`. Use
   `mx2-code-reviewer` for structural evaluation, or handle directly. If relaying
-  reviewer feedback, inject the Feedback Reception preamble (see CLAUDE.md dispatch #6)
+  reviewer feedback, inject the Feedback Reception preamble (see the reviewer-feedback dispatch heuristic in CLAUDE.md)
 - **Historical regression check**: dispatch `mx2-git-historian` when the diff modifies
   a file with 2+ merged PRs in the last 90 days AND the diff alters existing behavior
   (not pure additions). Skip when the file's `git log` shows < 2 commits in 180 days.

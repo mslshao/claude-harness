@@ -37,7 +37,7 @@ composite override forces it to last place regardless of raw Score:
 | 3 | Hard delete + audit row | legacy | M | med | hard | match | aligned | med | high | 10 |
 | 4 | Two-phase delete | hybrid | L | high | hard | new | aligned | low | high | 5 (override: last) |
 
-Tenth-man dispatched on top-3 by Score (approaches 1, 2, 3). Returns
+Skeptic dispatched on top-3 by Score (approaches 1, 2, 3). Returns
 🔻 with no concerns: the recommended winner is dominant on every
 column, the gap to top-2 is wide (22 vs 13), and the high-consequence
 candidates (3 and 4) are not in the recommendation slot.
@@ -89,7 +89,7 @@ on read", "eager backfill via batch job", "event-driven on
 schema-change SNS", "no-op + telemetry to scope first."
 
 **Phase 3 (evaluate)**: Top-3 cluster at Scores 11/10/9 with no clear
-winner. All three are mid-Verifiability and mid-Consequence. Tenth-man
+winner. All three are mid-Verifiability and mid-Consequence. Skeptic
 returns: "I don't know which of these is right because I don't know
 if you're optimizing for backwards-compat with 10M existing docs or
 for forward-cleanliness on a new corpus."
@@ -126,7 +126,7 @@ sweep against a 1K dev-table slice in 30 minutes; confirm idempotency
 and throttling fit budget"). Score rises to 19.
 
 **Phase 4 (gate, Round 3)**: PROCEED. Clear winner, Verifiability=high,
-Consequence=med (acceptable given Verifiability), tenth-man clean.
+Consequence=med (acceptable given Verifiability), skeptic clean.
 
 **Phase 5 (present)**: Iteration log shows Round 0, then Round 1
 (ESCALATE-QUESTIONS, 2 questions, user answered), then Round 2

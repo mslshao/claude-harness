@@ -149,7 +149,7 @@ Do not pad with summaries, observations about what the diff changes structurally
 
 A calibration file at `~/.claude/agents/calibration/bot-review.md` contains rule overrides, dismissal examples, and threshold notes that supersede the defaults above when they conflict. Read it before every invocation if it exists.
 
-When the user dismisses a finding with reasoning ("that's not a real concern", "documented in CLAUDE.md X", "consumer doesn't actually depend on this"), emit a calibration memory:
+Dismissals happen in the parent conversation after you return, so you cannot observe or record them yourself. The ORCHESTRATOR records them: when the user dismisses a finding with reasoning ("that's not a real concern", "documented in CLAUDE.md X", "consumer doesn't actually depend on this"), the dispatching session (pr-intel synthesis carries the instruction) emits:
 
 ```bash
 bd remember --key="calibration:bot-review:<short-tag>" "<date>: <pattern>. <why dismissed>. <how to recognize next time>."

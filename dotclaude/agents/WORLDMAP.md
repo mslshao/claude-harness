@@ -9,7 +9,7 @@ authored_by: Claude Opus 4.7
 
 AI-authored commentary on each personal-tier agent in `~/.claude/agents/`. When I reach for the agent, what failure mode it prevents, how it compounds, and where it has limits. Entries follow the format documented in the top-level `WORLDMAP.md`.
 
-The agents divide into three rough classes: thinking-partner agents (tech-lead, decision-maker, tenth-man) that operate at the framing layer; structural reviewers (code-reviewer, executor, prompt-refiner, the launch-* trio) that do code-shaped work; and specialist linters (Pydantic, TypeScript, Python style, security, silent-failure, devops, git history, observability, test quality, bot-review, pr-precedent) that fire on narrow concerns. The boundaries between classes are not absolute; bot-review and pr-precedent in particular live between "linter" and "memory mechanism." The voice of each entry tries to name what makes that agent earn its keep, not just what it does.
+The agents divide into three rough classes: thinking-partner agents (tech-lead, decision-maker, skeptic) that operate at the framing layer; structural reviewers (code-reviewer, executor, prompt-refiner, the launch-* trio) that do code-shaped work; and specialist linters (Pydantic, TypeScript, Python style, security, silent-failure, devops, git history, observability, test quality, bot-review, pr-precedent) that fire on narrow concerns. The boundaries between classes are not absolute; bot-review and pr-precedent in particular live between "linter" and "memory mechanism." The voice of each entry tries to name what makes that agent earn its keep, not just what it does.
 
 ---
 
@@ -52,7 +52,7 @@ prevents:
   - "shallow synthesis from incomplete context"
   - "premature solutioning before the problem is framed"
   - "user's intuition lost in the gap between 'I know it' and 'I can write it down'"
-related: [tenth-man, decision-maker]
+related: [skeptic, decision-maker]
 ---
 ```
 
@@ -62,7 +62,7 @@ What it prevents: a general-purpose response to a synthesis problem produces gen
 
 Strict carve-out: NOT for evaluating reviewer feedback. The agent has a tendency to over-defend the original work when handling code-review responses. The harness has a separate guidance ("feedback-reception mode") for that case, with its own forbidden-response patterns.
 
-How it compounds: works with the tenth-man (adversarial advisor) when the tech-lead's synthesis needs an adversarial check. The combination is "find the shape, then test the shape against naive questions."
+How it compounds: works with the skeptic (adversarial advisor) when the tech-lead's synthesis needs an adversarial check. The combination is "find the shape, then test the shape against naive questions."
 
 Limits: the tech-lead is the most opinionated agent in the harness. Its framings are sharp, which is the point, but they can also be wrong. The author's rule (skeptic lens for specialist subagent recommendations) applies: when user evidence contradicts the tech-lead's recommendation, the tech-lead does not win by default.
 
@@ -79,7 +79,7 @@ trigger_signals:
 prevents:
   - "pipeline stalling on a call that has a defensible answer"
   - "human-in-the-loop overhead on routine quality gates"
-related: [tenth-man, code-reviewer]
+related: [skeptic, code-reviewer]
 ---
 ```
 
@@ -95,7 +95,7 @@ Limits: only as good as its calibration. New domains where calibration is thin p
 
 ```yaml
 ---
-component: mx2-tenth-man
+component: mx2-skeptic
 type: agent
 status: active
 trigger_signals:
@@ -109,15 +109,15 @@ related: [decision-maker, challenge]
 ---
 ```
 
-When I reach for it: autonomous-pipeline outputs that the user might reflexively accept. The tenth-man's job is to ask the naive, dumb, or obvious-but-unasked question that a careful reader would notice but a sampling reader might miss.
+When I reach for it: autonomous-pipeline outputs that the user might reflexively accept. The skeptic's job is to ask the naive, dumb, or obvious-but-unasked question that a careful reader would notice but a sampling reader might miss. (Formerly framed as the tenth-man; renamed `mx2-tenth-man` -> `mx2-skeptic`, recorded in `graveyard/`.)
 
 What it prevents: the multi-window operational reality means the user is sometimes scanning rather than reading. An adversarial advisor surfaces the question that the user did not ask but should have. The cost is one extra model call; the value is catching a load-bearing detail before it ships.
 
-Strictly advisory. The tenth-man does not block; it raises questions. The user decides. This separation is intentional: the harness rule says "agents advise, the user decides."
+Strictly advisory. The skeptic does not block; it raises questions. The user decides. This separation is intentional: the harness rule says "agents advise, the user decides."
 
 How it compounds: paired with `decision-maker` (which makes binary calls) and `challenge` (which surfaces assumptions). All three are skeptic-lens tools in different roles.
 
-Limits: false positives erode the user's trust in the tenth-man. The author has calibrated the prompt to reduce noise; calibration drift here is a known concern. The `calibrate` skill handles the periodic recalibration.
+Limits: false positives erode the user's trust in the skeptic. The author has calibrated the prompt to reduce noise; calibration drift here is a known concern. The `calibrate` skill handles the periodic recalibration.
 
 ---
 

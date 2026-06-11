@@ -41,7 +41,8 @@ expected structure.
   - Line number: from the `**Line N**` marker (this is file-relative, use directly)
   - Ready-to-paste text: content of the fenced block ONLY
   - Classification: `speed-amplified` or `bot-surfaced` from the briefing-context section's classification line (synthesis.md step 5d). Used to populate audit counts in Step 5.
-- **Bot reactions** (when present): from the pr-intel `bot_reactions` list (rendered as a `### Bot Reactions (for /post-review)` section in the briefing output per pr-intel's bot-reactions.md). Each entry has `{comment_id, endpoint, reaction, bot_name, finding_summary}` where `endpoint` is `pulls` (inline review comment) or `issues` (issue-level conversation comment), and `reaction` is `+1` (bot finding was correct) or `-1` (bot finding was a false positive). If absent, skip Step 3.5. Legacy fallback: if the briefing renders a `### Bot Endorsements` section (old name), treat each entry as implicit `reaction: +1` and accept the schema; Step 3.5 documents the transitional support window.
+  - **Reply target** (when present): the briefing-context section may contain a `Reply target: comment <prior_comment_id> (<author> <date> on <path:line>)` line indicating pr-intel synthesis routed this finding to be threaded under a prior-round same-author comment. When present, MOVE this entry from the main inline-comments list to a separate `inline_replies` list (keyed by `prior_comment_id` and `body`). These do NOT go into the atomic review POST in Step 3; they are posted separately in Step 3.6. If a comment has both a `**Line N**` marker AND a `Reply target:` line, the `Reply target:` wins (the line marker is for briefing context only when the comment is a reply). See pr-intel `synthesis.md` Step 2 position-based same-author dedup rule for the upstream logic.
+- **Bot reactions** (when present): from the pr-intel `bot_reactions` list (rendered as a `### Bot Reactions (for /post-review)` section in the briefing output per pr-intel's bot-reactions.md). Each entry has `{comment_id, endpoint, reaction, bot_name, finding_summary}` where `endpoint` is `pulls` (inline review comment) or `issues` (issue-level conversation comment), and `reaction` is `+1` (bot finding was correct) or `-1` (bot finding was a false positive). If absent, skip Step 3.5.
 
 **SAFETY RULE - CRITICAL**: Extract ONLY the fenced ready-to-paste text blocks as comment body.
 NEVER extract briefing context into posted comments. Briefing context appears AFTER the fenced
@@ -53,6 +54,27 @@ block under `**Briefing context**` and includes:
 
 These are for the reviewer's eyes only. If any of this appears in extracted comment text,
 stop and re-extract.
+
+**Briefing-only sections (do NOT extract)**. pr-intel renders three briefing
+sections that orient the reviewer but never get posted to GitHub. Their
+substance flows into the Draft Review Summary or into specific inline
+comments; the sections themselves are navigation aids only:
+
+- `### Front Door` (above Review Recommendation): table of type/model
+  smells or large-refactor methodology gaps tagged `front_door: true`.
+  The framing ("the priority for this round is X") is already in the Draft
+  Review Summary text per pr-intel synthesis.md step 7b. Do not extract
+  the Front Door table rows as comments.
+- `### Spot-Check Mode` (above Scope, present when `spot_check_eligible:
+  true`): describes that specialists ran on 3 representative files
+  instead of the full diff. The Draft Review Summary already mentions
+  the spot-check sample status. Do not extract the methodology quote or
+  file list as comments.
+- Phase 0 short-circuit output (default mode, Action=Comment, Front Door
+  count=1, no Draft Inline Comments section): post as body-only review.
+  The Draft Review Summary contains the "send it back" framing. The
+  inline_comments list is correctly empty in this case; extraction logic
+  handles this gracefully (no comments to post means body-only).
 
 If pr-intel output is absent or too fragmented to extract reliably, stop:
 "Could not extract review data from conversation. The pr-intel output may have been compacted.
@@ -72,8 +94,13 @@ For each inline comment, run these two checks per file, in parallel:
 # Content check: verify the target line has the expected text
 git show <headRefOid>:<file_path> | awk 'NR==<line> {print NR": "$0}'
 
-# Hunk check: extract the +NNN,+M ranges from the PR diff hunks for this file
-git diff origin/main <headRefOid> -- <file_path> | grep "^@@"
+# Hunk check: extract the +NNN,+M ranges from the PR diff hunks for this file.
+# THREE-DOT (merge-base) diff is mandatory: GitHub's PR view and its 422
+# line-resolution are merge-base-relative; a two-dot diff diverges whenever
+# main has advanced past the merge-base (the common case in this monorepo).
+git fetch origin main --quiet && git diff origin/main...<headRefOid> -- <file_path> | grep "^@@"
+# Authoritative fallback when local objects are missing:
+#   gh api /repos/{owner}/{repo}/pulls/{n}/files --jq '.[] | select(.filename=="<file_path>") | .patch' | grep "^@@"
 ```
 
 If `headRefOid` is not in the conversation, fetch it:
@@ -103,7 +130,51 @@ as a file:line bullet, or drop it.
 
 **Clean comments**: include in the preview without annotation.
 
-## Step 3: Preview
+## Step 2.5: Attribution Check
+
+**Skip for --quick mode** (no inline comments). Runs in default mode before the preview.
+
+Every inline comment pr-intel emits is tool-discovered: it passed through a specialist
+agent or an orchestrator pattern check, not Michael's unaided reading. Per a reviewer's
+2026-05-26 ask (review-voice.md T5 / reviewer-discipline.md T5), each posted inline
+comment MUST open with an explicit attribution lede, never in Michael's first-person
+voice, and the attribution is the lede, not parenthetical. The review SUMMARY body is
+exempt (it is allowed to be in reviewer voice).
+
+Before the preview, verify each inline comment body opens with one of:
+- `My automated <specialist> pass flagged ...` / `My `<agent-name>` specialist flagged ...`
+- `Cross-file analysis surfaced that ...` / `Cross-service ...`
+- `AC item N expects X, the diff implements Y`
+- `The design doc specifies X (section N): ...`
+- `SonarCloud flagged python:S<code>: ...` / `Copilot flagged ...` / `Datadog flagged ...`
+- `Pattern check flagged ...` / `Flagged by <tool> ...`
+
+A comment that merely mentions a tool in prose ("Your decline of Copilot's suggestion...")
+does NOT satisfy this: the source must be the opener. If any comment is in unaided
+first-person voice, rewrite the lede to attribute the source before posting.
+
+The provenance classification (`speed-amplified` vs `bot-surfaced`) is for audit/telemetry
+only and does NOT change this: a `speed-amplified` finding is still bot-discovered and still
+requires attribution. The only exception is a comment Michael personally authored during his
+editing pass (rare; pr-intel does not emit these).
+
+**Structural enforcement (two layers).** Both call `~/.claude/hooks/lib/check_review_attribution.py`,
+which also runs the @-mention guard (no `@person` in any posted body; only `@claude` allowed).
+- `block-unattributed-review-comment.sh` (PreToolUse on Bash) parses the `gh api .../pulls/N/reviews`
+  POST payload (and single-comment POST/PATCH) from `--input <file>`, a heredoc, or `-f body=@file`,
+  and blocks the post (exit 2) if any inline `comments[].body` lacks an attribution lede.
+- `block-unattributed-review-comment-file.sh` (PostToolUse on Write/Edit) is the BACKUP: it scans
+  any written JSON file that looks like a review payload (conservative shape + filename gate, so it
+  never fires on unrelated JSON) and blocks at write time. This catches payloads posted through a
+  path the Bash hook cannot see (e.g. a Python subprocess calling `gh ... --input <file>`).
+
+The review summary, reactions, and replies endpoints are exempt. Both hooks are the backstop;
+do not rely on the prose instruction alone. **Convention:** write review payload JSON via the
+Write tool (not an in-script `json.dump`), so the backup hook sees it; a payload both built and
+posted entirely inside one subprocess is invisible to both hooks. See
+`bd memories correction:skill:post-review-attribution-enforcement`.
+
+## Step 2.6: Preview
 
 Present the verified data for confirmation before any API call. Render as regular markdown (do NOT wrap in a fenced code block):
 
@@ -150,57 +221,32 @@ Wait for user response:
 
 ## Step 3: Post
 
-> **Em-dash guard**: `~/.claude/hooks/block-em-dash.sh` scans the review body
-> and all inline comments in the `gh api -X POST /repos/.../pulls/N/reviews`
-> payload for U+2014 (in both inline heredoc and `--input <file>` forms) and
-> blocks the call on match with exit 2. Sanitize the drafted prose before
-> building the JSON payload: replace em-dashes with hyphens, commas,
-> semicolons, or parentheses. This guard fires regardless of which skill or
-> agent invoked the post.
-
-> **Backticks for code identifiers**: GitHub Markdown parses `__text__` as bold
-> and `*text*` as italic. Code identifiers without backticks render mangled in
-> the posted review: `__init__.py` becomes "**init**.py", `__all__` becomes
-> "**all**", `__str__` becomes "**str**". There is no hook for this (GitHub
-> accepts the post regardless), so the discipline is at draft time. Wrap in
-> backticks: paths (`libs/models/__init__.py`), dunders (`__all__`, `__str__`),
-> class/function names (`Activities.RUNNING`, `update_item`), imports
-> (`from foo import *`), config files (`pyrightconfig.json`). Recurrence
-> context: `bd memories gotcha:review-body-needs-backticks`.
-
-> **Destructive-commands false positive**: `~/.claude/hooks/block-destructive-commands.sh`
-> scans the bash command for an `rm <path>` pattern combined with a `-X-r-Y`
-> substring and a trailing `*` or path. Review bodies that mention a deletion
-> ("rm libs/models", "rm -rf the package") and include any `*` (e.g. quoting
-> `from foo import *`) can satisfy the regex when posted via stdin heredoc,
-> because the body text becomes part of the bash command. The hook does NOT
-> scan file contents passed via `--input <path>`. **Default to `--input <file>`
-> for review posts**: write the JSON payload to
-> `/home/vscode/.claude/scratch/<pr>-review.json` first (flat path, no
-> subdirectory; see personal-tier-vocab note below), then
-> `gh api -X POST .../reviews --input <that-file>`. This sidesteps both this
-> hook and any future bash-command scanners without changing the API call
-> shape. Recurrence context: `bd memories gotcha:post-review-rm-path-hook`.
-
-> **Personal-tier vocab hook catches scratch paths**:
-> `~/.claude/hooks/block-personal-tier-vocab.sh` scans the bash command (not
-> file contents) for personal-tier slash command names like `/pr-intel`,
-> `/launch`, `/converge`. Path arguments to `gh api --input` are part of the
-> command text and DO get scanned. A scratch path like
-> `/home/vscode/.claude/scratch/pr-intel/9025-review.json` will block the post
-> because it contains `/pr-intel`. **Default to a flat scratch path**:
-> `/home/vscode/.claude/scratch/<pr>-review.json`. No subdirectory named after
-> a personal slash command. Recurrence context: `bd memories
-> gotcha:post-review-scratch-path-personal-tier-hook`.
+Five hooks can block this POST: the em-dash guard (U+2014 in body/comments),
+the destructive-commands false positive (a review body mentioning `rm` + `*`),
+and the personal-tier-vocab scan (a `/pr-intel`-style path argument to
+`--input`). The em-dash guard also fires on `gh pr comment` / `gh pr review` /
+`gh api -X POST/PATCH`. Two defaults sidestep all of them: (1) write the JSON
+payload to a FLAT scratch path `/home/vscode/.claude/scratch/<pr>-review.json`
+(no subdirectory named after a slash command) via the Write tool, then post
+with `gh api --input <that-file>` in a SEPARATE command (the attribution
+PreToolUse hook reads the file before the Bash command runs, so build-then-post
+in one command validates stale content). (2) GitHub Markdown mangles
+unbackticked dunders/paths (`__init__.py` -> bold); backtick code identifiers
+at draft time. For the full per-hook explanation and recurrence contexts, see
+[post-hooks.md](post-hooks.md).
 
 Get the repo owner/name:
 ```bash
 gh repo view --json nameWithOwner --jq '.nameWithOwner'
 ```
 
-Post the atomic review using the mechanism from `github-review-api.md`:
-```bash
-gh api -X POST /repos/{owner}/{repo}/pulls/{pull_number}/reviews --input - <<JSON
+Post the atomic review using the mechanism from `github-review-api.md`, as a
+TWO-STEP sequence (never a stdin heredoc; heredocs trip the destructive-command
+and vocab scans and bypass the attribution hook's payload validation):
+
+1. Write the payload with the Write tool to
+   `/home/vscode/.claude/scratch/<pr_number>-review.json`:
+```json
 {
   "body": "<review summary>",
   "event": "<event type>",
@@ -208,18 +254,15 @@ gh api -X POST /repos/{owner}/{repo}/pulls/{pull_number}/reviews --input - <<JSO
     {"path": "<file>", "line": <N>, "body": "<comment text>"}
   ]
 }
-JSON
+```
+2. Post it referencing the file in a separate command:
+```bash
+gh api -X POST /repos/{owner}/{repo}/pulls/{pull_number}/reviews --input /home/vscode/.claude/scratch/<pr_number>-review.json
 ```
 
-When there are no inline comments (e.g., --quick mode), omit the `comments` field entirely:
-```bash
-gh api -X POST /repos/{owner}/{repo}/pulls/{pull_number}/reviews --input - <<JSON
-{
-  "body": "<review summary>",
-  "event": "<event type>"
-}
-JSON
-```
+When there are no inline comments (e.g., --quick mode), omit the `comments`
+field entirely from the JSON file; the two-step sequence is otherwise
+identical.
 
 **Error handling:**
 - 422 "Path could not be resolved": the entire file is not in GitHub's three-dot diff
@@ -237,76 +280,24 @@ JSON
 
 ## Step 3.5: Bot Reactions
 
-After the main review post succeeds (Step 3), apply bot reactions (thumbs-up
-or thumbs-down) to bot comments that pr-intel classified during its Bot
-Reactions phase. This is the upgraded form of a teammate's 2026-05-20 "thumbs-up
-instead of repeat" feedback: a thumbs-up signals the bot's finding was
-correct (whether or not the reviewer also added a comment); a thumbs-down
-signals it was a false positive (whether or not the reviewer also wrote a
-rebuttal). See pr-intel `bot-reactions.md` for the 5-category decision tree
-that produces the `bot_reactions` list this step consumes.
+After the main review post succeeds, apply `+1`/`-1` reactions to the bot
+comments pr-intel classified in its Bot Reactions phase (the upgraded form of
+a reviewer's 2026-05-20 "thumbs-up instead of repeat" feedback). The `bot_reactions`
+list (extracted in Step 1) carries `{comment_id, endpoint, reaction, bot_name,
+finding_summary}`; POST each to the `pulls/comments/{id}/reactions` (inline) or
+`issues/comments/{id}/reactions` (issue-level) endpoint. Skip silently if empty.
+For the endpoint split, error handling (404 / 422-already-exists / 403), and the
+report-line additions, see [reactions-and-replies.md](reactions-and-replies.md).
 
-The `bot_reactions` list is part of the pr-intel output (extracted in Step 1
-alongside review summary and inline comments). Each entry has:
+## Step 3.6: Inline Replies (thread continuations)
 
-- `comment_id`: GitHub comment ID
-- `endpoint`: `pulls` (inline review comment from Copilot/Sentry/Datadog
-  code-quality) or `issues` (issue-level conversation comment from
-  SonarQube/Vercel/PR Metrics/Datadog PR-summary)
-- `reaction`: `+1` (bot finding was correct) or `-1` (bot finding was a
-  false positive)
-- `bot_name`: the bot that authored the comment (Copilot, Sentry, Datadog,
-  SonarQube, Vercel, PR Metrics, etc.)
-- `finding_summary`: one-line description of what the bot caught
-
-For each entry, POST the reaction:
-
-```bash
-# For inline review comments (Copilot, Sentry, Datadog code-quality):
-gh api -X POST \
-  /repos/{owner}/{repo}/pulls/comments/{comment_id}/reactions \
-  -f content=<reaction>
-
-# For issue-level conversation comments (SonarQube, Vercel, PR Metrics, Datadog PR-summary):
-gh api -X POST \
-  /repos/{owner}/{repo}/issues/comments/{comment_id}/reactions \
-  -f content=<reaction>
-```
-
-Where `<reaction>` is the literal value from the entry (`+1` or `-1`). The
-reactions endpoint accepts the same auth as the rest of `gh api` (no extra
-setup).
-
-**Error handling**:
-- 404: the bot comment was deleted between pr-intel and post-review. Log and
-  skip; do not retry. The classification was based on a comment that no longer
-  exists.
-- 422 "already exists": Michael already reacted to this comment in a prior
-  session. Treat as success (the reaction signal is already on the comment).
-  If the prior reaction was the OPPOSITE of the new one (e.g., a `-1` exists
-  but the new entry is `+1`), surface to user with a note so they can decide
-  whether to clear the prior reaction before re-posting; do NOT silently
-  overwrite (changing a reaction requires DELETE on the old reaction ID first).
-- 403: token lacks `repo` scope for reactions. Surface to user and skip; main
-  review post already succeeded.
-
-**Skip silently** if `bot_reactions` is empty (no bot overlap on this PR).
-
-**Backwards compatibility** (transitional, remove after 2 weeks): if the
-pr-intel output emits the legacy `bot_endorsements` section name instead of
-`bot_reactions`, treat each entry as having implicit `reaction: +1` (the
-legacy schema only supported thumbs-up). This handles in-flight briefings
-from before the 2026-05-21 phase promotion. Drop this when no
-`bot_endorsements`-format outputs remain in active session memory.
-
-Add the reaction counts to the user-facing report:
-```
-Review posted to PR #NNN.
-<review URL>
-N inline comments posted. <skip note if applicable>
-M bot reactions applied (P thumbs-up, Q thumbs-down across <bot names>).
-Memory: review:pr-NNN:YYYY-MM-DD recorded.
-```
+After reactions, post any inline comments pr-intel synthesis tagged for
+reply-in-thread (the atomic review endpoint does not accept `in_reply_to_id`,
+so these are separate calls). Each carries `{path, prior_comment_id, body}`;
+POST to `pulls/{pr}/comments/{prior_comment_id}/replies`. Step 1 already
+filtered these OUT of the atomic POST so they do not double-post. Skip silently
+if none (the common case). For error handling and the report-line additions,
+see [reactions-and-replies.md](reactions-and-replies.md).
 
 ## Step 4: Report
 
@@ -317,7 +308,7 @@ Review posted to PR #NNN.
 <review URL>#pullrequestreview-<id>
 
 N inline comments posted. <note if any were skipped with reason>
-M bot endorsements applied (<list bot names>).
+M bot reactions applied (<list bot names>).
 ```
 
 On partial failure (some comments skipped): list which were skipped and why.
@@ -333,8 +324,10 @@ Gather these facts (most come from the pr-intel output and the successful post r
 - `<event>` - APPROVE / COMMENT / REQUEST_CHANGES (the actual event posted, not the
   recommendation; these can diverge if the user overrode with `change`)
 - `<head_sha_short>` - first 12 chars of `headRefOid` (fetched earlier during line
-  verification); represents the exact commit the review was posted against, so a
-  later round can diff against it
+  verification; in --quick mode that step is skipped, so fetch it here:
+  `gh pr view <number> --json headRefOid --jq '.headRefOid'`); represents the
+  exact commit the review was posted against, so a later round can diff
+  against it
 - `<commit_count>` - number of commits on the PR at review time, as a rough "revision
   number" so a later session can tell how much churn has happened since. Compute with:
   ```bash
@@ -356,6 +349,14 @@ Gather these facts (most come from the pr-intel output and the successful post r
   per bot-reactions.md categories 1, 2, 3)
 - `<bot_thumbs_down_count>` - number of `-1` reactions (bot finding disagreed-with
   as false positive; per bot-reactions.md categories 4, 5)
+- `<inline_replies_posted>` - number of inline reply-in-thread comments
+  successfully posted in Step 3.6 (threading to prior-round comments at the
+  same path:line under the same author handle). Zero is the common case;
+  non-zero is the signal that the position-based same-author dedup rule in
+  pr-intel synthesis fired and routed a finding to the replies endpoint
+  rather than letting it land as a duplicate top-level inline. See
+  calibration:pr-intel-same-line-dedup-2026-05-20 for the failure mode this
+  count tracks.
 - `<findings_summary>` - one clause per posted inline comment plus any body-fold
   findings, formatted as `file.py:LINE (short clause)`. Keep each clause under 80
   chars and the total under ~6 lines.
@@ -371,7 +372,7 @@ rounds are different artifacts.
 
 Write with:
 ```bash
-bd remember --key="review:pr-<N>:<YYYY-MM-DD>" "<YYYY-MM-DD> <event> on PR #<N> (<title>, <author>). Rev <commit_count> at <head_sha_short>. Posted <posted_inline_count> inline (<bot_surfaced_count> bot-surfaced + <speed_amplified_count> speed-amplified) + <body_fold_count> body-fold + <bot_reaction_count> bot-reactions (<bot_thumbs_up_count> up / <bot_thumbs_down_count> down). Findings: <findings_summary>. URL: <review_url>"
+bd remember --key="review:pr-<N>:<YYYY-MM-DD>" "<YYYY-MM-DD> <event> on PR #<N> (<title>, <author>). Rev <commit_count> at <head_sha_short>. Posted <posted_inline_count> inline (<bot_surfaced_count> bot-surfaced + <speed_amplified_count> speed-amplified) + <body_fold_count> body-fold + <bot_reaction_count> bot-reactions (<bot_thumbs_up_count> up / <bot_thumbs_down_count> down) + <inline_replies_posted> inline-replies. Findings: <findings_summary>. URL: <review_url>"
 ```
 
 The `<bot_surfaced_count>` and `<speed_amplified_count>` fields support an
@@ -381,7 +382,7 @@ bot-surfaced count with low author engagement) or genuine reviewer judgment.
 Read these back via `bd memories review:pr-` to spot-check the trust signal
 direction; if bot-surfaced consistently dominates and author engagement drops,
 the skill is producing bot-noise rather than amplifying judgment. The
-`<bot_endorsement_count>` measures how often the dedup-and-react path fires;
+`<bot_reaction_count>` measures how often the dedup-and-react path fires;
 high count signals the bots are catching things upstream.
 
 Example (illustrative only; do not copy verbatim):
@@ -403,72 +404,17 @@ Memory: review:pr-NNN:YYYY-MM-DD recorded.
 
 ## Step 6: Persist to DynamoDB (cross-modality)
 
-After Step 5 succeeds, also write the review state to the `pr-review` DynamoDB
-table so cross-modality consumers (the Slack bot, future review tooling) can see
-this round. This is best-effort: if the write fails, log and continue. Do not
-block or fail the overall flow. The GitHub post (Step 3) is the authoritative
-action; DynamoDB is supplementary state.
-
-**Step 6a: Check SSO.**
-
-```bash
-aws sts get-caller-identity --profile dev 2>&1 >/dev/null
-```
-
-If nonzero, log:
-> DynamoDB write-back skipped (SSO not active; run `aws sso login --profile dev` to enable)
-
-and stop. Step 5 (beads memory) is the durable record either way.
-
-**Step 6b: Write the review record.**
-
-The `pr-review` table lives in the dev account (`574892373306`, `us-east-1`).
-The `pr_review_state` module imports `boto3` and `pydantic>=2`; use `uv run --with`
-so the heredoc runs in an ephemeral env. boto3 reads `AWS_DEFAULT_REGION`, not
-`AWS_REGION`.
-
-```bash
-AWS_PROFILE=dev AWS_DEFAULT_REGION=us-east-1 uv run --with boto3 --with 'pydantic>=2' python3 - <<'PY'
-import sys
-sys.path.insert(0, '/home/vscode/.claude/tooling/pr-review-bot/pkg')
-from pr_review_state import Review, ProposedComment, write_review
-
-review = Review(
-    repo="<org>/<repo>",
-    pr=<PR_NUMBER>,
-    timestamp=<UTC_ISO_TIMESTAMP>,
-    head_sha=<HEAD_SHA>,
-    title=<PR_TITLE>,
-    author=<PR_AUTHOR>,
-    size=<SIZE>,
-    briefing_md=<FULL_BRIEFING_MARKDOWN>,
-    proposed_comments=[
-        ProposedComment(
-            id=<stable_id>, path=<file>, line=<line>,
-            body=<comment_body>, status="posted",
-            posted_comment_id=<github_comment_id>,
-        ),
-        # one entry per posted inline comment
-    ],
-    source="terminal",
-)
-write_review(review)
-print(f"Wrote review {review.pr}@{review.timestamp} to DynamoDB")
-PY
-```
-
-Populate the placeholders from the review you just posted:
-- `<PR_NUMBER>`: integer PR number
-- `<UTC_ISO_TIMESTAMP>`: ISO-8601 UTC timestamp for this write (e.g. `2026-04-17T14:00:00Z`)
-- `<HEAD_SHA>`: the `headRefOid` from PR metadata (same as the `<head_sha_short>` source in Step 5)
-- `<PR_TITLE>`, `<PR_AUTHOR>`, `<SIZE>`: from PR metadata and size classification
-- `<FULL_BRIEFING_MARKDOWN>`: the full text of the briefing produced by /pr-intel
-- `proposed_comments`: one `ProposedComment` per inline comment that was posted,
-  using the `id` (GitHub comment ID) returned by Step 3
-
-**Behavior on write failure**: Log the exception, continue. Do not surface the DynamoDB
-error to the user as a review failure. The GitHub post is the authoritative action;
-DynamoDB is supplementary state for cross-modality coordination.
+After Step 5, also write the review state to the `pr-review` DynamoDB table
+(dev account `574892373306`, `us-east-1`) so cross-modality consumers (the
+Slack bot, future review tooling) see this round. Best-effort: gate on
+`aws sts get-caller-identity --profile dev` (skip with a logged note if SSO is
+inactive), then write a `Review` record (one `ProposedComment` per posted
+inline) via `pr_review_state.write_review` using
+`AWS_PROFILE=dev AWS_DEFAULT_REGION=us-east-1 uv run --with boto3 --with 'pydantic>=2'`.
+On write failure, log and continue; the GitHub post (Step 3) is authoritative
+and the beads memory (Step 5) is the durable record. For the full heredoc, the
+`ProposedComment.id` str-wrap type note, and placeholder population, see
+[dynamodb-writeback.md](dynamodb-writeback.md).
 
 ## Human Editing Step (Context Only)
 
@@ -481,7 +427,7 @@ This is the 5-question quick-check from `memory/reviewer-discipline.md`:
 5. Am I over-commenting?
 
 This skill does not automate these questions - that's your editorial judgment.
-The preview step (Step 2) gives you one final chance to drop comments before posting.
+The preview step (Step 2.6) gives you one final chance to drop comments before posting.
 
 ## Rules
 

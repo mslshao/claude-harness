@@ -1,7 +1,8 @@
 ---
 name: ideate
 description: >
-  Divergent approach generation with evaluative ranking, mandatory tenth-man
+  (personal; shadows the project-tier `ideate` and takes precedence) Delta vs the project version: adds the mx2-decision-maker iterate gate (ITERATE/ESCALATE loops), accepts bead IDs as input, and hands the winner to /converge rather than stopping at presentation.
+  Divergent approach generation with evaluative ranking, mandatory skeptic
   pass, and a decision-maker iterate gate. Use when you have a problem but
   do not yet know which of N approaches to pursue: "what are my options for
   X", "brainstorm Y", "tradeoffs between X and Y", "which approach should
@@ -134,8 +135,14 @@ Load all inputs, strip bias, clarify the problem.
    Convergence with prior thinking is fine and worth noting; the goal
    is to NOT pre-load the user's answer into the specialists' question.
 
-5. **Output**: refined problem (1-3 sentences with constraints) plus
-   the two context blocks. Not shown to user.
+5. **Detect scope-signal.** Set a `SCOPE_SIGNAL` flag if the problem
+   carries scope-signal words (lightweight, simple, minimal, quick,
+   basic, just, for most users). When set, Phase 2 treats the
+   minimal-viable candidate as the front-runner to beat, and the Phase 3
+   right-sizing flag weights proportionality harder.
+
+6. **Output**: refined problem (1-3 sentences with constraints), the two
+   context blocks, and the `SCOPE_SIGNAL` flag. Not shown to user.
 
 ### Phase 2: Diverge (internal, parallel)
 
@@ -151,6 +158,13 @@ Key invariants:
 - Specialists receive ONLY the problem-only context block. Bias-stripping
   is structural, not advisory.
 - `mx2-tech-lead` is always in the roster as the broadest-shape lens.
+- **Minimal-viable candidate is mandatory in the candidate pool.** One
+  approach is always the minimal-viable version: the smallest thing
+  delivering ~80% of the *stated* goal, explicitly labeled. Every
+  specialist is asked to steelman, which skews the pool elaborate;
+  without a simple anchor on the table the ranking cannot pick simple
+  even when simple is correct. It is the reference point for the Phase 3
+  right-sizing flag. See [specialists.md](specialists.md) for sourcing.
 - Each specialist returns 1-2 approaches with Shape, Context, Steelman,
   Tradeoff, Codebase touch points, Verifiability, Verification path,
   and Consequence per approach (the format Phase 3 consumes).
@@ -158,12 +172,12 @@ Key invariants:
 ### Phase 3: Evaluate (internal)
 
 Rank approaches on the multi-criteria scoring matrix, then run mandatory
-tenth-man on the top-3.
+skeptic on the top-3.
 
 For the full scoring matrix (8 columns: Context, Effort, Risk,
 Reversibility, Fit, Rules-alignment, Verifiability, Consequence), the
 composite Score formula, the override rules, AND the Phase 3c
-tenth-man dispatch prompt with edge-case + failure handling, see
+skeptic dispatch prompt with edge-case + failure handling, see
 [scoring-matrix.md](scoring-matrix.md).
 
 Key invariants:
@@ -173,10 +187,10 @@ Key invariants:
   to last place regardless of Score.
 - Consequence=high AND Verifiability=low is also forced to last place
   (trust-asymmetry override).
-- Tenth-man (`mx2-tenth-man`) runs on the top-3 by Score. Mandatory,
-  not opt-in. Findings fold into Phase 5 as a `Tenth-Man Lens` block.
+- Skeptic (`mx2-skeptic`) runs on the top-3 by Score. Mandatory,
+  not opt-in. Findings fold into Phase 5 as a `Skeptic Lens` block.
   When fewer than 3 approaches survive Phase 2, run on whatever
-  exists. If dispatch fails, note "Tenth-Man Lens unavailable" and
+  exists. If dispatch fails, note "Skeptic Lens unavailable" and
   proceed; do not block on advisory tooling.
 
 ### Phase 4: Iterate (internal)
@@ -239,6 +253,13 @@ Verification path: <how to validate this before committing>.
 sentences. State the Consequence-of-wrong / Verifiability pairing
 explicitly so the user can sanity-check the asymmetry.
 
+If the Phase 3 right-sizing flag fired (the winner is materially heavier
+than the minimal-viable candidate), the rationale MUST justify the extra
+complexity against the minimal-viable variant (what each extra component
+buys), or switch the recommendation to the minimal-viable candidate. If
+SCOPE_SIGNAL was set in Phase 1, lean toward the minimal-viable variant
+unless a stated constraint demands more.
+
 If the gate forced a low-confidence PROCEED (2 ITERATE rounds hit the
 cap, or the user opted out of ESCALATE-QUESTIONS with "you decide"),
 suffix the section header with `(low-confidence)` and add a
@@ -276,7 +297,7 @@ adjacent-but-novel approach the prior was reaching toward".>
 clause naming the condition under which this alternative becomes the
 right choice. Per CLAUDE.md "Preserve dissent in durable records".>
 
-### Tenth-Man Lens
+### Skeptic Lens
 <Verbatim 🔻 block from Phase 3c. Always present (mandatory pass).
 Include the "no concerns" line verbatim if that was the result.>
 
@@ -362,6 +383,13 @@ ITERATE then PROCEED) live in [walkthroughs.md](walkthroughs.md).
   strongest version of itself.
 - **Distinct approaches, not variants.** Merge near-duplicates during
   Phase 2 collection.
+- **Minimal-viable candidate always on the table.** One of the 3-5
+  approaches is the minimal-viable version (~80% of the goal), explicitly
+  labeled. When it is materially lighter than the recommended approach,
+  the Phase 3 right-sizing flag fires and Phase 5 must justify the extra
+  complexity against it; YAGNI is the default (CLAUDE.md Scope
+  discipline). Scope built for a hypothetical future is a tradeoff to
+  name, not a free win.
 - **Score is a tiebreaker, not the rationale.** Composite Score drives
   ordering; the qualitative tradeoff drives the winner pick.
 - **Rules contradictions always lose.** Forced last place regardless
@@ -372,7 +400,7 @@ ITERATE then PROCEED) live in [walkthroughs.md](walkthroughs.md).
   regardless of how well the approach scores elsewhere. When two
   approaches tie on the rest of the matrix but differ on Consequence,
   the lower-Consequence approach wins decisively.
-- **Tenth-man is mandatory, not optional.** Phase 3c runs on the
+- **Skeptic is mandatory, not optional.** Phase 3c runs on the
   top-3 by Score (or fewer if Phase 2 produced fewer).
 - **Iterate when the gate says iterate.** ITERATE cap is 2 rounds.
   Beyond that, force PROCEED with low-confidence annotation OR

@@ -43,6 +43,25 @@ principle: one wrong call that destroys a workstream outweighs nine
 right calls. When two approaches tie on the rest of the matrix but
 differ on Consequence, the lower-Consequence approach wins decisively.
 
+## Right-Sizing Flag (Proportionality)
+
+A FLAG, not just a principle. The minimal-viable candidate (Phase 2) is
+the reference point. Compute the flag after ranking:
+
+- **Fires when** the top-Score (recommended) approach is materially
+  heavier than the minimal-viable candidate (more components, more new
+  abstractions/code paths, or a full Effort tier higher) AND the
+  minimal-viable candidate still delivers ~80% of the stated goal.
+- **Weights harder** when Phase 1 set `SCOPE_SIGNAL` (the goal carried
+  lightweight / simple / minimal / quick / for-most-users words).
+
+When the flag fires, Phase 5 MUST surface it and the winner narrative
+MUST justify the extra complexity against the minimal-viable variant
+(what does each extra component buy?), or switch the recommendation to
+the minimal-viable candidate. "We might need it later" does not justify;
+the justification must be a STATED constraint (CLAUDE.md Scope
+discipline / YAGNI).
+
 ## Composite Overrides (force last place regardless of Score)
 
 Any ONE of these overrides forces an approach to last place:
@@ -56,15 +75,15 @@ Any ONE of these overrides forces an approach to last place:
 
 Surface every override explicitly in the Phase 5 rationale.
 
-## Phase 3c: Mandatory Tenth-Man Stress-Test on Top-3
+## Phase 3c: Mandatory Skeptic Stress-Test on Top-3
 
-After ranking, dispatch `mx2-tenth-man` on the top-3 by Score. This is
-NOT opt-in; the tenth-man pass is the canonical adversarial check that
+After ranking, dispatch `mx2-skeptic` on the top-3 by Score. This is
+NOT opt-in; the skeptic pass is the canonical adversarial check that
 catches the class of issue the convergent ranking assumes away.
 
 ```
 Agent(
-  subagent_type="mx2-tenth-man",
+  subagent_type="mx2-skeptic",
   description="Adversarial stress-test of top-3 ideate approaches",
   prompt="Ask naive, dumb, or obvious-but-unasked questions about these
   three candidate approaches. The user is trying to choose among them.
@@ -85,28 +104,28 @@ Agent(
 )
 ```
 
-Fold the tenth-man output into the Phase 5 presentation as a
-`### Tenth-Man Lens` section AFTER the recommended winner. If the
-tenth-man returns `🔻 No concerns from this lens`, still include the
+Fold the skeptic output into the Phase 5 presentation as a
+`### Skeptic Lens` section AFTER the recommended winner. If the
+skeptic returns `🔻 No concerns from this lens`, still include the
 section with that exact line so the user can see the pass ran.
 
 ### Edge case: fewer than 3 approaches survived Phase 2
 
 When fewer than 3 approaches survived Phase 2 (rare; usually only
 happens when Phase 2 produced near-duplicates that got merged), run
-tenth-man on whatever exists (top-1 or top-2). The pass still runs;
+skeptic on whatever exists (top-1 or top-2). The pass still runs;
 the prompt's "three candidate approaches" wording becomes "two
 candidate approaches" or "the single candidate".
 
 ### Failure handling
 
-If the tenth-man dispatch fails (agent missing, transient error),
+If the skeptic dispatch fails (agent missing, transient error),
 note the failure in the Phase 5 output as a one-line
-"Tenth-Man Lens unavailable: <reason>" and proceed. Do not block
+"Skeptic Lens unavailable: <reason>" and proceed. Do not block
 ideation on advisory tooling, but do not silently drop the pass
 either; the user must know the adversarial check did not run.
 
-The Phase 4 decision-maker gate receives the tenth-man output (or
-the unavailable-reason) as input. A missing tenth-man pass is itself
+The Phase 4 decision-maker gate receives the skeptic output (or
+the unavailable-reason) as input. A missing skeptic pass is itself
 a signal the gate considers: PROCEED on a top-1 that was not
 adversarially checked carries lower confidence.

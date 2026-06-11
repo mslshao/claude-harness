@@ -7,7 +7,7 @@ description: Evaluate a Codility Legal Document Management API submission using 
 
 Two-pass evaluator rubric for the Legal Document Management API assessment.
 
-- Source rubric: <internal-confluence-url>
+- Source rubric: https://<company>.atlassian.net/wiki/spaces/PPET/pages/5920882702
 - Beads memory: `assessment-calibration`
 
 ## Inputs to gather
@@ -65,10 +65,13 @@ Tally high-weight reds and medium-weight reds.
 
 | High reds | Medium reds | Decision |
 |---|---|---|
-| 0-1 | any | Authentic. Proceed to Pass 2. |
-| 2 | 0-1 | Inconclusive. Recommend second-engineer review. |
+| 0 | any | Authentic. Proceed to Pass 2. |
+| 1 | 0-1 | Authentic. Proceed to Pass 2. |
 | 1 | 2+ | Inconclusive. Recommend second-engineer review. |
+| 2 | any | Inconclusive. Recommend second-engineer review. |
 | 3+ | any | Pass on candidate. Do not advance. |
+
+(Rows are disjoint and exhaustive; exactly one row matches any tally.)
 
 If Pass 1 fails or is inconclusive, draft the recruiter reply without naming the AI-paste theory directly. Frame as "the code shape and Cody transcript don't match the seniority signal we'd expect at this level" and recommend either passing or pulling in a second engineer for review.
 

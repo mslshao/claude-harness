@@ -34,7 +34,7 @@ Route to a consult skill: runs in a forked context, parallelizes specialists, sy
 
 Route to a tech-lead agent: sense-making, synthesis, and articulation. NOT for evaluating reviewer feedback.
 
-**Manual orchestrator dispatch only**: do NOT wire the tech-lead into automation skills (PR-intel, consult, convergence specialist roster, autopilot, launch). For automation that needs adversarial judgment, use the adversarial advisor (the tenth-man agent) which is advice-only.
+**Manual orchestrator dispatch only**: do NOT wire the tech-lead into automation skills (PR-intel, consult, convergence specialist roster, autopilot, launch). For automation that needs adversarial judgment, use the adversarial advisor (the skeptic agent) which is advice-only.
 
 ## 7. Is the task iterating on reviewer feedback or satisfying PR review comments?
 

@@ -97,6 +97,8 @@ When your review identifies structural concerns (SRP violations, coupling, error
 
 **Errors propagate cleanly.** Are exceptions used over return codes? Is the log-and-reraise anti-pattern avoided? Are bare excepts absent? Do context managers handle resource cleanup? Is null returned or passed where it shouldn't be?
 
+**Exceptions describe the condition, not the handling.** Single-responsibility applies to exception design. A document-retrieval module raises `DocumentNotFound`; the HTTP handler decides whether that maps to a 404 or a 410. Flag when a low-level module's exception type encodes handler-layer concerns (raising `HTTPNotFoundError` from a storage layer, raising response-shape exceptions from a parser). Also flag when the same module raises AND handles the same exception class extensively, which suggests the abstraction is doing two jobs. a reviewer's framing: "properly-designed exceptions should be unintrusive; you shouldn't see a ton of exception handling throughout the code."
+
 **Dead weight is removed.** No commented-out code. No redundant comments restating what type hints already express. No speculative generality. No duplicate logic that should be extracted.
 
 **Structural smell categories:** Bloaters (methods/classes that have grown too large), coupling (inappropriate intimacy, feature envy), dispensables (dead code, speculative generality, redundant comments), change preventers (shotgun surgery, divergent change).
@@ -113,7 +115,15 @@ These checks encode human reviewer standards from the team's [Code Review Guide]
 
 **None-Abuse Semantics.** When you see `list[T] | None` or `dict[K,V] | None`, ask: is None semantically distinct from the empty collection? If not, use the empty collection as default. `bool | None` is a three-state enum, not a boolean.
 
+**Type System Subversion (a reviewer #2).** Three smells that ride together and ripple downstream. Surface them as Front Door when present, because changing the type forces re-shaping every consumer.
+
+1. **Untyped dict or unnamed tuple as a record stand-in.** A `dict` or a `tuple` works as a quick container, but the moment it carries semantically distinct fields (an ID and a status, a request and its metadata), it should be a Pydantic model or a `NamedTuple`. Flag when a function returns or accepts a dict/tuple that callers pick fields out of by position or string key.
+2. **`dict[str, Any]` as a type-system escape hatch.** Flag any `dict[str, Any]` not at a system boundary that is documented as JSON. Inside the codebase, `Any` is "I gave up on typing this." Ask: what fields actually flow through? If the answer is knowable, name them in a model.
+3. **Same model representing multiple independent concepts.** a reviewer's canonical example: a `Response` class with both `response_object: T | None` and `error_message: str | None`, where exactly one is set depending on success or error. Flag when a model's fields are mutually exclusive depending on a discriminator (success vs error, type-A vs type-B). The fix is a union of distinct models (`SuccessResponse | ErrorResponse`), not one model with conditional fields.
+
 **Don't Trace Execution.** Do not mentally execute code line-by-line to verify correctness. Instead check: are there tests? Do they cover this path? Is the logic obviously correct at the structural level? If tests are missing, flag the gap.
+
+**Read, Don't Guess, Framework and Hierarchy Facts.** When a load-bearing claim is about framework-internal behavior (a library default, what a base class provides) or class hierarchy (is this field inherited? does this class extend a shared base?), and the source is readable from your tool surface (the worktree file, or the installed package under site-packages), READ it before asserting. Reserve hedged phrasing ('likely', 'almost certainly') for facts genuinely not readable from where you sit; a hedge that points the wrong way on a readable fact is worse than reading the five lines. This complements 'Don't Trace Execution': do not mentally execute runtime flow, but DO read declarations and source for structural facts you are about to state.
 
 **Large-PR Methodology.** For large PRs, first determine: is this a global refactor (review the methodology and spot-check instances) or a feature PR that should be split? For refactors, the PR description must explain the methodology.
 
@@ -124,6 +134,8 @@ These checks encode human reviewer standards from the team's [Code Review Guide]
 **Naming Encodes Business Meaning.** Variables named after data structures (`chunk_list`, `result_dict`, `items`) don't convey intent. Conditionals should read as business rules: `if not chunks_needing_processing` is clearer than `if not chunk_list`. Flag when `if not X` reads as "X is empty" rather than conveying the domain meaning.
 
 **Mechanism Justification.** Every mechanism should earn its place: `yield` without teardown should be `return`, spans on trivial methods should be removed, settings that duplicate existing ones should be deleted. Ask: "What breaks if we remove this?"
+
+**Pragma Justification.** Any safety-check override (`# noqa: <code>`, `# pylint: disable=<code>`, `# type: ignore[<code>]`, `# pyright: ignore`, `# ruff: noqa`, `// eslint-disable-next-line`) requires three things: (a) the override is genuinely necessary, not a shortcut around an issue that should be fixed; (b) a one-line comment or PR-description note explaining *why* (next to the pragma, not buried elsewhere); (c) minimal scope: line-level or smallest-block, never module-level or file-level unless the entire file is the affected unit. Bare `# noqa` (no rule code) is always flagged; the override should name what it's silencing. a reviewer's framing: ask "is this really necessary, or could we just comply with the guardrail?" Cross-ref: `code-style.md` "Dead code with pragmas" handles the type-narrowed-guard-vs-delete decision.
 
 **Nondeterminism Detection.** `next(iter(set))`, `dict.popitem()`, or any pattern where iteration order is undefined. Even if the result doesn't functionally matter, nondeterminism makes tests fragile and debugging harder. Flag and suggest deterministic selection (`min()`, `sorted()[0]`).
 

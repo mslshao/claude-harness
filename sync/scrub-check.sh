@@ -5,6 +5,14 @@
 # Exits 1 on any finding. Exits 0 on clean.
 #
 # Spec: see sync/SCRUB-SPEC.md for what gets scrubbed and why.
+#
+# Tier 1 (real names) reads its pattern list from the gitignored local file
+# sync/scrub-names.local so the committed repo carries no real names, not
+# even inside its own detector. When that file is absent or has no patterns,
+# Tier 1 is SKIPPED with a loud stderr warning and a qualified summary line;
+# Tiers 2-4 still run, and the script never prints an unqualified "clean"
+# for a scan it did not perform. Fail-open-with-loud-warning mirrors the
+# jq-missing philosophy in the harness's enforcement hooks.
 
 set -euo pipefail
 
@@ -34,11 +42,17 @@ SCAN_DIRS=(
 # Always include top-level Markdown files in the scan.
 SCAN_FILES=(README.md WORLDMAP.md)
 
-# Tier 1: real names of teammates (first names only; first+last would be more
-# precise but more false-positive prone since 'a team lead manager' or 'a teammate' is generic).
-# Word-boundary required to avoid false positives ('davidson', 'a peer reviewer' inside
-# 'atomic', etc.). Tweak this list as the team composition changes.
-TIER1_NAMES_REGEX='\b(the engineering lead|a team lead|a teammate|a peer reviewer|a solo-team engineer|a teammate|a teammate|a teammate)\b'
+# Tier 1: real names of teammates. The pattern list is externalized to the
+# gitignored sync/scrub-names.local (one extended-regex pattern per line;
+# '#' comments and blank lines ignored; patterns are OR-joined). The list
+# stays out of the commit so the committed repo is name-free; tweak the
+# local file as team composition changes. Absent-file behavior is documented
+# in the header above.
+NAMES_FILE="$SCRIPT_DIR/scrub-names.local"
+TIER1_NAMES_REGEX=""
+if [ -f "$NAMES_FILE" ]; then
+  TIER1_NAMES_REGEX="$(grep -vE '^[[:space:]]*(#|$)' "$NAMES_FILE" 2>/dev/null | paste -sd'|' - || true)"
+fi
 
 # Tier 2: incident-specific patterns + employer identification.
 # The repo refers to the employer's actual GitHub org and codebase paths
@@ -110,7 +124,14 @@ scan_pattern() {
   fi
 }
 
-scan_pattern "1 (real names)" "$TIER1_NAMES_REGEX"
+TIER1_SKIPPED=0
+if [ -n "$TIER1_NAMES_REGEX" ]; then
+  scan_pattern "1 (real names)" "$TIER1_NAMES_REGEX"
+else
+  TIER1_SKIPPED=1
+  echo "scrub-check: WARNING: $NAMES_FILE not found (or contains no patterns)." >&2
+  echo "scrub-check: WARNING: Tier 1 real-name scan DISABLED; create it to enable. See sync/SCRUB-SPEC.md Tier 1." >&2
+fi
 
 for p in "${TIER2_PATTERNS[@]}"; do
   scan_pattern "2 (incident reference)" "$p"
@@ -126,7 +147,11 @@ done
 
 echo ""
 if [ "$FINDINGS" -eq 0 ]; then
-  echo "scrub-check: clean (${#SCAN_FILE_LIST[@]} files scanned, 0 findings)"
+  if [ "$TIER1_SKIPPED" -eq 1 ]; then
+    echo "scrub-check: Tiers 2-4 clean (${#SCAN_FILE_LIST[@]} files scanned, 0 findings); Tier 1 real-name scan SKIPPED (no scrub-names.local)"
+  else
+    echo "scrub-check: clean (${#SCAN_FILE_LIST[@]} files scanned, 0 findings)"
+  fi
   exit 0
 else
   echo "scrub-check: $FINDINGS pattern hit(s). See sync/SCRUB-SPEC.md for what to do."

@@ -22,7 +22,7 @@ Different tools handle context loss differently. Some truncate older messages wh
 
 If you've ever thought "this tool is useless, it can't even remember what I told it five minutes ago," you were probably right. The good news: this is a solvable configuration problem, not a permanent limitation. The rest of this document is about solving it.
 
-> 💡 **Try This Today**: Start a conversation with any AI tool. Give it three specific facts about your project (e.g., "we use pytest, not unittest" / "our API uses FastAPI" / "we deploy on AWS Lambda"). Close the conversation. Open a new one and ask it about your project. Notice what it retained (nothing) and what it forgot (everything). That's the problem this page addresses.
+> 💡 **Try This Today**: Start a conversation with any AI tool. Give it three specific facts about your project (e.g., "we use pytest, not unittest" / "our API uses FastAPI" / "we deploy on AWS Lambda"). Close the conversation. Open a new one and ask it about your project. Notice what it retained (nothing) and what it forgot (everything). That's the problem this page addresses. One caveat: if your tool has a memory feature (ChatGPT has memory on by default; `claude.ai` also has memory now), turn it off first or expect this demo to fail. Managed memory is exactly the kind of persistence this page teaches you to control deliberately.
 
 ---
 
@@ -48,9 +48,11 @@ Most AI coding tools support some form of persistent instructions: a file or set
 
 | What you want | ChatGPT | GitHub Copilot | Cursor | Claude Code |
 | --- | --- | --- | --- | --- |
-| Project conventions applied automatically | Custom instructions | .github/copilot-instructions.md | .cursorrules | `CLAUDE.md` + `.claude/rules/` |
-| Personal preferences across projects | Custom instructions | Not available (repo-level only) | `~/.cursorrules` | `~/.claude/CLAUDE.md` |
-| Tool remembers past conversations | Memory feature (managed) | Not available | Not available | Not built-in (manual via files) |
+| Project conventions applied automatically | Custom instructions | .github/copilot-instructions.md | `.cursor/rules/` (the legacy `.cursorrules` file is deprecated) | `CLAUDE.md` + `.claude/rules/` |
+| Personal preferences across projects | Custom instructions | Not available (repo-level only) | User Rules in Cursor settings | `~/.claude/CLAUDE.md` |
+| Tool remembers past conversations | Memory feature (managed) | Not available | Not available | Built-in auto-memory (per-project memory directory, index auto-loaded every conversation) + manual rules files |
+
+Claude Code now maintains memory across sessions automatically: it keeps a per-project memory directory whose index loads into every conversation, alongside any rules files you write by hand.
 
 **What if your tool doesn't have rules files?** ChatGPT's memory feature is managed: the model decides what to remember, and you can view or delete memories in settings. Gemini has Gems with system instructions. If your tool has no persistence mechanism at all, the same principles still apply. Save your best-performing instructions in a shared doc or snippet manager, and paste the relevant block at the start of each conversation. It's more manual, but everything in the next two sections about *what* to persist and *how* to write it applies regardless of mechanism.
 
@@ -162,9 +164,9 @@ This is the same concept as the parent page's "Progressive disclosure for long c
 
 ## Appendix: What a Mature Setup Looks Like
 
-The setup described below is one author's specific configuration after months of iteration. It is illustrative, not prescriptive: adopt the layering shape, not the exact tools.
+> **Note**: Everything below is specific to one developer's setup after ~3 months of daily iteration. It's included as a concrete example of the Section 6 pattern at scale, not as required reading or a recommended configuration. Adopt the layering shape, not the exact tools.
 
-The setup has four tiers:
+The setup that emerged has four tiers:
 
 **Tier 1: Always-loaded index** (~150 lines). A `MEMORY.md` file that's automatically loaded into every conversation. Contains the most critical cross-cutting rules and one-line pointers to topic files: "Working on search infrastructure? Read `memory/elasticsearch.md`."
 
@@ -182,11 +184,11 @@ The setup has four tiers:
 
 You've iterated on your rules, split them into topic files, and the AI works the way you want. Then you lose the laptop. Or a bad sync clobbers the file. Or a machine migration skips the `.claude` directory. Months of iteration, gone.
 
-This isn't hypothetical. Rules files are hidden dotfiles or tucked into tool-specific directories. They don't ride along with most device backup tools, and they aren't tracked in the repos they configure. If you built the setup once by hand, you can build it again; but the iteration history (the corrections that became rules, the topic files you refined over months) lives only in those files. Losing them resets you to week one.
+This isn't hypothetical, but be precise about what's at risk. Your project-level rules files are committed to the repo and ride along with it (that's the shared tier from Section 3); losing a laptop doesn't touch them. The at-risk tier is your personal config: `~/.claude/CLAUDE.md`, personal topic files, custom commands, anything in hidden dotfiles or tool-specific directories outside any repo. Those don't ride along with most device backup tools. If you built the setup once by hand, you can build it again; but the iteration history (the corrections that became rules, the topic files you refined over months) lives only in those files. Losing them resets you to week one. The rest of this section is about that personal tier.
 
 **What to persist:**
 
-* Your rules files (project-level and personal)
+* Your personal rules files (project-level ones are committed to the repo and already ride along with it)
 * Your topic files if you went to Tier 2 (see the appendix above)
 * Anything downstream your AI tool reads: custom commands, agent definitions, any scripts you wrote to support the setup
 
@@ -200,7 +202,7 @@ Every time you make a meaningful change. Not daily-scheduled, not once-a-month; 
 
 If your AI tool supports cloud sync natively, use it. If it doesn't, and you've invested meaningful time in this configuration, build the layer yourself before you lose it. The appendix above shows one concrete implementation.
 
-> 💡 **Try This Today**: Check whether your rules file is backed up somewhere other than your laptop. If the answer is no, and you'd care if it was gone, spend 20 minutes setting up a versioned bucket. This is maintenance, not feature work, but it's the difference between "annoying to redo" and "weeks of work, gone."
+> 💡 **Try This Today**: Check whether your personal config is backed up somewhere other than your laptop. If the answer is no, and you'd care if it was gone, the simplest path is to put your personal config directory in a private git repo and push it (about 15 minutes, no new infrastructure). If you outgrow that, the versioned-bucket pattern in the appendix adds point-in-time restore and a fresh-machine bootstrap. This is maintenance, not feature work, but it's the difference between "annoying to redo" and "weeks of work, gone."
 
 ---
 

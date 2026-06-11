@@ -1,4 +1,4 @@
-# Phase 3.5 + 3.6: Tenth-Man Lens and Decision-Maker Gate
+# Phase 3.5 + 3.6: Skeptic Lens and Decision-Maker Gate
 
 This file holds the adversarial-pass and proceed/iterate-gate prompts
 that run after Phase 3 synthesize. SKILL.md and plan-pipeline.md
@@ -14,16 +14,16 @@ real PR review burden, and worktree cleanup, so two more safety
 checkpoints run before the user sees anything: an adversarial pass
 (3.5) and a decision-maker gate (3.6).
 
-## Phase 3.5: Tenth-Man Lens
+## Phase 3.5: Skeptic Lens
 
-Dispatch `mx2-tenth-man` for an adversarial pass on the converged
+Dispatch `mx2-skeptic` for an adversarial pass on the converged
 plan. The agent asks naive, dumb, or obvious-but-unasked questions
 designed to surface risks the consensus challenge + consult passes
 assumed away.
 
 ```
 Agent(
-  subagent_type="mx2-tenth-man",
+  subagent_type="mx2-skeptic",
   description="Adversarial stress-test of launch plan",
   prompt="Ask naive, dumb, or obvious-but-unasked questions about this
   launch plan. The plan has passed challenge + consult; your job is to
@@ -39,7 +39,12 @@ Agent(
   (d) INPUT_MODE = mechanism-prescribed where the mechanism was never
   challenged on first-principles grounds,
   (e) phase gates that read programmatic but actually require human
-  judgment to verify.
+  judgment to verify,
+  (f) Proportionality: is this plan over-built for the goal's stated
+  weight? Is there a materially simpler 80/20 plan? If the goal carries
+  scope-signal words (lightweight / simple / minimal / quick / for most
+  users), name the minimal-viable variant and what each extra component
+  buys before the agent team writes code against it.
 
   Converged plan + convergence delta:
   <plan block>
@@ -61,35 +66,36 @@ Do NOT omit silently.
 ### Failure handling
 
 If the dispatch fails (agent missing, transient error), note the
-failure as a one-line "Tenth-Man Lens unavailable: <reason>" in the
+failure as a one-line "Skeptic Lens unavailable: <reason>" in the
 Phase 4 output and proceed. Do not block on advisory tooling. The
 Phase 3.6 gate receives the unavailable-reason as input and factors
-it into the verdict (a missing tenth-man pass lowers gate confidence).
+it into the verdict (a missing skeptic pass lowers gate confidence).
 
 ### Stage Event Write
 
-After tenth-man returns (or fails), write a `[LAUNCH_STAGE stage=tenth-man ...]`
+After skeptic returns (or fails), write a `[LAUNCH_STAGE stage=skeptic ...]`
 entry. The 🔻 block is usually inline-sized (<2KB); only goes to scratch
 if concerns are extensive.
 
 ```bash
 ROUND=${ITERATE_ROUND:-0}
 
-if [ "$TENTH_MAN_STATUS" = "unavailable" ]; then
+if [ "$SKEPTIC_STATUS" = "unavailable" ]; then
   bd update "$LAUNCH_BEAD_ID" --append-notes \
-    "[LAUNCH_STAGE stage=tenth-man round=$ROUND status=unavailable reason=$REASON ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)]"
-elif [ "$TENTH_MAN_CONCERNS" = "" ]; then
+    "[LAUNCH_STAGE stage=skeptic round=$ROUND status=unavailable reason=$REASON ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)]"
+elif [ "$SKEPTIC_CONCERNS" = "" ]; then
   bd update "$LAUNCH_BEAD_ID" --append-notes \
-    "[LAUNCH_STAGE stage=tenth-man round=$ROUND status=no-concerns ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)]"
-elif [ "$TENTH_MAN_SIZE" -lt 2048 ]; then
+    "[LAUNCH_STAGE stage=skeptic round=$ROUND status=no-concerns ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)]"
+elif [ "$SKEPTIC_SIZE" -lt 2048 ]; then
   # Inline the 🔻 block in the entry (escape newlines as needed)
   bd update "$LAUNCH_BEAD_ID" --append-notes \
-    "[LAUNCH_STAGE stage=tenth-man round=$ROUND status=concerns concerns=$(echo "$TENTH_MAN_OUTPUT" | tr '\n' ' ') ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)]"
+    "[LAUNCH_STAGE stage=skeptic round=$ROUND status=concerns concerns=$(echo "$SKEPTIC_OUTPUT" | tr '\n' ' ' | tr ' ' '_') ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)]"
 else
-  TENTH_PATH="$HOME/.claude/scratch/launch-$LAUNCH_BEAD_ID/tenth-man-$ROUND.md"
-  echo "$TENTH_MAN_OUTPUT" > "$TENTH_PATH"
+  mkdir -p "$HOME/.claude/scratch/launch-$LAUNCH_BEAD_ID"
+  SKEPTIC_PATH="$HOME/.claude/scratch/launch-$LAUNCH_BEAD_ID/skeptic-$ROUND.md"
+  echo "$SKEPTIC_OUTPUT" > "$SKEPTIC_PATH"
   bd update "$LAUNCH_BEAD_ID" --append-notes \
-    "[LAUNCH_STAGE stage=tenth-man round=$ROUND status=concerns path=$TENTH_PATH ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)]"
+    "[LAUNCH_STAGE stage=skeptic round=$ROUND status=concerns path=$SKEPTIC_PATH ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)]"
 fi
 ```
 
@@ -106,7 +112,7 @@ Agent(
   prompt="**MODE: LAUNCH GATE.** You are gating an implementation plan
   from /launch (not an autopilot checkpoint, not an ideation gate,
   not a convergence gate). Calibration context: the plan has passed
-  challenge + consult + tenth-man, and IS ABOUT TO drive an agent
+  challenge + consult + skeptic, and IS ABOUT TO drive an agent
   team that writes real code and creates a real PR. The cost of a
   bad plan is real commits, real PR review burden, and a worktree
   cleanup; the gate's threshold should reflect that.
@@ -117,7 +123,7 @@ Agent(
   PROCEED if the plan is defensible: convergence delta is concrete,
   every work item has a Verification path, Consequence=high items
   have matching Verification paths or are explicitly downgraded,
-  phase gates are programmatically verifiable, tenth-man findings
+  phase gates are programmatically verifiable, skeptic findings
   either resolved or surfaced as Open Assumptions for user adjudication.
   CONFIRMED delta is acceptable IF the input was simple or specialists
   offered concrete evidence; suspicious otherwise.
@@ -125,7 +131,7 @@ Agent(
   ITERATE if the plan is uncertain BUT another challenge+consult pass
   with a focused weak-dimension target would plausibly resolve it.
   Specify WEAK_DIMENSION (one of: verification, consequence, scope,
-  decomposition, mechanism, phase-gates).
+  decomposition, mechanism, phase-gates, proportionality).
   - mechanism is canonical for Fulfillment-vs-Coverage: INPUT_MODE =
     mechanism-prescribed AND DELTA_CATEGORY = CONFIRMED on a non-trivial
     plan usually means the prescribed mechanism was rubber-stamped.
@@ -154,8 +160,11 @@ Agent(
   INPUT_MODE: <problem-framed | mechanism-prescribed>
   DELTA_CATEGORY: <CONFIRMED | MINOR_ADJUSTMENTS | MAJOR_REVISIONS | SCRAPPED_AND_REBUILT>
 
-  Tenth-man findings (or 'Tenth-Man Lens unavailable: <reason>'):
-  <tenth-man block>
+  Skeptic findings (or 'Skeptic Lens unavailable: <reason>'):
+  <skeptic block>
+
+  Iteration History: <prior gate verdicts this /launch invocation, or
+  'First evaluation'>
 
   Return VERDICT (PROCEED / ITERATE / ESCALATE-QUESTIONS /
   ESCALATE-ROUTE), REASON (1-3 sentences), and:
@@ -191,8 +200,13 @@ focused WEAK_DIMENSION instruction:
   crossed the boundary."
 - `phase-gates`: "Re-write each phase gate as a programmatically
   verifiable command. No prose criteria."
+- `proportionality`: "Re-decompose toward the minimal-viable variant.
+  Name the smallest 80/20 plan that meets the stated goal, then keep only
+  the work items whose extra value over it is justified by a STATED
+  constraint (not a hypothetical future). The cost here is real commits,
+  so right-sizing before the agent team starts matters."
 
-Re-synthesize (Phase 3c). Re-run tenth-man (Phase 3.5). Re-gate
+Re-synthesize (Phase 3c). Re-run skeptic (Phase 3.5). Re-gate
 (Phase 3.6).
 
 #### ESCALATE-QUESTIONS
@@ -201,6 +215,12 @@ Surface NARROWING_QUESTIONS to the user via the AskUserQuestion tool
 option for free-text answers) or as a numbered list in chat (for 1
 open-ended question). Each question shows its WHY clause inline so
 the user knows what each answer unblocks.
+
+Non-interactive callers (agent dispatch, /autopilot embedding, any
+context where no human can answer): do NOT block on AskUserQuestion.
+Treat as the 'you decide' opt-out: orchestrator-derive
+VERDICT=LOW_CONFIDENCE, proceed, and carry the unanswered narrowing
+questions into the plan's Open Assumptions.
 
 Frame the ask: "I have a few narrowing questions before launching
 the agent team would be productive. If you don't want to answer,
@@ -262,8 +282,14 @@ to scratch when extensive.
 
 ```bash
 ROUND=${ITERATE_ROUND:-0}
-VERDICT_LOWER=$(echo "$VERDICT" | tr '[:upper:]' '[:lower:]' | tr '_' '-')
-# Maps to: proceed | iterate | escalate-questions | escalate-route | low-confidence
+# The agent returns HYPHENATED verdicts (ESCALATE-QUESTIONS / ESCALATE-ROUTE);
+# normalize to underscores so the case patterns match. LOW_CONFIDENCE is never
+# returned by the agent: the ORCHESTRATOR sets VERDICT=LOW_CONFIDENCE itself
+# when forcing a low-confidence proceed (ITERATE cap hit, or the user opted
+# out of narrowing questions with "you decide").
+VERDICT=$(echo "$VERDICT" | tr '-' '_')
+# Event values must not contain spaces (durable-state event format rule):
+REASON_SHORT=$(echo "$REASON_SHORT" | tr ' ' '_')
 
 case "$VERDICT" in
   PROCEED)

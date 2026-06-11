@@ -1,7 +1,7 @@
 ---
 component: patterns
 type: directory-map
-status: V0 complete (all 11 pattern docs have entries)
+status: V0 complete (all 12 pattern docs have entries)
 authored_by: Claude Opus 4.7
 ---
 
@@ -77,6 +77,26 @@ The pattern explicitly extends to executable specifications (agent definitions, 
 
 ```yaml
 ---
+component: contrapositive-proof
+type: pattern
+status: active
+ref: contrapositive-proof.md
+fires_when: "authoring a rule, skill, or agent definition that a model will read literally as an executable spec"
+prevents:
+  - "a principle nested inside a conditional being read as licensing the contrapositive (under the threshold implies the opposite)"
+  - "numeric thresholds read backward as two-way gates when they were meant to fire in one direction only"
+related: [self-review-protocol, decision-making-rules, two-tier-doctrine]
+---
+```
+
+When this fires: authoring any rule a model reads literally. State unconditional principles OUTSIDE conditional scopes; mark numeric thresholds as one-way triggers (over implies the action; under implies nothing). The corpus is the program the agent executes, so an ambiguous branch is a behavioral bug, not a typo.
+
+The doc's concrete instance is the load-bearing part: a PR-size rule nested an unconditional one-concern-per-PR principle inside a ~250-line size conditional, and a literal-reading model took "under 250 lines" as a license for multiple concerns in one PR. The fix stated the concern principle unconditionally and marked the size number one-way. `evidence/2026-06-11-rules-as-executable-specs.md` carries the full case plus the honest bound (verified forward in replay; the original red was N=1 and not reproducible on demand).
+
+---
+
+```yaml
+---
 component: multi-window-discipline
 type: pattern
 status: active
@@ -91,7 +111,7 @@ related: [writing-style-discipline, response-behavior, decision-making-rules]
 
 When this fires: every design decision about output shape. Lead with the highest-impact information; end-of-turn summaries scannable in under 30 seconds; visual signals (severity tags, code blocks for IDs) to direct attention; never bury blockers in prose.
 
-The pattern is grounding for many of the others. Writing-style discipline (terse, calibrated), response-behavior (don't reconfirm within a directive's scope), decision-making (lead with current state) all serve the multi-window reality. The `mx2-tenth-man` agent exists explicitly as the safety net for this failure mode.
+The pattern is grounding for many of the others. Writing-style discipline (terse, calibrated), response-behavior (don't reconfirm within a directive's scope), decision-making (lead with current state) all serve the multi-window reality. The `mx2-skeptic` agent exists explicitly as the safety net for this failure mode.
 
 ---
 

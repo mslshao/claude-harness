@@ -41,11 +41,11 @@ You do not need to memorize the names. You need to recognize the shapes when you
 
 The exercise is solo. There is no share-back. The point is to calibrate your eye against real diffs that shipped through review in this codebase.
 
-Pick **one** of the three PRs below. Pull up the diff. Read the discussion.
+Pick **one** of the three PRs below. Pull up the diff in GitHub. Read the discussion.
 
-* **PR #8585** (the type-narrow-vs-delete pattern): AI added a runtime `if not response` guard for a value the production type system already proved was non-`None`. CI's type checker flagged the new branch as unreachable. The correct fix was deletion of the guard, not narrowing it. The lesson: when a reviewer flags a runtime guard, check the production type signature before responding. If the type rules out the protected case, delete the guard.
-* **PR #8140** (the required-Settings-default pattern): AI used empty-string defaults (`= ""`) on required Settings fields (DynamoDB table names, SQS queue URLs). The service started successfully and crashed on the first request because Pydantic never raised `ValidationError` at startup. The correct fix was no default at all, so the validation gate fires on missing config. The lesson: required Settings fields must have no default value.
-* **PR #8517** (the broad-except-to-make-test-pass pattern): AI used a broad `except Exception` to make a flaky test pass. Three independent signals (Copilot inline, Sentry production trace, a human reviewer) converged on the same finding. The correct fix was narrowing to `except RequestError` and adding an explicit `strict_mapping` check. The lesson: `except Exception` is banned in new code. Use the narrowest exception class that names the actual failure mode.
+* **PR #8585**: AI added a runtime `if not response` guard for a value the production type system already proved was non-`None`. CI mypy flagged the new branch as unreachable. The correct fix was deletion of the guard, not narrowing it.
+* **PR #8140**: AI used empty-string defaults (`= ""`) on required Settings fields (DynamoDB table names, SQS queue URLs). The service started successfully and crashed on the first request. The correct fix was no default at all, so Pydantic raises `ValidationError` at startup.
+* **PR #8517**: AI used a broad `except Exception` (plus linter-suppression pragmas) to tolerate an expected indexing failure during a migration, swallowing unrelated exceptions with it. Three independent signals (Copilot inline, Sentry production trace, a human reviewer) converged on the same finding. The correct fix was narrowing to `except RequestError` and adding an explicit `strict_mapping` check.
 
 Three questions to write down (one or two sentences each):
 
@@ -53,25 +53,26 @@ Three questions to write down (one or two sentences each):
 * Which of the six failure patterns from the parent page does it most closely match?
 * What did the reviewer's correction look like in the diff?
 
-If none of these PR shapes match a service you have touched, that is fine. The exercise is pattern recognition, not domain knowledge.
+If none of these PRs are in a service you have touched, that is fine. The exercise is pattern recognition, not domain knowledge.
 
-> 💡 PR #8517 is a useful one to choose if you have time, because it intersects with section 2 of [AI Coding Tools](./ai-coding-tools.md)'s caution about "multiple tools agreeing." Three sources flagged the same finding. The parent page warns that AI tools can share blind spots and produce false convergence. But it also names a flip side: convergence across **meaningfully independent** angles is legitimate. Which side does #8517 land on, and why? The answer is in the diff and in the lesson: a human reviewer plus a runtime error tracker plus a static analyzer are meaningfully independent angles. AI tools trained on similar data share blind spots. The distinction matters.
+> 💡 PR #8517 is a useful one to choose if you have time, because it intersects with section 2 of [AI Coding Tools](./ai-coding-tools.md)'s caution about "multiple tools agreeing." Three sources flagged the same finding. The parent page warns that AI tools can share blind spots and produce false convergence. But it also names a flip side: convergence across **meaningfully independent** angles is legitimate. Which side does #8517 land on, and why? The answer is in the diff.
 
 ---
 
-## 4. The 5-question filter
+## 4. Extending the 5-question filter
 
-[AI Coding Tools](./ai-coding-tools.md)'s section 5 lists a 5-question filter for evaluating AI suggestions. For deeper practice on this skill, add a 5th question:
+[AI Coding Tools](./ai-coding-tools.md)'s section 5 lists a 5-question filter for evaluating AI suggestions. For deeper practice, add a sixth question:
 
 1. Does acting on this make the code better? (not just different)
 2. Can I verify the claim in 30 seconds?
 3. Would I have caught this myself?
 4. Is this actionable, or just an observation?
-5. **Is this finding worth codifying as a rule, or is it one-off?**
+5. Am I acting on too many AI suggestions at once? (2-3 per session is healthy; 10+ means you're not filtering)
+6. **Is this finding worth codifying as a rule, or is it one-off?**
 
-Question 5 is the upstream instinct. A finding worth codifying is one where the same mistake would recur on the next AI-assisted task in this codebase, and where a one-sentence rule would make the AI catch it before submission.
+Question 6 is the upstream instinct. A finding worth codifying is one where the same mistake would recur on the next AI-assisted task in this codebase, and where a one-sentence rule would make the AI catch it before submission.
 
-> 💡 **Try This Today**: Take one finding from your last AI-assisted task. Run it through the 5 questions. If question 5 lands on "worth codifying," draft the rule.
+> 💡 **Try This Today**: Take one finding from your last AI-assisted task. Run it through the 6 questions. If question 6 lands on "worth codifying," draft the rule.
 
 ---
 

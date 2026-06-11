@@ -10,8 +10,8 @@ These skills can be recommended to the user when the current task would benefit 
 Phrase recommendations as: "This would benefit from `/skill-name`; it provides [specific value]."
 
 ## /consult
-Parallel multi-specialist analysis in a forked context. Launches 2+ specialist agents simultaneously, deduplicates findings, resolves conflicts, and returns a unified report.
-**Recommend when**: Code review findings span multiple domains (security + style + structure), large-task AGENT REVIEW pass needs parallel specialist depth, or context window is too deep for serial subagent calls.
+Parallel multi-specialist analysis run from the main conversation (the orchestrator dispatches 2+ specialist agents simultaneously; subagents cannot fork further). Deduplicates findings, resolves conflicts, and returns a unified report.
+**Recommend when**: Code review findings span multiple domains (security + style + structure), large-task AGENT REVIEW pass needs parallel specialist depth, or findings need cross-specialist deduplication and conflict resolution in one report.
 **Not for**: Single-domain questions that one specialist can answer.
 
 ## /test-forge
@@ -108,6 +108,31 @@ Capture the current Claude Code system prompt's behavioral sections to a version
 Two-pass evaluator for Codility Legal Document Management API submissions: authorship authenticity gate, then level calibration. Produces a scored Pass 1 read, a level recommendation if Pass 1 cleared, and an optional draft recruiter reply.
 **Recommend when**: User pastes a Codility submission (timeline + Cody transcript + code) or asks to review a candidate assessment.
 **Not for**: Non-Codility code review (use /pr-intel or mx2-code-reviewer). Interview-loop debriefs (no rubric defined here).
+
+## /ideate
+Divergent approach generation: produces 3-5 ranked candidate approaches with a mandatory skeptic pass and a decision-maker gate, then hands the winner to /converge.
+**Recommend when**: A problem has 3+ plausible mechanism shapes and no clear winner yet ("what are my options for X", "tradeoffs between X and Y").
+**Not for**: One obvious approach (go straight to /converge); stress-testing a single existing plan (/challenge).
+
+## /review
+Local self-review fan-out for uncommitted or branch-relative changes: dispatches up to twelve review agents in parallel, deduplicates, and presents a grouped severity report. Read-only, local-only, no GitHub posting.
+**Recommend when**: Before opening or pushing a PR; "review my changes / this branch / self-review".
+**Not for**: Reviewing someone else's PR (use /pr-intel); posting comments to GitHub (use /post-review).
+
+## /compound
+Improvement loop: scans a just-completed work unit for friction signals and builds the concrete improvement (with a present-and-confirm gate), falling back to habit-memory capture when none exists.
+**Recommend when**: After a PR merges, a /launch ships, a bead closes, or a substantial work unit wraps ("what did we learn from that", "capture this workflow").
+**Not for**: A cold-start prompt for the next session (use /handoff); a single fact (use bd remember).
+
+## /recall
+BFS-first cross-corpus search over beads, memories, and topic files for information another session produced.
+**Recommend when**: The user references past work without a current-session referent ("what we discussed about X", "remind me about Y", vague pronouns after a session gap).
+**Not for**: Information already in the current conversation; live external-system lookups.
+
+## /capture-transcript
+Ingest a pasted meeting/standup/1:1 transcript and route it: a scannable action breakdown for a standup, or a durable memory file + recall bead + index row for a sync/1:1.
+**Recommend when**: The user pastes a transcript with capture intent ("capture this standup", "capture this 1:1", "here is the transcript").
+**Not for**: Generating an outbound standup from your own activity (use /standup); a cold-start prompt (use /handoff).
 
 ---
 

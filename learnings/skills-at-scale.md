@@ -78,7 +78,7 @@ Concrete patterns that work:
 | "Consider whether tests are needed" | "After every new function, write at least one test" |
 | "Be careful about deletes" | "Before any `rm` or `git reset`, ask the user to confirm by typing the word DELETE" |
 | "Use existing patterns" | "Read 3 example files in the same directory before writing a new one. Match their structure." |
-| "Verify the output" | "Run the project's check command (`pants check`, `pnpm type-check`, etc.). If it returns errors, fix them before claiming done." |
+| "Verify the output" | "Run `pants check {target}`. If it returns errors, fix them before claiming done." |
 
 This is the opposite of how you'd write for a human teammate (where "consider X" is polite). Treat the skill as instructions to a literal-minded contractor who bills by the minute. The clearer the spec, the better the output.
 
@@ -158,7 +158,7 @@ The MCP servers commonly configured for a Claude Code session are: Atlassian, Da
 
 ## 8. Sub-Agent Dispatch
 
-Some skills are too big for one invocation. The pattern: dispatch sub-agents to do specialized work in parallel, then aggregate.
+Some skills are too big for one invocation. A sub-agent is a separate Claude instance with its own fresh context, launched mid-task to do a bounded piece of work and report back. The pattern: dispatch sub-agents to do specialized work in parallel, then aggregate.
 
 **When to use sub-agents:**
 
@@ -173,6 +173,15 @@ Some skills are too big for one invocation. The pattern: dispatch sub-agents to 
 * The total work is small enough to fit in one session.
 
 A PR review intelligence skill, for example, can dispatch a security auditor, a style reviewer, and a code reviewer in parallel against the same diff, then synthesize the findings into one report. The skill itself is the conductor; the agents are the orchestra.
+
+In the `SKILL.md`, the dispatch is plain instructions, the same as any other step:
+
+```markdown
+## Step 2: Dispatch reviewers in parallel
+
+Launch the security-auditor agent and the code-reviewer agent on the same diff.
+Wait for both to finish. Merge findings into one report, deduplicating overlaps.
+```
 
 > **The cost calculus**: Sub-agents are not free. Each one starts a fresh context. Loading the sub-agent's instructions, the relevant code, and the task description costs tokens. Use sub-agents when the parallelism is worth it; don't use them as a default just because they exist.
 

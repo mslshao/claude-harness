@@ -1,10 +1,11 @@
 # Decision-Maker Calibration
 
-Last reviewed by Michael: 2026-04-28 (Tier 1 backfill)
+Last reviewed by Michael: 2026-06-10 (/calibrate merge: 4 merged, 1 rejected; see lookback log)
 
 This file is read by the mx2-decision-maker agent before every decision.
 The agent emits calibration drift via `bd remember` (key prefix
-`calibration:decision-maker:`); the `/calibrate` skill is the human review
+`calibration:mx2-decision-maker:`, FULL agent name per
+`decision:calibration-key-full-agent-name-2026-06-04`); the `/calibrate` skill is the human review
 gate that merges accepted entries into this file. Append-only audit of
 merged/rejected entries lives at `decision-maker.lookback.md`.
 
@@ -88,6 +89,39 @@ platform's own settings (UI toggle, permission grant, configuration in an
 external system)?" If the answer is unknown, that is the FRAGILE assumption
 to challenge first. Source: `~/.claude/CLAUDE.md` "Strategy enumeration:
 include zero-code paths."
+
+### Locked-target integrity and designed read events
+
+ITERATE-refine when (a) synthesis silently re-scopes a capability target the
+user explicitly locked (audience drift: half a locked 70/30 diagnosis dropped
+without surfacing the change), or (b) the capability target requires a
+retrieval path but the plan has no designed read event (a write-only artifact
+with no read trigger does not deliver the capability). Source: 2026-05-20
+/converge comprehension-anchor gate; merged 2026-06-10. The companion
+lighter-alternative trigger from the same incident is covered by the standing
+proportionality criterion in the agent definition.
+
+### Unconfirmed-mechanism candidates route to instrumentation first
+
+At ideation/launch gates, when the candidates all target an UNCONFIRMED
+mechanism hypothesis (the failure mode has never been instrumented or
+observed; e.g. a zero-count metric that collapses 4+ distinct failure modes
+observationally), ESCALATE-ROUTE to /investigate rather than rating the
+candidates. Designing solutions against a never-tested model is the
+fixing-for-unconfirmed-root-cause failure; debugging.md Iron Law and the
+Diagnostic Instrumentation Pattern own the next step. Source: 2026-05-21
+/ideate pr-intel mutation-execution gate; merged 2026-06-10.
+
+### Verify checkable data parameters before rating
+
+When a top candidate rests on a CHECKABLE data parameter (a retention window,
+a count, a quota, a date range), verify the parameter holds with a single
+tool call BEFORE rating verifiability/consequence. Instance: a transcript-mine
+plan assumed a 90-day baseline; one `find` showed ~35-day actual retention,
+falsifying the window and flipping a would-be PROCEED to ITERATE. Distinct
+from the unconfirmed-mechanism rule above: this is an unverified-but-checkable
+DATA PARAMETER, not a mechanism hypothesis. Source: 2026-06-09 ideation gate;
+merged 2026-06-10.
 
 ### Fail-closed semantics: plan must name concrete exception classes
 
@@ -198,6 +232,22 @@ Stream configuration checks. Missing these is an ITERATE, not an ESCALATE
 
 **Salesforce integration**: Any plan touching Salesforce sync should verify retry
 logic patterns. Salesforce API is unreliable; missing retry logic is an ITERATE.
+
+---
+
+## False-Negative Patterns
+
+### Delta categorization: kind of change over count of changes
+
+In confirmation-mode convergence, DELTA_CATEGORY MINOR-vs-MAJOR weighs the
+KIND of change over the COUNT. Any pinned-decision REVERSAL (a previously
+ratified choice flipped on new evidence) or a reopened ratified-vs-ratified
+structural conflict tips the delta to MAJOR_REVISIONS, regardless of how many
+tidy guard/AC additions accompany it; the count of additions does not dilute
+a decision-class change. Instance: a ~10-amendment delta framed as "MINOR,
+mostly added guards" was actually MAJOR (two pin reversals incl. an
+arithmetically invalidated batch size, plus one reopened structural conflict).
+Source: 2026-06-10 MX2-XXXXX confirmation-mode gate; merged 2026-06-10.
 
 ---
 

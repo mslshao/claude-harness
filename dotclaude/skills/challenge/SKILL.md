@@ -159,9 +159,9 @@ to Phase 4a and verify it. This prevents false confidence.
 ### Phase 5: Escalation (rare)
 
 Only escalate to specialist dispatch when:
-- 2+ FRAGILE assumptions require different specialist agents from the routing
-  table (e.g., one needs `mx2-security-auditor`, another needs
-  `mx2-devops-build-deploy`)
+- 2+ FRAGILE assumptions require different specialist agents (e.g., one needs
+  `mx2-security-auditor`, another needs `mx2-devops-build-deploy`; see
+  `consult/specialists.md` for the dispatch routing)
 - A single FRAGILE assumption requires deep structural analysis (3+ modules)
 
 If all FRAGILE findings map to one specialist, route directly. If they span

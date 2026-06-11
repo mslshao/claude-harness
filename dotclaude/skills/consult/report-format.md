@@ -2,7 +2,7 @@
 
 ## Report Template
 
-```)
+```
 ## Consult: <brief description of what was analyzed>
 
 ### Summary
@@ -39,17 +39,17 @@ what information would resolve it.]
 
 ### Deferred
 [Issues triaged as low-priority, with reasoning]
-```)
+```
 
 ## Decision Record Format
 
 Use this when specialists disagree on a significant trade-off:
 
-```)
+```
 ## Decision: [Title]
 Context: [What prompted this]
 Decision: [What and why]
 Trade-offs: [What downsides were accepted]
 Revisit when: [Conditions that invalidate this decision]
 Sources: [Which specialists contributed to each section]
-```)
+```

@@ -43,7 +43,7 @@ The Perplexity Spaces port (planned, tracked) is the validation experiment for t
 
 A few entry points depending on intent:
 
-- **"What did the author actually do?"**: read `dotclaude/CLAUDE.md` for the global instructions, then sample a few agents in `dotclaude/agents/` (mx2-tech-lead, mx2-decision-maker, mx2-tenth-man, bot-review, prompt-refiner cover the interesting design space).
+- **"What did the author actually do?"**: read `dotclaude/CLAUDE.md` for the global instructions, then sample a few agents in `dotclaude/agents/` (mx2-tech-lead, mx2-decision-maker, mx2-skeptic, bot-review, prompt-refiner cover the interesting design space).
 - **"What is the meta-game?"**: read this file, then `patterns/` (reflection-trigger, lab-to-production, self-review-protocol, multi-window-discipline are the load-bearing pieces).
 - **"How do I adopt this?"**: read `sync/README.md` for the install script; the install handles symlinking `dotclaude/` into `~/.claude/`.
 - **"What got deleted along the way?"**: read `graveyard/` for the Keymaker principle and the components that lost their purpose.
@@ -76,14 +76,13 @@ Specific limits worth naming, in approximate order of severity:
 | `dispatch/` | 4 routing docs; WORLDMAP pointer-shaped commentary complete | None for V0 |
 | `scaffolding/` | 7 memory architecture docs; WORLDMAP pointer-shaped commentary complete | None for V0 |
 | `learnings/` | 11 of 12 corpus pages lifted from Confluence with editorial scrubbing; PM-focused 12th page deferred | When/if the deferred PM-focused page returns, it returns as a fresh audience-broad write |
-| `evidence/` | placeholder README only | At least one own-loop before/after entry |
+| `evidence/` | 7 entries (1 third-party, 6 own-loop) | More own-loop entries as instances surface |
 | `dotclaude/agents/` | 21 agent files + calibration + shared; WORLDMAP per-agent commentary complete | None for V0; review for accuracy on agent rev |
 | `dotclaude/skills/` | 22 skill directories (47 files); WORLDMAP per-skill commentary complete | None for V0; review for accuracy on skill rev |
 | `dotclaude/hooks/` | description-first README + 6 portable examples; WORLDMAP category-shaped commentary complete | None for V0 |
 | `dotclaude/CLAUDE.md` | scrubbed personal global instructions | None for V0 |
 | `project-tier/` | 3 agents (observability-reviewer, test-quality-reviewer, silent-failure-hunter) + 3 skills (enrich, investigate, review) mirrored from team-reviewed PR promotions; README documents the lift and the scrubbing applied | Optional: mirror selected project-tier rules; deferred to patterns/lab-to-production.md cross-references for V1 |
 | `graveyard/` | placeholder README only | agentcore, medical-legal-specialist entries + git scan for project-tier deletions |
-| `sync/` | SCRUB-SPEC.md + scrub-check.sh | install.sh + uninstall.sh |
-| `evidence/` | placeholder README | a teammate SF dedup entry + own-loop entry |
+| `sync/` | install.sh + uninstall.sh + scrub-check.sh + SCRUB-SPEC.md | None |
 
 V0 is the foundational layout plus the philosophy content. The AI-authored per-component commentary (WORLDMAP files in agents/, skills/, patterns/, dispatch/, scaffolding/, hooks/) is now complete; V1 priorities are `evidence/` empirical entries and the `learnings/` migration from Confluence.

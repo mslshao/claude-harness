@@ -7,7 +7,7 @@
 > **Output**: A four-stage workflow with concrete prompts, traps to avoid, and stop-criteria for each stage.
 > **If you only have 5 minutes**: read §1 (just-got-assigned exploration) and §4 (responding to PR comments). Those are the two stages where AI most consistently saves time.
 
-**One practical note**: Stages 1 and 2 flow naturally in one conversation. Start a fresh session before Stage 3 (implementation), since earlier exploration context can distract the AI from writing focused code. Stage 4 is always a new conversation.
+**One practical note**: Stages 1 and 2 (planning and implementation) flow naturally in one conversation. Start a fresh session for Stage 3 (the pre-push review): an AI that just helped write the code will tend to defend it rather than review it. Stage 4 is always a new conversation.
 
 ---
 
@@ -72,7 +72,7 @@ If you're going back and forth for more than 3 rounds on a design decision, the 
 
 **Before moving on, verify:** You can explain the approach to a teammate in 2 sentences. If you can't, you're not ready to code.
 
-> **Try This Today:** Pick a ticket you were recently assigned. Before writing any code, paste the relevant service into your AI tool and ask: "What are the three most important things I need to understand about this code before I change it?" Compare the answer to what you actually needed to know. The gap tells you how to write better exploration prompts.
+> **Try This Today:** Pick a ticket you were recently assigned. Before writing any code, point your AI tool at the relevant service: in Claude Code, open a session in the repo and name the service's directory in your question; in Cowork, attach the two or three core files (for example the handler and main processing module). Then ask: "What are the three most important things I need to understand about this code before I change it?" Compare the answer to what you actually needed to know. The gap tells you how to write better exploration prompts.
 
 ---
 

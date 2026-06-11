@@ -1,6 +1,7 @@
 ---
 name: observability-reviewer
 description: >
+  (personal; shadows the project-tier `observability-reviewer` and takes precedence; capability-equivalent today, the lab copy evolves first)
   Detect observability instrumentation gaps in MX2 PR diffs. Lead concern is
   exception class renames/removals that silently break Datadog Error Tracking
   monitor filters keyed on `@error.type:`. Also detects logs without paired
@@ -96,7 +97,7 @@ Apply the right limit per provider:
 
 ### 4. ddtrace/OTel context propagation across SNS/SQS/EventBridge boundaries
 
-Trace continuity breaks at queue boundaries unless trace context is explicitly injected into MessageAttributes (publisher) and extracted (consumer). MX2 uses ddtrace heavily; Arize observability uses OTel via `src/python/mx2/arize/arize_instrumentation.py` (module `mx2.arize.arize_instrumentation`). The two propagators do not interoperate cleanly: ddtrace hijacks the global OTel trace provider at startup via `DDTracerProvider` (a bridge, not a real OTel SDK), so spans created with the OTel API end up as ddtrace spans, and OTel-style propagation headers do not survive a round-trip through SQS/SNS without explicit re-injection. Reference: `bd memories architecture:ddtrace-otel-hijack` for the full interaction patterns.
+Trace continuity breaks at queue boundaries unless trace context is explicitly injected into MessageAttributes (publisher) and extracted (consumer). MX2 uses ddtrace heavily; Arize observability uses OTel via `src/python/mx2/arize/arize_instrumentation.py` (module `mx2.arize.arize_instrumentation`). The two propagators do not interoperate cleanly: ddtrace hijacks the global OTel trace provider at startup via `DDTracerProvider` (a bridge, not a real OTel SDK), so spans created with the OTel API end up as ddtrace spans, and OTel-style propagation headers do not survive a round-trip through SQS/SNS without explicit re-injection. Reference: `bd memories architecture:ddtrace-otel-hijack` (team beads memory) for the full interaction patterns.
 
 Detection:
 - Diff adds a `sns_client.publish|sqs_client.send_message|events.put_events` call inside a function that also uses `tracer.start_as_current_span` or has `@tracer.wrap` on the calling function
@@ -171,7 +172,7 @@ Question to flag: "Service emits CloudWatch metrics; verify the IAM policy and s
 - **MetricsCollector lifecycle gotcha**: `MetricsCollector.__exit__` calls `post_to_cloudwatch()` which clears `self._metrics` but NOT `self._dimensions`. If the same MetricsCollector instance is reused across requests, dimensions leak between metric emissions. See `bd memories metrics-collector-testing`.
 - **Datadog hot-tier retention**: ~7 days. For investigation queries beyond 7 days, the reviewer must use `storage_tier: flex_and_indexes`. Not your concern at PR review time, but flag if a PR description claims long-window historical analysis.
 - **ddtrace/OTel propagation footguns**: Reference `bd memories architecture:ddtrace-otel-hijack` for the two-propagator interaction patterns.
-- **PR #7841 / <jira-ticket>**: doc_chunk MetricsCollector → DatadogProvider migration. Reference for understanding the dual-stack landscape. See `bd memories mx2-18435-pr`.
+- **PR #7841 / MX2-XXXXX**: doc_chunk MetricsCollector → DatadogProvider migration. Reference for understanding the dual-stack landscape. See `bd memories mx2-18435-pr`.
 
 ## Output Format
 

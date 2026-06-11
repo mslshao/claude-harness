@@ -1,6 +1,6 @@
 ---
 name: investigate
-description: Structured investigation of production errors. Use when investigating any production error, Lambda failure, unexpected behavior, or silent regression, especially when an error message or stack trace is pasted into the conversation. Traces backward from the failure point through call path and git history, identifies the introducing change, looks for in-flight fixes, and estimates blast radius. Produces a structured investigation document with file:line citations ready to paste into Jira or Slack. Does NOT propose fixes (investigation only). Use before /bead-forge (fix planning) or /consult (multi-specialist review) when contributing factors are not yet known. Also trigger on phrases like "what's causing this", "prod issue", "error in Lambda", "why is X failing", "this error started after".
+description: (personal; shadows the project-tier `investigate` and takes precedence) Delta vs the project version: beads-aware downstream routing (/bead-forge fix planning, /consult multi-specialist) instead of the generic ticket/SME handoff. Structured investigation of production errors. Use when investigating any production error, Lambda failure, unexpected behavior, or silent regression, especially when an error message or stack trace is pasted into the conversation. Traces backward from the failure point through call path, git history, AWS deploy state, and Datadog signals to identify contributing factors and the leading hypothesis. Produces a structured investigation document with file:line citations ready to paste into Jira or Slack. Does NOT propose fixes (investigation only). Use before /bead-forge (fix planning) or /consult (multi-specialist review) when contributing factors are not yet known. Also trigger on phrases like "what's causing this", "prod issue", "error in Lambda", "why is X failing", "this error started after".
 ---
 
 # investigate
@@ -13,12 +13,14 @@ This skill ends at a structured investigation document that names contributing f
 
 Before reading any files, extract from the error message or context:
 
-1. **What failed**: exception type and message (verbatim)
+1. **What failed**: exception type and message (verbatim, for investigation context only)
 2. **Where it failed**: file and line from the stack trace
 3. **What triggered it**: the specific value, field name, or behavior that caused the failure
 4. **When it became visible**: was this always failing, or did a recent deploy expose it?
 
 Write these four items down before reading anything. If any are unclear, note them as "unknown (to be determined)."
+
+**PII boundary**: capture verbatim values in your investigation notes (chat / scratch) only. The published investigation document (Phase 4 output) must redact true PII, document content, client names, and full payloads per `.claude/rules/security.md`. Unredacted system identifiers (document ID, request ID, user ID, matter ID, job ID) are not sensitive and should appear in the published artifact; they are how the investigation is reproducible.
 
 ## Phase 2: Derive investigation questions
 
@@ -84,6 +86,56 @@ gh pr list --state open --search "<relevant terms>"
 
 If a fix is already in flight, note it. Deploy order often matters; code that writes new fields before the schema accepts them will reproduce the error.
 
+### AWS context (Lambda and ECS errors)
+
+When the error originates in a Lambda function or ECS task, fetch the current deployment configuration before forming theories about whether a regression commit is live.
+
+Use `mcp__aws__call_aws` with `GetFunctionConfiguration` (Lambda) or `DescribeTaskDefinition` / `DescribeServices` (ECS) to confirm:
+
+- The `LastModified` timestamp on the function or task definition (Lambda: `LastModified` field; ECS: task definition `registeredAt`)
+- The currently active alias target (Lambda: `GetAlias` for aliases like `live` or `prod`)
+- Environment variable values are typically non-secret configuration in MX2 services: table names, queue URLs, region, log level, SecretsManager ARN references (the secret payloads themselves are fetched at runtime, not stored in env). Record values that bear on the investigation; redact anything that looks like a raw credential or token. `DD_VERSION` is especially useful: it holds the commit hash of the deployed build, so `git log <DD_VERSION>` lists exactly which commits are running.
+- **When AWS is blocked (SSO expired, fork PR with restricted access): recover the deployed build without AWS via the Datadog `version` metric tag** (populated from `DD_VERSION`). Query `get_datadog_metric` with `by {version}` on any metric the service emits (e.g. `sum:<service_metric>{*} by {version}.as_count()`); the version tag still receiving data is the live build, and `git log <version>` lists what is running. It is a proxy, not a direct config read, so flag that caveat in the writeup. (Verified 2026-06-01 on the <service>-coverage SLI investigation when `GetFunctionConfiguration` returned an expired-token error.)
+
+**Critical note on deploy lag.** `LastModified` reflects when the function was last deployed, not when the commit was merged. The lag between a merge and the corresponding deploy can be days or weeks. Do NOT assume a recent commit is running in production unless the deploy timestamp confirms it. If `LastModified` predates the regression commit, the regression is not yet in production and the investigation focus shifts.
+
+Example: to check a Lambda named `my-service-prod`:
+
+```
+mcp__aws__call_aws(
+  service="lambda",
+  operation="GetFunctionConfiguration",
+  parameters={"FunctionName": "my-service-prod"}
+)
+```
+
+Check the `LastModified` field against the regression commit date before concluding the commit caused the observed error.
+
+### Datadog context (confirming current firing state)
+
+Before concluding an error is actively causing production impact, verify it is currently firing using the `mcp__datadog__*` tool family. Checking git history tells you what code changed; Datadog tells you whether the error is actually happening now.
+
+Relevant tools:
+- `mcp__datadog__search_datadog_logs` - search for the error message in recent log windows
+- `mcp__datadog__aggregate_spans` - group by service or error type to confirm active traces
+- `mcp__datadog__search_datadog_events` - check for correlated deployment or alert events
+- `mcp__datadog__search_datadog_incidents` - check for open incidents tied to the error
+- `mcp__datadog__search_datadog_error_tracking_issues` (Error Tracking) - get issue-level first_seen, last_seen, count
+
+Target fields from a Datadog query:
+- Error count over last 24 hours
+- `first_seen` and `last_seen` timestamps
+- Whether the case is currently open or resolved
+- Fingerprint stability (see gotcha 3 below)
+
+**Three gotchas - apply before forming any Datadog theory:**
+
+1. **ECS service tag suffix.** ECS-deployed services carry an `-ecs` suffix on their Datadog service tag. Query `<service>-doc_chunk-ecs`, not `<service>-doc_chunk`. Always verify the actual service tag via `mcp__datadog__aggregate_spans` grouped by `service` before forming theories. Using the wrong tag returns zero results and incorrectly suggests the error is not firing.
+
+2. **Flex tier retention for windows over 7 days.** Any query window greater than 7 days needs `storage_tier: "flex_and_indexes"` set explicitly. The default hot tier silently drops older data; queries that span more than 7 days will appear to show zero matches when matches exist in the flex tier. A query showing zero results for a window over 7 days cannot be trusted without confirming the storage tier parameter.
+
+3. **Error Tracking fingerprint drift.** Error Tracking case fingerprints can drift over time. A single ET case can accumulate different stack-trace fingerprints, hijacking the case across distinct error classes. Compare `first_seen` vs `last_seen` fingerprint hashes before trusting case-level "still firing" signals. If the fingerprints differ, the case may be aggregating unrelated errors under one ID.
+
 ### Estimate blast radius
 
 Determine whether failures are:
@@ -97,7 +149,7 @@ If blast radius requires production data to verify precisely, say so and provide
 
 ## Phase 4: Output
 
-Produce a structured investigation document using this format. The structure is the output; use it verbatim.
+Produce a structured investigation document using this format. The structure is the output; use it verbatim. Include the AWS evidence and Datadog evidence sections when those sources were relevant to the investigation.
 
 ---
 
@@ -118,6 +170,26 @@ For each question from Phase 2, answer it with evidence. Cite files and line num
 [Answer. File:line citations.]
 
 (continue for all questions)
+
+### AWS Evidence
+
+*(Include this section when the error originates in Lambda or ECS.)*
+
+- **Function/service name**: [Lambda function name or ECS service name]
+- **Last deploy timestamp** (`LastModified`): [timestamp from GetFunctionConfiguration or task definition registeredAt]
+- **Current alias target** (Lambda only): [alias name and version number, if applicable]
+- **Deploy lag vs regression commit**: [is the regression commit deployed? confirm by comparing LastModified to commit date]
+
+### Datadog Evidence
+
+*(Include this section when Datadog was queried to confirm current firing state.)*
+
+- **Case ID** (if Error Tracking case found): [ET-XXXXX or "not found"]
+- **first_seen**: [timestamp]
+- **last_seen**: [timestamp]
+- **Current count over last 24h**: [N errors]
+- **Fingerprint stability check**: [stable / drifted - if drifted, note the distinct fingerprints observed]
+- **Service tag verified**: [actual service tag used, confirmed via aggregate_spans grouped by service]
 
 ### Findings
 

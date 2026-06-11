@@ -107,21 +107,24 @@ fi
 
 ## Phase 3: Stress Test (Parallel)
 
-Launch Challenge (3a) and Consult (3b) as parallel subagents via the
-Agent tool. Both receive the draft plan + the INPUT_MODE classification
-from Phase 1. INPUT_MODE-aware framing in both prompts ensures
+Launch the Challenge subagent (3a) AND all selected consult
+specialists (3b, roster: `~/.claude/skills/consult/specialists.md`)
+as parallel Agent tool calls: 1 + N dispatches, no consult-coordinator
+subagent (subagents cannot spawn subagents). Every dispatch receives
+the relevant plan content + the INPUT_MODE classification from
+Phase 1. INPUT_MODE-aware framing in the prompts ensures
 mechanism-prescribed inputs get enhanced scrutiny (the
 Fulfillment-vs-Coverage guard).
 
-**CRITICAL: Launch both in a single message. Do not serialize.**
+**CRITICAL: Launch all of them in a single message. Do not serialize.**
 
-For the full Phase 3a (Challenge) and Phase 3b (Consult) subagent
+For the full Phase 3a (Challenge) and Phase 3b (per-specialist)
 prompt templates, see
 [stress-test-prompts.md](stress-test-prompts.md).
 
 ### 3c: Synthesize
 
-When both subagents return:
+When the Challenge subagent and all specialists return:
 
 1. **Merge findings**: deduplicate, connect themes, resolve
    contradictions.
@@ -154,7 +157,7 @@ When both subagents return:
    depth of pushback at a glance.
 
 Output: converged plan + parallelization-strategy YAML + DELTA_CATEGORY
-label. Phase 3.5 (Tenth-Man Lens) consumes this directly.
+label. Phase 3.5 (Skeptic Lens) consumes this directly.
 
 ### 3c Stage Event Write
 
@@ -176,9 +179,9 @@ The `status` field IS the DELTA_CATEGORY (lowercased + hyphenated). This
 means cold-start can read the synthesize entry and know the convergence
 delta category without parsing the scratch file.
 
-## Phase 3.5: Tenth-Man Lens
+## Phase 3.5: Skeptic Lens
 
-Dispatch `mx2-tenth-man` for an adversarial pass on the converged
+Dispatch `mx2-skeptic` for an adversarial pass on the converged
 plan. Mandatory. For the full dispatch prompt, no-concerns case
 handling, and failure-mode handling, see
 [gate-prompts.md](gate-prompts.md).

@@ -2,7 +2,7 @@
 name: converge
 description: >
   End-to-end planning pipeline with challenge + consult stress-test,
-  mandatory tenth-man pass, and decision-maker proceed/iterate gate. Use
+  mandatory skeptic pass, and decision-maker proceed/iterate gate. Use
   when the user has a rough idea and wants a production-quality plan
   without manually orchestrating each skill. Accepts free-text, Jira
   tickets, beads, Slack threads, Confluence rough-drafts, or transcripts.
@@ -21,7 +21,7 @@ allowed-tools: ["Bash", "Glob", "Grep", "Read", "Agent", "WebFetch"]
 
 Orchestrate the full planning pipeline: refine a rough idea, decompose
 it into a plan, stress-test assumptions, get specialist review,
-synthesize findings, run an adversarial tenth-man pass, run a
+synthesize findings, run an adversarial skeptic pass, run a
 decision-maker proceed/iterate gate, then present the converged result
 for signoff. The user sees one synthesis-level output: the final plan.
 
@@ -76,7 +76,7 @@ rough idea (text, Jira, bead, Slack, Confluence, transcript)
 [Phase 4: Synthesize] ------------+
              |                    |
              v                    |
-[Phase 4.5: Tenth-Man Lens]       |
+[Phase 4.5: Skeptic Lens]       |
              |                    |
              v                    |
 [Phase 4.6: Convergence Gate] ----+
@@ -183,27 +183,33 @@ dependency graph. Not shown to user yet.
 
 ### Phase 3: Stress Test (parallel, internal)
 
-Launch two parallel subagents via the Agent tool: Phase 3a (Challenge)
-and Phase 3b (Consult). Both receive the draft plan plus the
-INPUT_MODE classification.
+Dispatch the Phase 3a Challenge subagent AND all selected Phase 3b
+consult specialists (roster: `~/.claude/skills/consult/specialists.md`)
+in ONE message: 1 + N Agent tool calls. All receive the draft plan plus
+the INPUT_MODE classification. There is NO consult-coordinator subagent:
+subagents cannot spawn subagents, so YOU dispatch the specialists
+directly and synthesize their findings yourself.
 
-For the full Challenge and Consult subagent prompt templates (including
+For the full Challenge and per-specialist prompt templates (including
 the enhanced-scrutiny instructions for mechanism-prescribed inputs),
 see [stress-test-prompts.md](stress-test-prompts.md).
 
 Key invariants:
-- **Parallel is mandatory.** Launch both subagents in a single message
-  with multiple Agent tool calls. Serializing defeats the purpose.
-- When INPUT_MODE=mechanism-prescribed, both subagents receive
+- **Parallel is mandatory.** Launch the Challenge subagent and every
+  selected specialist in a single message with multiple Agent tool
+  calls. Serializing defeats the purpose.
+- When INPUT_MODE=mechanism-prescribed, every dispatch receives
   enhanced-scrutiny instructions: treat the prescribed mechanism as
   an explicit assumption to evaluate on first-principles grounds, not
   a given.
-- Both subagents must check sibling beads for ratified architectural
+- Every dispatch must check sibling beads for ratified architectural
   decisions that supersede the draft plan.
 
 ### Phase 4: Synthesize (internal)
 
-When both Phase 3 subagents return, merge their findings:
+When the Challenge subagent and all Phase 3b specialists return, merge
+the findings (the consult-side synthesis is YOUR job now, not a
+coordinator's):
 
 1. **Gather**: Collect challenge modifications and consult findings.
 2. **Connect**: Find themes across both. Where do challenge and consult
@@ -242,23 +248,23 @@ When both Phase 3 subagents return, merge their findings:
 Output: the converged plan (modified work items + convergence delta
 prose + DELTA_CATEGORY label).
 
-### Phase 4.5: Tenth-Man Lens (internal)
+### Phase 4.5: Skeptic Lens (internal)
 
-Dispatch `mx2-tenth-man` for an adversarial pass on the converged
+Dispatch `mx2-skeptic` for an adversarial pass on the converged
 plan. The agent asks naive, dumb, or obvious-but-unasked questions
 designed to surface risks the consensus passes assumed away. Output
 is advisory.
 
-For the full Tenth-Man dispatch prompt and failure handling, see
+For the full Skeptic dispatch prompt and failure handling, see
 [stress-test-prompts.md](stress-test-prompts.md).
 
 Key invariants:
-- Tenth-man is mandatory, not opt-in. Findings fold into Phase 5 as a
-  `Tenth-Man Lens` block.
-- If dispatch fails, note "Tenth-Man Lens unavailable: <reason>" and
+- Skeptic is mandatory, not opt-in. Findings fold into Phase 5 as a
+  `Skeptic Lens` block.
+- If dispatch fails, note "Skeptic Lens unavailable: <reason>" and
   proceed. Do not silently drop the pass.
-- The Phase 4.6 gate receives tenth-man output (or unavailable-reason)
-  as input. Missing tenth-man pass lowers gate confidence.
+- The Phase 4.6 gate receives skeptic output (or unavailable-reason)
+  as input. Missing skeptic pass lowers gate confidence.
 
 ### Phase 4.6: Convergence Gate (internal)
 
@@ -277,7 +283,7 @@ Key invariants:
   `bd remember --key='calibration:mx2-decision-maker:converge:<topic>'`.
 - ITERATE re-runs Phase 2 + 3 with a focused WEAK_DIMENSION
   modification (verification / consequence / scope / decomposition /
-  mechanism). Cap: 2 ITERATE rounds per invocation.
+  mechanism / proportionality). Cap: 2 ITERATE rounds per invocation.
 - ESCALATE-QUESTIONS poses 1-3 focused narrowing questions to the
   user via `AskUserQuestion`. Each question must include a WHY clause.
   Cap: 1 user-question round per invocation.
@@ -299,92 +305,16 @@ First synthesis-level output the user sees.
 > Checkpoint Recommendation still apply unchanged. The Phase 6 "Create"
 > step is replaced by user signoff to send/post.
 
-```markdown
-## Converged Plan: [topic, 3-8 words]  (low-confidence)?
-
-[Suffix `(low-confidence)` on the H2 IF the Phase 4.6 gate forced a
-low-confidence PROCEED (2 ITERATE rounds hit the cap, or the user
-opted out of ESCALATE-QUESTIONS with "you decide"). Add a
-"Low-confidence reason:" line at the end of the Summary stating which
-path triggered it. Without this signal, the user has no indication the
-plan is provisional.]
-
-### Summary
-[2-5 sentences: what this plan accomplishes, how many work items, key design decisions]
-
-### Iteration Log
-[Always present even when Round 0 was final, so the user sees the
-gate ran. List each round with verdict + action taken:]
-- Round 0 (initial): N work items drafted; DELTA_CATEGORY=<X>.
-- Round 1 (if any): VERDICT (REASON). Action: <what changed>.
-- Round 2 (if any): VERDICT (REASON). Action: <what changed>.
-- Final verdict: PROCEED | LOW-CONFIDENCE | ESCALATE-ROUTE.
-
-### Convergence Delta  [CATEGORY: CONFIRMED | MINOR_ADJUSTMENTS | MAJOR_REVISIONS | SCRAPPED_AND_REBUILT]
-> [What changed during stress-testing. 2-4 bullet points showing the
-> most significant modifications from challenge/consult. The CATEGORY
-> tag is load-bearing: CONFIRMED means specialists agreed with
-> concrete evidence (not punted); MAJOR_REVISIONS or
-> SCRAPPED_AND_REBUILT means the original framing did not survive.]
-
-### Prior Thinking Comparison  [only when INPUT_MODE = mechanism-prescribed]
-[Surface how the converged plan compares to the user's prescribed
-mechanism. One of:
-- "Specialists agreed the prescribed mechanism is right. <Brief
-  evidence cited.>" (CONFIRMED outcome)
-- "Specialists refined the prescribed mechanism: <what changed>"
-  (MINOR_ADJUSTMENTS)
-- "Specialists recommended a different mechanism: <X>. <Brief why.>"
-  (MAJOR_REVISIONS)
-- "Specialists recommended scrapping the prescribed mechanism: it
-  should be folded into <Y> as a feature of <Y>, not a new noun."
-  (SCRAPPED_AND_REBUILT, canonical Fulfillment-vs-Coverage outcome)
-This section makes mechanism-vs-feature decisions visible BEFORE the
-user commits to beads. Omit when INPUT_MODE = problem-framed.]
-
-### Tenth-Man Lens
-[Verbatim 🔻 block from Phase 4.5. Always present (the pass is
-mandatory). If returned "🔻 No concerns from this lens", include that
-line verbatim so the user can see the pass ran.]
-
-### Work Items
-
-[For each item in dependency order, using the format defined in
-work-item-structure.md.]
-
----
-
-### Dependency Graph
-[ASCII representation showing execution order and parallelism]
-
-### Open Assumptions
-[Any FRAGILE/UNVERIFIABLE assumptions the user should confirm. Include
-any mixed-input precedence disagreements from Phase 1. Omit only if
-none.]
-
----
-
-### OR: Escalation: No Plan Produced  [only when final verdict was ESCALATE-ROUTE]
-[Replaces the Work Items / Dependency Graph / Open Assumptions
-sections when the Phase 4.6 gate fired ESCALATE-ROUTE. 2-3 sentences
-naming the SUGGESTED_NEXT_SKILL and the reason no plan is being
-produced. Format:
-
-"The convergence gate fired ESCALATE-ROUTE: <reason from gate>. No
-plan is being produced; the suggested next step is
-<SUGGESTED_NEXT_SKILL: /ideate, /investigate, or direct execution>.
-The draft work items are preserved above for reference, but /converge
-is not the right tool for this problem."
-
-The Iteration Log + Convergence Delta + Prior Thinking Comparison
-sections are still shown so the user understands WHY the gate
-refused to converge.]
-
----
-
-**Approve this plan?** Reply "yes" to create beads (with optional
-human gate on implementation), or provide feedback to revise.
-```
+Present the converged plan using the template in
+[present-template.md](present-template.md). The template is the structural
+contract: an H2 `## Converged Plan` (with `(low-confidence)` suffix when the
+Phase 4.6 gate forced a low-confidence PROCEED), then Summary, Iteration Log
+(always present so the user sees the gate ran), Convergence Delta (with
+CATEGORY tag), Prior Thinking Comparison (mechanism-prescribed inputs only),
+the mandatory Skeptic Lens block, Work Items (per work-item-structure.md),
+Dependency Graph, Open Assumptions, the ESCALATE-ROUTE-only "No Plan Produced"
+variant, and the closing "Approve this plan?" prompt. Populate every applicable
+section in order; do not free-form narrate the plan.
 
 ### Phase 6: Create (on approval)
 
@@ -453,8 +383,9 @@ plan is approved.
 - **No intermediate output.** Phases 1-4.6 are invisible. Phase 5 is
   the first synthesis-level visible output. Exception: the narrowing
   questions in ESCALATE-QUESTIONS are explicitly user-facing.
-- **Parallel is mandatory.** Phase 3 Challenge and Consult run in
-  parallel via separate Agent tool calls in the same message.
+- **Parallel is mandatory.** Phase 3's Challenge subagent and all
+  selected consult specialists run in parallel via separate Agent tool
+  calls in the same message (no coordinator subagent).
 - **Beads are created last.** Do not create beads during Phases 1-4.6.
   The whole point is convergence before commitment.
 - **Don't rubber-stamp.** A CONFIRMED delta category is suspicious
@@ -465,6 +396,11 @@ plan is approved.
 - **Scope guard.** If the refined input is too large for a single
   converge pass (10+ work items likely), say so in Phase 5 and
   suggest breaking into sub-features.
+- **Proportionality is gated.** Phase 4.6 must check the plan is
+  right-sized to the goal: scope-signal inputs or plans materially
+  heavier than a minimal-viable 80/20 version must justify the extra
+  complexity, or the gate fires ITERATE with
+  WEAK_DIMENSION=proportionality. See convergence-gate.md.
 - **Mixed-input precedence is fixed.** Inline text > Slack/transcript
   > Confluence > Jira/PR > bead notes. Surface disagreements in
   Phase 5 Open Assumptions.
@@ -483,8 +419,8 @@ plan is approved.
 - **Convergence Delta gets a category, not just prose.** One of
   CONFIRMED / MINOR_ADJUSTMENTS / MAJOR_REVISIONS /
   SCRAPPED_AND_REBUILT.
-- **Tenth-man is mandatory.** Phase 4.5 runs always. If dispatch
-  fails, note "Tenth-Man Lens unavailable" and proceed; do not
+- **Skeptic is mandatory.** Phase 4.5 runs always. If dispatch
+  fails, note "Skeptic Lens unavailable" and proceed; do not
   silently drop.
 - **Convergence gate is mandatory.** Phase 4.6 runs always. PROCEED
   is not the default; the gate must affirmatively reach it. ITERATE
@@ -509,8 +445,11 @@ plan is approved.
 - [input-loading.md](input-loading.md): Phase 1 multi-input loading,
   URL parsing, mixed-input precedence, bias-detection.
 - [stress-test-prompts.md](stress-test-prompts.md): Phase 3a Challenge,
-  Phase 3b Consult, and Phase 4.5 Tenth-Man dispatch prompts.
+  Phase 3b Consult, and Phase 4.5 Skeptic dispatch prompts.
 - [convergence-gate.md](convergence-gate.md): Phase 4.6 decision-maker
   dispatch, branch logic, caps, iteration log format.
 - [work-item-structure.md](work-item-structure.md): Phase 2 work item
   field structure and Phase 5 presentation format.
+- [present-template.md](present-template.md): Phase 5 converged-plan
+  output template (Summary, Iteration Log, Convergence Delta, Work Items,
+  Dependency Graph, ESCALATE-ROUTE variant).

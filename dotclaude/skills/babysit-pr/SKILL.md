@@ -1,8 +1,8 @@
 ---
 name: babysit-pr
 description: Autonomous PR-iteration loop. Polls a draft PR on a paced cadence, classifies incoming comments (bot vs human, mechanical vs substantive), auto-remediates mechanical bot suggestions via a pre-staged worktree, replies inline, and escalates human reviewer feedback to the user. Use when stepping away from an open draft PR and wanting the loop to handle bot noise + small mechanical fixes without losing context. Trigger phrases include "babysit this PR", "watch PR #N", "auto-iterate on PR", "/babysit-pr".
-argument-hint: "<pr-number> [--authorize-force-push] [--allow-published] [--window <duration>]"
-allowed-tools: ["Bash", "Glob", "Grep", "Read", "Edit", "Write", "ScheduleWakeup"]
+argument-hint: "<pr-number> [--authorize-force-push] [--allow-published] [--window <duration>] [--stop]"
+allowed-tools: ["Bash", "Glob", "Grep", "Read", "Edit", "Write", "ScheduleWakeup", "CronCreate"]
 ---
 
 # Babysit PR
@@ -33,6 +33,7 @@ Extract from `$ARGUMENTS`:
 - **`--authorize-force-push`**: presence enables AUTO-REMEDIATE classification. Without it, ALL actionable findings escalate.
 - **`--allow-published`**: presence overrides the non-draft refusal. Operator accepts auto-merge risk.
 - **`--window <duration>`**: total window length. Default 1 hour. Accepts `30m`, `2h`, `90m`, etc.
+- **`--stop`**: presence signals the loop to terminate immediately; emit `[PR_BABYSIT_TERMINATED]` with `terminal_reason: operator-stopped` (see termination condition 6).
 
 If no PR number is found and the current branch has an associated PR, infer it via `gh pr view --json number,isDraft --jq '.number'`. Otherwise stop and ask.
 
@@ -105,6 +106,8 @@ ScheduleWakeup(
 ```
 
 The 270-second cadence sits just under the 300-second prompt-cache TTL so each wakeup re-enters with a warm cache. See Anti-pattern 5 for the rationale; do not regress to 300 or 600 even though those values appear in older docs.
+
+**Harness fallback** (applies to every wakeup in this skill): ScheduleWakeup is a main-loop tool documented as /loop pacing machinery; it works when called directly today (verified 2026-06-09) but is not guaranteed across harness versions. If the ScheduleWakeup call is rejected or the tool is absent, schedule the wakeup with a CronCreate one-shot instead: `CronCreate(cron="<minute> <hour> <dom> <month> *", recurring=false, prompt="/babysit-pr <number>")` pinned 4-5 minutes out (compute the fields from the current local time; cron is minute-granular, so the cache-warm 270s precision degrades to ~240-300s, which is acceptable). Do not silently drop the wakeup; if neither tool is available, say so and stop the loop cleanly.
 
 Note: the prompt is the same `/babysit-pr <number>` invocation. The skill re-enters preflight, detects the existing bead via `bd search "babysit-pr #<number>"`, skips re-creation, and jumps to the loop body. Idempotency is load-bearing because the cold-start re-entry must work the same as a hot continuation.
 
@@ -187,7 +190,7 @@ Append a new `[PR_BABYSIT_STATE cycle=N]` block as a comment on the bead with:
 - Updated `actions_taken` (entries for each AUTO-REMEDIATE and REPLY-ONLY this cycle)
 - Updated `escalations` (entries for each ESCALATE this cycle)
 - `ci_snapshot: <success_count> SUCCESS / <failure_count> FAILURE / <pending_count> PENDING`
-- `review_state: <one-line summary, e.g. "approved by a peer reviewer-forthepeople; awaiting a teammate">`
+- `review_state: <one-line summary, e.g. "approved by a teammate; awaiting a teammate">`
 
 ```bash
 bd comment <bead-id> "[PR_BABYSIT_STATE cycle=N]

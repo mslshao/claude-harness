@@ -15,7 +15,7 @@ When prompts are brief:
 
 For people the user references, store known facts in persistent memory: real names, role, GitHub username, communication channels, ownership. Do not construct usernames or handles from partial information or naming conventions; conflation errors are costly to recover from.
 
-A specific instance the author saw: confusing `mslshao` (Michael Shao) with `a teammate` (a different person named a teammate, who uses the `teammate/` branch prefix). The conflation looked plausible from the partial information; the actual identity was unrelated. The lesson: search memory for stored facts before guessing; if memory does not have the identity, ask one focused question rather than guessing.
+A specific instance the author saw: the author's own handle was conflated with a different teammate whose first name matched but whose actual identity (last name, GitHub handle, branch prefix) was unrelated. The conflation looked plausible from the partial information; the real identity was someone else entirely. The lesson: search memory for stored facts before guessing; if memory does not have the identity, ask one focused question rather than guessing.
 
 ## Incident threads
 

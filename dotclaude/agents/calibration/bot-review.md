@@ -3,11 +3,18 @@
 Last reviewed by Michael: 2026-05-07 (initial scaffold; no overrides yet)
 
 This file is read by the `bot-review` agent before every invocation.
-The agent emits calibration drift via `bd remember` (key prefix
-`calibration:bot-review:`); the `/calibrate` skill is the human review
-gate that merges accepted entries into this file. Append-only audit of
+The ORCHESTRATOR (pr-intel synthesis) records dismissal-driven calibration
+drift via `bd remember` (key prefix `calibration:bot-review:`); the agent
+itself cannot observe dismissals, which happen after it returns. The
+`/calibrate` skill is the human review gate that merges accepted entries
+into this file. Append-only audit of
 merged/rejected entries lives at `bot-review.lookback.md` (created on first
 calibration merge).
+
+3-segment `calibration:bot-review:<short-tag>` keys route to
+`## Example Dismissals` by default (every bot-review emission is a
+dismissal; the pr-intel synthesis dismissal-capture step is the only
+emitter).
 
 If this file is empty (or contains only the scaffold below with no rule
 overrides), default rules from the agent definition apply. The agent's
@@ -60,8 +67,9 @@ Examples that would land here:
 
 ## How `/calibrate` interacts with this file
 
-The agent emits dismissal memories with keys like
-`calibration:bot-review:<short-tag>`. The user runs `/calibrate
+The ORCHESTRATOR (pr-intel synthesis dismissal capture) emits dismissal
+memories with keys like `calibration:bot-review:<short-tag>`; the agent
+cannot observe dismissals itself. The user runs `/calibrate
 --agent=bot-review` periodically (or when prompted by the SessionStart
 hook nudge). The skill presents each entry, the user accepts or rejects,
 and accepted entries get merged here under the appropriate section.

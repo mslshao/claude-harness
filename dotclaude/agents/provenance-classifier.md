@@ -204,16 +204,17 @@ or commentate. The synthesizer reads your JSON output mechanically.
 
 ## Calibration Loop
 
-Record drift via:
+The ORCHESTRATOR records calibration drift; do not run `bd` yourself (your
+tools are Read+Grep, and your output contract is mechanical JSON).
 
-```
-bd remember --key="calibration:provenance-classifier:<topic>" "<one-line drift note>"
-```
-
-When the classifier defaults to bot-surfaced low-confidence three or more
-times in a single run, the synthesizer's source-tagging is leaking
-findings without source fields. Surface this as a calibration note so the
-upstream synthesis can be patched (the right fix is upstream, not in
-this agent's defaults).
+When you default to bot-surfaced low-confidence three or more times in a
+single run, the synthesizer's source-tagging is leaking findings without
+source fields. You do NOT need to signal this: your output contract is a
+bare JSON array the synthesizer reads mechanically, and the orchestrator
+side (pr-intel provenance-classification.md) already counts low-confidence
+defaults and records the drift via
+`bd remember --key="calibration:provenance-classifier:<topic>" "<note>"`.
+The right fix is upstream in the synthesis, not in this agent's defaults;
+keep your output strictly to the classification array.
 
 Recurrence context: bd memories calibration:pr-intel-provenance-rule-2026-05-21

@@ -14,7 +14,7 @@ The parent page's section 3 covers how to give AI better instructions. This page
 
 ## 1. The Faros thesis, operationalized
 
-The parent page's section 1 and the prior subpage both cite the Faros AI Engineering Report 2026 (page 21 framing): the review tax falling on senior engineers is not a review-side problem to solve with more reviewer attention. It is an authoring-side problem to solve with better authoring.
+[Spotting AI Failure Patterns](./spotting-failure-patterns.md) (section 1) cites the Faros report's page 21 framing: the review tax falling on senior engineers is not a review-side problem to solve with more reviewer attention. It is an authoring-side problem to solve with better authoring.
 
 This page operationalizes that. The question is: when a reviewer catches a pattern, **where does the catch live afterward?**
 
@@ -88,12 +88,10 @@ A "Review findings I've codified" section in your personal `CLAUDE.md`. Each ent
 >
 > ```
 > ## Review findings I've codified
-> - PR #8585 (type-narrow-vs-delete): A reviewer pushed back on AI code that added a runtime `if x is None` guard for a value the production type system already proved was non-None. CI's type checker flagged the new branch as unreachable. The right fix was deletion of the guard, not narrowing it. Rule: when a code reviewer flags a runtime guard, check the production type signature before responding. If the type rules out the protected case, delete the guard, do not narrow it.
-> - PR #8140 (empty-string defaults on required Settings): AI used empty-string defaults (`= ""`) on required Settings fields (DynamoDB table names, SQS queue URLs). The service started successfully and crashed on the first request because the validator never ran. Rule: required Settings fields must have no default value. Pydantic raises ValidationError at startup, which is the correct fail-fast behavior.
-> - PR #8517 (broad except Exception in test fixture): AI used a broad `except Exception` to make a flaky test pass. Three independent signals (Copilot inline, Sentry production trace, a human reviewer) converged on the same finding. The narrowing fix was `except RequestError` plus an explicit check on the response shape. Rule: `except Exception` is banned in new code. Use the narrowest exception class that names the actual failure mode.
+> - PR #8585: type-narrow-vs-delete. Rule: when a code reviewer flags a runtime guard, check the production type signature before responding. If the type rules out the protected case, delete the guard, do not narrow it.
+> - PR #8140: empty-string defaults on required Settings. Rule: required Settings fields must have no default value. Pydantic raises ValidationError at startup, which is the correct fail-fast behavior.
+> - PR #8517: broad except Exception in test fixture. Rule: except Exception is banned. Use the narrowest exception class that names the actual failure mode.
 > ```
-
-The PR numbers are anchors; the real value is the failure mode each rule encodes. A reader without access to the codebase still gets the lesson because the failure mode is named inline.
 
 Verify each new rule the same way [Spotting AI Failure Patterns](./spotting-failure-patterns.md) does:
 

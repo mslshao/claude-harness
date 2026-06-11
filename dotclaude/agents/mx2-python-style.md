@@ -2,7 +2,7 @@
 name: mx2-python-style
 description: >
   Python style enforcement: Google Python Style Guide + MX2 overrides
-  (2-space indent, 108-char lines, modern type syntax, logging conventions).
+  (4-space indent, 108-char lines, modern type syntax, logging conventions).
 
   INVOKE WHEN: reviewing or generating Python code for MX2 style compliance.
   DO NOT INVOKE FOR: Settings/os.environ → mx2-pydantic-reviewer,
@@ -60,7 +60,6 @@ These supersede Google defaults. Flag the Google default as an error when encoun
 | Rule | Google default | MX2 override |
 |------|---------------|--------------|
 | Line length | 80 chars | **108 chars** |
-| Indentation | 4 spaces | **2 spaces** |
 | Quotes | Single preferred | **Match existing file; double for new files** |
 | Logger variable | `logger` | **`log = logging.getLogger(__name__)` at module level** |
 
@@ -148,11 +147,11 @@ If everything passes, say so in one line. Don't pad. Don't explain Python basics
 | `assert x > 0` (as validation) | CRITICAL | 🚨 | Use `raise ValueError` |
 | `log.info(f'{x}')` | CRITICAL | 🚨 | Use `log.info('%s', x)` |
 | `Optional[str]` / `List[int]` | CRITICAL | 🚨 | Modern syntax: `str \| None`, `list[int]` |
-| 4-space indentation | CRITICAL | 🚨 | MX2 uses 2 spaces |
+| 2-space indentation (pre-reformat legacy) | CRITICAL | 🚨 | MX2 uses 4 spaces since the 2026-05 reformat |
 | Line > 108 chars | CRITICAL | 🚨 | Break with implicit joining |
 | `default=datetime.now(...)` | CRITICAL | 🚨 | `default_factory=mx2.datetimes.utcnow` |
 | `from . import x` | - | 🚨 | Full package path |
-| Tab character | - | 🚨 | 2 spaces |
+| Tab character | - | 🚨 | 4 spaces |
 | `\` line continuation | - | 🚨 | Implicit joining |
 | Module named `utils.py` | - | 🚨 | Rename by purpose |
 | Commented-out code block | - | 🚨 | Delete; use version control |
@@ -166,7 +165,7 @@ If everything passes, say so in one line. Don't pad. Don't explain Python basics
 When generating code (not reviewing):
 - Apply all rules automatically. No commentary unless asked.
 - Include complete PEP 257 docstrings; downstream maintainers depend on them.
-- Use 2-space indentation, 108-char line limit, double quotes for new files.
+- Use 4-space indentation, 108-char line limit, double quotes for new files.
 - Follow MX2 patterns for Pydantic models, AWS typing, logging setup.
 - Organize imports per isort conventions from the start.
 - Err toward explicit and readable over terse; this code will be handed off.

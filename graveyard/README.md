@@ -20,6 +20,9 @@ Personal-tier `~/.claude/` is not git-versioned by default, so perma-deleted per
 | `medical-legal-specialist.md` | recall | mx2-security-auditor + per-domain context |
 | `project-tier-best-practices-rule.md` | git log | restructured into separate scoped rules (tenets, code-style, debugging, verification) |
 | `project-tier-project-context-rule.md` | git log | absorbed into hierarchical CLAUDE.md restructure |
+| `mx2-tenth-man.md` | repo history | renamed/reframed to `mx2-skeptic` (capability intact; the obscure name was the liability) |
+
+Note: `mx2-tenth-man.md` is the one entry here that is a RENAME, not a deletion. The agent still exists as `mx2-skeptic`; the entry records why the name was retired (a retrieval-surface label that needed decoding before it meant anything). It is kept in the graveyard because the reasoning generalizes, even though the Keymaker "build for a need, retire when superseded" framing is usually about deletion.
 
 ## Pattern observation
 

@@ -1,8 +1,8 @@
 ---
 name: pr-intel
 description: Actionable PR intelligence briefing with specialist-backed analysis and draft review comments ready to post. Use when the user asks to review a PR in any phrasing - "review a PR", "analyze PR", "PR intel", "look at PR #123", "check this PR", "thoughts on #456", "can you go through this PR" - or needs a structured briefing before reviewing. Also triggers for self-review with --mine flag when user says "review my PR", "check my changes before I submit".
-argument-hint: "[pr-number] [--mine] [--quick] [free-text review context]"
-allowed-tools: ["Bash", "Glob", "Grep", "Read", "Agent", "WebFetch"]
+argument-hint: "[pr-number] [--mine] [--quick] [--once] [free-text review context]"
+allowed-tools: ["Bash", "Glob", "Grep", "Read", "Agent", "WebFetch", "ScheduleWakeup", "Skill"]
 ---
 
 # PR Intel
@@ -17,7 +17,11 @@ Raw invocation: `/pr-intel $ARGUMENTS`
 
 Parse the raw invocation above to extract:
 1. **PR number**: first numeric token (e.g., `7640`), or a GitHub PR URL
-2. **Mode flags**: `--mine` (self-review), `--quick` (triage only), or neither (default)
+2. **Mode flags**:
+   - **neither (default)**: full analysis AND the multi-phase `@claude` verify loop (see [verify-loop.md](verify-loop.md)). After producing the briefing, default mode posts the bot-invoked `@claude` questions (with your OK), waits for the GitHub `@claude` bot, reconciles its answer against the local findings, and recommends a verdict. The loop engages only when synthesis produced at least one `@claude` question; with none, it degrades to a one-shot briefing.
+   - **`--once`**: one-shot. Full analysis and briefing (drafting any `@claude` questions) but NO post-and-wait loop. This is the pre-2026-05-29 default; use it to get the briefing now without waiting on the bot, or when you will handle verification yourself.
+   - **`--mine`** (self-review): one-shot, unchanged. No verify loop and no `@claude` bot-routing; an unverified falsifiable claim surfaces as a pre-submission item to check, not an `@claude` question.
+   - **`--quick`** (triage only): one-shot, no specialist dispatch, no loop.
 3. **Reviewer context**: everything else is free-text instructions from the reviewer.
    Use this to steer your analysis focus, specialist prompts, and output framing.
    It takes priority over default analysis behavior.
@@ -27,6 +31,23 @@ If no PR number is found, auto-detect from the current branch:
 gh pr view --json number --jq '.number'
 ```
 If that also fails, stop and ask the user for a PR number.
+
+## Reading Paths (conditional, by mode and title-prefix size)
+
+The PR title's automated size prefix (XS/S/M/L/XL/2XL/3XL, stamped by Graphite/GitHub tooling) is the CANONICAL size for routing below; it is the same complexity signal a human reviewer sees. Infer from additions+deletions ONLY when no prefix exists (same fallback as Size Classification). Do not substitute independent complexity judgment for the prefix (2026-06-09 directive, bd docr-pnx9).
+
+This SKILL.md is always read in full. Sub-files load per the table; skipping a "Skip (sanctioned)" file on a matching run is correct behavior, not a shortcut.
+
+| Mode / size | Read | Skip (sanctioned) |
+|---|---|---|
+| every run | [output-formats.md](output-formats.md) (the output contract; never skippable, any mode, any size) | |
+| `--quick` | nothing further | all other sub-files |
+| default / `--once` / `--mine`, XS-S | [prior-reviews.md](prior-reviews.md) (if prior rounds exist), [compliance-checks.md](compliance-checks.md) (if Jira ticket or CI failures), [provenance-classification.md](provenance-classification.md), [bot-reactions.md](bot-reactions.md) (default mode only) | [dispatch.md](dispatch.md) (no specialist dispatch at XS/S), [synthesis.md](synthesis.md), [verification.md](verification.md), [diagrams.md](diagrams.md) |
+| default / `--once` / `--mine`, M+ | all of the above plus [dispatch.md](dispatch.md), [dispatch-mechanics.md](dispatch-mechanics.md), [synthesis.md](synthesis.md), [static-analyzers.md](static-analyzers.md) | [verification.md](verification.md) at M when no BLOCKING-class findings |
+| L+ | plus [verification.md](verification.md) | |
+| trigger-conditional, any size | [checkov.md](checkov.md) (`has_terraform` + net-new tf), [diagrams.md](diagrams.md) (M+ AND `multi_service`), [design-doc.md](design-doc.md) (Confluence link in body), [context.md](context.md) (migration/series triggers), [verify-loop.md](verify-loop.md) (default mode, >=1 `@claude` question), [freshness.md](freshness.md) / [grounding.md](grounding.md) when those checks need their exact commands | |
+
+The Stop-hook backstop (`stop-validate-pr-intel.sh`) still validates every render, so a misjudged reading path degrades to a caught retry, not a silent miss. Mandatory PHASES (provenance classification, bot reactions) are unaffected by reading paths; only reference depth varies.
 
 ## Data Gathering
 
@@ -39,7 +60,7 @@ If that also fails, stop and ask the user for a PR number.
 - [ ] **Prior review memories loaded** via `bd memories pr-<number>` (see [prior-reviews.md](prior-reviews.md))
 - [ ] **DynamoDB prior reviews loaded** (skipped if SSO not active) via `pr_review_state.list_reviews_for_pr` (see [prior-reviews.md](prior-reviews.md))
 - [ ] **Jira ticket hydrated** if `MX2-NNNNN` or similar appears in PR body
-- [ ] **Design doc hydrated** if any `<internal-confluence> URL appears in PR body (see lesson #11 in `reviewer-discipline.md`)
+- [ ] **Design doc hydrated** if any `<company>.atlassian.net/wiki/` URL appears in PR body (see lesson #11 in `reviewer-discipline.md`)
 - [ ] Inline review comments fetched if prior reviews exist (required for dedup)
 - [ ] PR Series context checked if Jira ticket was found
 - [ ] Service Context extracted from CLAUDE.md or README
@@ -87,59 +108,24 @@ see [prior-reviews.md](prior-reviews.md).
 If both channels fail, proceed as first-round (see `correction:skill:pr-intel-first-round`
 in beads memory).
 
-### Merge Base Freshness
+### Merge Base Freshness & Ghost Diffs
 
-After fetching the PR head ref, check whether any files in the PR's changeset have
-content identical to current main (changes already shipped via a sibling PR that
-merged first). This is a local git operation and always runs.
+After fetching the PR head ref, run two local git checks (always run):
 
-1. Get files that actually differ from main at the PR's HEAD:
-   ```bash
-   git diff origin/main <headRefOid> --name-only
-   ```
-2. Compare against the PR's full file list (from the `files` field in PR metadata).
-3. Files present in the PR's file list but **absent** from the 2-dot diff output are
-   **already on main**: their content at the PR HEAD is identical to current main.
-4. Store as `merge_base_freshness`:
-   - `stale_files`: file paths whose content matches main
-   - `net_new_files`: file paths with actual differences
-   - `is_stale`: true if any stale files detected
-5. Downstream effects:
-   - **Size Classification**: use net-new additions/deletions, not raw PR totals
-   - **Dispatch Signals**: compute from net-new files only; exclude stale files
-     from the filtered diffs sent to specialists
-   - **Inline comments**: never target stale files (enforced in grounding.md)
-   - **Scope**: show breakdown: "Files: 21 (17 net-new, 4 already on main)"
+1. **Merge Base Freshness**: files in the PR's changeset whose content is
+   identical to current main (already shipped via a sibling PR). Store
+   `merge_base_freshness` (`stale_files`, `net_new_files`, `is_stale`); Size
+   Classification, Dispatch Signals, and inline comments all use net-new only.
+   If ALL files are already on main, short-circuit: the branch needs a rebase.
+2. **Ghost Diffs (reverse freshness)**: files in the 2-dot `git diff` but ABSENT
+   from the PR's file list. GitHub's three-dot merge base hides these; they are
+   usually a rebase conflict silently reverting a recently-merged change.
+   **High-consequence: surface as BLOCKING** with the recently-merged PR
+   reference. Cannot receive inline comments; report in the review body.
 
-If all files are already on main (pure rebase artifact), short-circuit:
-"This PR's diff is entirely content already on main. The branch needs a rebase."
-
-### Ghost Diffs (Reverse Freshness)
-
-Also check the reverse: files in the 2-dot diff that are **absent** from the PR's
-file list. These are "ghost diffs" that GitHub's three-dot merge base hides from the
-PR diff view. They typically appear when a PR is squashed/rebased and a rebase
-conflict resolution accidentally reverts a recently-merged change.
-
-1. Files present in the 2-dot `git diff` output but **absent** from the PR's `files`
-   metadata are ghost diffs.
-2. For each ghost file, check `git log origin/main -- <path>` (last 5 commits) to
-   identify what recently-merged PR touched it. This reveals whether the ghost diff
-   is an accidental revert of a specific PR.
-3. Ghost diffs are **high-consequence findings** (potential silent reverts of merged
-   work). Surface them as BLOCKING in the review summary with the recently-merged PR
-   reference.
-4. Ghost diffs cannot receive inline comments (not in GitHub's diff view). Include
-   findings in the review body with file:line references.
-5. Show in Scope: "Ghost diffs (not in GitHub diff): N files - see review body"
-
-This check is the highest-value add for squashed PRs, where inter-revision visibility
-is lost and rebase conflict reverts become invisible.
-
-If `git fetch` failed earlier, skip this check and treat all files as net-new.
-
-If `git fetch` fails (network error, fork PR with restricted access), note the failure
-and skip worktree creation during specialist dispatch (see Branch Safety below).
+If `git fetch` failed earlier, skip both and treat all files as net-new. For the
+exact `git diff`/`git log` commands, the `merge_base_freshness` field shapes, and
+the downstream-effects list, see [freshness.md](freshness.md).
 
 After metadata is loaded, fetch inline review comments (in addition to the issue-level
 comments already pulled via `gh pr view --json comments`). Bot commenters split across
@@ -185,73 +171,20 @@ description quality gap (same as today) but skip hydration. If the MCP call fail
 note the failure and continue without ticket context. Do not block on Jira
 availability.
 
-### Design Doc Hydration
+### Design Doc Hydration & Spec Compliance Check
 
-After metadata is loaded, scan the PR body for Confluence links matching the pattern
-`<internal-confluence> (URLs or Confluence short links). If found, extract the
-page ID and fetch the page content AND comments **in parallel** with Jira hydration:
-
-```
-mcp__atlassian__getConfluencePage
-  cloudId: <your-atlassian-cloud-id>
-  pageId: <extracted page ID>
-  contentFormat: markdown
-
-mcp__atlassian__getConfluencePageInlineComments
-  cloudId: <your-atlassian-cloud-id>
-  pageId: <extracted page ID>
-  contentFormat: markdown
-
-mcp__atlassian__getConfluencePageFooterComments
-  cloudId: <your-atlassian-cloud-id>
-  pageId: <extracted page ID>
-  contentFormat: markdown
-```
-
-Extract and store:
-- **Design spec**: the page body (parameters, logic steps, response shapes, limitations)
-- **Inline comments**: each with author, resolution status, and the text they annotate
-- **Footer comments**: each with author and body
-- **Unresolved comment count**: total open inline + footer comments from non-author users
-
-**Page ID extraction**: Confluence URLs contain the page ID as a numeric path segment
-(e.g., `.../pages/5799772177/...`). Short links (`/wiki/x/<encoded>`) can be passed
-directly as `pageId` to the MCP.
-
-If no Confluence link is found in the PR body, skip silently. If the MCP call fails,
-note the failure and continue without design doc context.
-
-**Downstream effects:**
-- **Spec Compliance Check**: runs after design doc is loaded (see below)
-- **Open Threads**: unresolved design doc comments surface as open threads in the output,
-  separate from PR inline comment threads
-- **Specialist preamble**: append design spec context so specialists can flag deviations
-
-### Spec Compliance Check (when design doc is available)
-
-When a Confluence design page was successfully hydrated, compare the PR's
-implementation against the design spec. This complements AC Compliance (Jira)
-with a deeper comparison against the full design document.
-
-For each behavioral specification in the design doc:
-1. **Trace it in the diff.** Can you identify the code that implements this spec?
-2. **Check for deviations.** Common divergences:
-   - Response shapes differ (field names, values, status codes)
-   - Parameters differ (naming, optionality, semantics)
-   - Routing or branching logic differs from described flow
-   - Edge cases described in the spec are not handled (or handled differently)
-3. **Surface unresolved design comments.** If the design page has open comments
-   from reviewers (especially tech leads), these represent design-level feedback
-   that may not have been addressed in the implementation. Flag them as open
-   threads regardless of whether they map to code findings.
-
-Deviations are not automatically bugs. The spec may have been updated after the
-code, or the author may have intentionally diverged. The goal is to surface the
-gap so the reviewer can ask "was this intentional?" This is the class of issue
-that code-only review (including all specialist agents) cannot detect.
-
-This check produces a **Design Doc Compliance** section in the output (see
-output-formats.md). It runs in default and --mine modes. Skip for --quick.
+After metadata is loaded, scan the PR body for Confluence links matching
+`<company>.atlassian.net/wiki/`. If found, hydrate the page body and comments (via
+`mcp__atlassian__getConfluencePage` + inline/footer comment calls) in parallel
+with Jira hydration, then compare the implementation against the spec: trace each
+behavioral specification in the diff, flag deviations (response shapes, parameters,
+routing, unhandled edge cases), and surface unresolved design-doc comments as open
+threads. Deviations are not automatically bugs; the goal is to let the reviewer ask
+"was this intentional?" This is the class of issue code-only review (all specialist
+agents) cannot detect. Produces a **Design Doc Compliance** output section; runs in
+default and `--mine`, skipped for `--quick`. If no Confluence link is found, skip
+silently. For the exact MCP calls (cloudId, page-ID extraction), the stored fields,
+and the deviation taxonomy, see [design-doc.md](design-doc.md).
 
 ### PR Context (series, service, migration)
 
@@ -306,6 +239,7 @@ Compute these booleans from the diff for specialist dispatch:
 - **has_pattern_precedent**: at least one file in changeset has >= 2 prior merged PRs in last 180 days AND the diff adds new public symbols. Symbol detection: added lines matching `^\+\s*(export |def |class |interface |type )`. Reuses the same `gh pr list` calls as `has_file_history`.
 - **changes_public_surface**: added/removed/modified lines declare a public symbol. Detection: lines matching `^[+-]\s*(def |async def |class |interface |type |export )`, OR `^[+-]\s*[A-Z_]+\s*[:=]` (constants, enum values), OR `^[+-]\s*\w+:\s*\w+` inside files matching `*Settings*` or Pydantic model classes (schema/Settings field changes). Excludes private symbols (leading underscore in Python, non-exported in TS). Drives `bot-review` dispatch (cross-file blast-radius lens). Size is a poor proxy for blast radius; an XS PR that changes a public type signature has higher downstream impact than an M PR refactoring internals.
 - **multi_service**: changed files (net-new only) span 2+ distinct top-level service directories. Service directory = first path segment after `src/python/mx2/`, `src/typescript/mx2/`, or `infra/`. Files outside these prefixes (root scripts, generated code) do not contribute. Drives the optional Sequence Diagram briefing section for M+ PRs. See [diagrams.md](diagrams.md).
+- **spot_check_eligible**: ALL of (a) size in {L, XL, 2XL, 3XL}, (b) net-new file count >= 10 AND median per-file diff lines <= 25 (mechanical-pattern proxy: many small uniform edits), (c) PR description contains a methodology statement detectable by regex (`script:|ran (the )?(command|script|tool)|applied (rule|codemod|transform)|using (yapf|ruff|isort|black|sed|jscodeshift|comby|grit)|migration script|codemod`). Drives the spot-check mode under Specialist Dispatch (a reviewer's Code Review Guide #11: "focus your review on the methodology... spot-check a few instances"). Conservative-by-default: when any of (a)/(b)/(c) is uncertain, set to false (full-diff dispatch is the safe default; spot-check trades coverage for speed and that trade only makes sense when the mechanical pattern is unambiguous).
 
 ## Phase 0: Description Quality Check
 
@@ -314,9 +248,39 @@ Before dispatching specialists, evaluate the PR description:
 - Does it explain intent (why), not just content (what)?
 - Is there a linked Jira ticket or meaningful context?
 
-If the description is absent or inadequate, short-circuit: produce a brief
-"send it back" recommendation instead of full specialist dispatch. Include what
-a good description should contain for this PR based on the diff scope.
+Boilerplate detection patterns (any of these alone is sufficient to
+fail Phase 0):
+- Description IS the ticket title (no additional context)
+- Only template skeleton remains ("As a [type of user]", "Given that...",
+  unfilled checklist headers)
+- Lists WHAT changed without WHY: leads with verbs like "Adds X / Implements
+  Y / Refactors Z" without any "because", "to fix", "needed for", or other
+  rationale connective
+- Single sentence < 30 chars
+- Empty body with only `Jira issue link: MX2-XXXX`
+
+If the description is absent or inadequate, **short-circuit**: produce a
+brief "send it back" briefing instead of full specialist dispatch. The
+framing is a reviewer's #1 explicitly: "don't waste your time reviewing
+without context." Skip CI status check, AC compliance, SonarCloud
+pre-check, and specialist dispatch entirely. The output should:
+
+- Set Action to **Comment** (NOT Approve with Comments; the PR is not
+  ready for that signal)
+- Open the Draft Review Summary with one sentence naming what's missing
+  (intent, ticket link, rationale) and asking the author to fill it in
+  before the next review pass
+- List what a good description should contain for this PR based on the
+  diff scope (3-5 bullets: the components touched, the user-facing
+  effect, the rationale, any operational risk)
+- Set Front Door count to 1 (description) in the Review Recommendation
+  header, even though no other front-door findings were detected
+- Skip the Front Door section's findings table; the briefing IS the
+  short-circuit, so the Draft Review Summary carries the action
+
+The short-circuit avoids the cost of specialist dispatch on a PR that the
+author should fix before further review. Re-running `/pr-intel` after the
+author updates the description is the right next step.
 
 ### CI Status + AC Compliance Checks
 
@@ -328,9 +292,13 @@ After Phase 0 description quality, run three pre-dispatch checks:
 2. **AC Compliance Check** (when Jira ticket is available): trace each
    acceptance criterion against the diff, flag deviations, and run the
    empty-ticket-blocking detector.
-3. **SonarCloud Rule Pre-Check** (always, but especially `--mine` mode): load
-   the SonarCloud rule library and walk known detectors against the diff so the
-   gate doesn't bounce post-push.
+3. **Static Analyzer Pre-Check** (always; specific sub-tools depend on what
+   posted on the PR): query each available static analyzer for findings
+   scoped to the PR. Three sub-tools today: SonarCloud (MCP available),
+   Datadog code analysis (MCP via `search_pr_insights`), Sentry (no live
+   bot on MX2 PRs; static patterns ride in `mx2-code-reviewer` instead).
+   a reviewer's Code Review Guide #7 explicitly says review these findings
+   and call out anything that should be blocking.
 
 **Without compliance-checks.md, CI failures are reported without distinguishing
 PR-specific regressions from global flakes (over-escalation of approvals over
@@ -343,83 +311,40 @@ the boilerplate-detection patterns ("As a [type of user]", "Given that..."),
 the deviation taxonomy, and the mode-irrespective always-runs invariant, see
 [compliance-checks.md](compliance-checks.md).
 
-### SonarCloud Rule Pre-Check
+### Static Analyzer Pre-Check
 
-The MX2 SonarCloud project (`mx2_docr`) is private; its issue API requires
-`SONAR_TOKEN`, which is only available to CI. That asymmetry means
-SonarCloud quality-gate failures land AFTER push, costing a force-push cycle
-per fix. The pre-check shifts known-rule detection left.
+Three static analyzers post on MX2 PRs (or could): SonarCloud
+(`mcp__sonarqube__*`), Datadog code analysis (`mcp__datadog__search_pr_insights`),
+and Sentry (no live bot on MX2 PRs as of 2026-05-28; static patterns ride in
+`mx2-code-reviewer`). Surface their findings alongside specialist results so the
+reviewer sees a reviewer's #7 in one place rather than scattered across bot comments.
 
-**Process**:
+**Always runs** (mode-irrespective, like AC Compliance); `--quick` skips only the
+SonarCloud leak-period diff filter. Static-analyzer findings are **inline-iterate,
+not Front Door class**: a finding can still be BLOCKING in its own severity bucket,
+which routes through the regular Recommendation Table (BLOCKING -> Request Changes),
+not the Front Door track. The **shared dedup rule** (an analyzer finding overlapping
+a specialist finding on the same file+line keeps the specialist finding and appends
+the analyzer rule code as an attribution line) runs in synthesis Step 2.
 
-1. Load [~/.claude/projects/-workspaces-main/memory/sonarcloud-rules.md](../../projects/-workspaces-main/memory/sonarcloud-rules.md).
-2. For every rule with a `**Detector**` block in the catalog, run the detector
-   against the PR diff (`git diff origin/main -- '*.py'` is the canonical
-   scope; substitute `--mine` base for stacks).
-3. Walk the catalog's "Pre-push self-check" checklist against the diff.
-4. Surface findings inline in the pr-intel output under a "SonarCloud risk"
-   sub-section of the synthesis. Treat catalog-rule hits as `🚨 critical`
-   when in `--mine` mode (would block the gate) and as `⚠️ advisory` on
-   others' PRs (the bot will catch it; flag for the author).
-
-**Growth rule**: when a NEW rule fires on a real PR (own or reviewed), the
-follow-up bead is "add `python:S<code>` to sonarcloud-rules.md with a
-concrete `**Detector**` block." Preventive entries (rules not yet seen on
-MX2) are allowed when the SonarSource rule definition is public AND the
-detector is concrete enough to be verifiable without re-fetching docs;
-mark each entry as `**Preventive**` vs `**Observed**` so provenance stays
-auditable and stale entries can be triaged later.
-
-**Token-gap escape hatch**: if the catalog scan turns up nothing but the
-gate still fails post-push, ask the user to paste the issue detail from
-`https://sonarcloud.io/project/issues?id=mx2_docr&pullRequest=<N>`. One
-paste resolves it; guessing burns force-push cycles. Add the new rule to
-the catalog as the resolution step.
+For the per-tool fetch paths and process, the SonarCloud leak-period scope filter
+and severity-by-metric mapping (rule violations vs coverage-flag-only vs gate
+conditions), the catalog-walk secondary, the Datadog `search_pr_insights` process,
+the Sentry no-bot rationale and future trigger conditions, and the dated calibration
+(`feedback:pr-review:sonarqube-leak-period-scope` 2026-05-18, PR 9274 coverage-gate
+phrasing 2026-05-21, `config:sonarcloud-mcp` 2026-05-21), see
+[static-analyzers.md](static-analyzers.md).
 
 ## Specialist Dispatch
 
-### Branch Safety (Worktree Isolation)
-
-Each pr-intel invocation creates its own temporary git worktree so it never
-touches the user's working tree. This allows multiple reviews to run in
-parallel without checkout conflicts or disrupting the user's terminal.
-
-**Exception: `--mine` mode.** When reviewing your own PR, the user is already
-on the PR branch. Skip worktree creation entirely and use `/workspaces/main`
-(the main repo) as the code root for all specialist prompts. The user's
-working tree already has the code they want reviewed.
-
-Do NOT use `isolation: "worktree"` on specialist Agent calls. That creates
-per-agent worktrees which causes git lock contention. Instead, create ONE
-worktree for the entire pr-intel invocation and pass the path to all
-specialists.
-
-**Before dispatching specialists (default and --quick modes only):**
-1. Create a temporary worktree at the PR's HEAD commit:
-   ```bash
-   WORKTREE_DIR=$(mktemp -d /tmp/pr-intel-XXXXXX)
-   git worktree add --detach "$WORKTREE_DIR" <headRefOid> 2>&1
-   ```
-2. Verify: `git -C "$WORKTREE_DIR" log -1 --oneline` should show `<headRefOid short>`.
-3. Save `$WORKTREE_DIR` - all specialist prompts must include it as the
-   code root for Read/Grep/Glob operations (see Dispatch below).
-
-**After ALL specialists return and synthesis is complete:**
-4. Remove the worktree:
-   ```bash
-   git worktree remove "$WORKTREE_DIR" --force 2>&1
-   ```
-5. If removal fails (e.g., locked), fall back to:
-   ```bash
-   rm -rf "$WORKTREE_DIR" && git worktree prune
-   ```
-
-The user's working tree is never modified. No branch save/restore needed.
-
-If `git fetch` failed in Data Gathering, skip worktree creation and add a
-BRANCH WARNING to each specialist prompt instead:
-"WARNING: Could not fetch PR branch. Your Read/Grep/Glob results may show code
-from a different branch. Rely primarily on the inline diff for analysis."
+For worktree isolation (the one shared worktree per invocation, the `--mine`
+skip, setup/teardown bash, and the git-fetch-failed BRANCH WARNING fallback),
+Spot-Check Mode for large mechanical refactors (deterministic 3-file sample,
+the mandatory briefing-addition template, what stays full-diff, the
+one-step-more-conservative recommendation), and `--mine` Review-Cache Reuse
+(diff-identity HIT/MISS keying, the reuse roster, the always-re-dispatch
+`mx2-pr-precedent` rule, bead `docr-xvnr`), see
+[dispatch-mechanics.md](dispatch-mechanics.md).
 
 ### Dispatch
 
@@ -463,6 +388,57 @@ is emitted only when the diff produces an unambiguous call-path summary; the gen
 emits a sentinel (`SEQUENCE_UNCLEAR` / `SEQUENCE_TOO_LARGE`) when grounding fails, and
 the section is omitted in that case rather than fabricating relationships.
 
+## Provenance Classification
+
+After Synthesis produces the finalized Draft Inline Comments list (and any
+substantive Draft Review Summary bullets that warrant classification), batch-dispatch
+the `provenance-classifier` agent to classify each finding as `speed-amplified`
+(reviewer would have caught from careful single-file diff reading; the bot got
+there faster) or `bot-surfaced` (verification path required live-state checks,
+multi-page document synthesis, or cross-file blast-radius analysis the reviewer
+could not have sustained at speed).
+
+**This is a mandatory top-level phase, not an optional step.** The dispatch
+happens REGARDLESS of size (XS/S/M/L/XL), regardless of specialist dispatch
+outcome, and regardless of finding count. Zero findings is still a valid input;
+the agent returns an empty classification array. The classifications drive the
+`Provenance:` and `Decision count:` lines in the Review Recommendation header
+(enforced by `stop-validate-pr-intel.sh`) and the per-finding `Classification:`
+line in each Draft Inline Comment briefing context.
+
+For the full dispatch contract (input schema, agent prompt construction,
+classification application, low-confidence handling, source-tagging discipline
+upstream), see [provenance-classification.md](provenance-classification.md).
+
+**Skip rule**: `--quick` mode skips this phase entirely (no inline comments to
+classify; the quick template has no Provenance line). `--mine` mode runs the
+phase normally; the classification still informs the briefing-context audit
+even when no comments will be posted.
+
+## Bot Reactions
+
+After Provenance Classification, build the bot reactions list from the dedup
+decisions made during Synthesis Step 2. Bot comments that overlapped with
+synthesizer findings get classified as either `+1` (bot finding is correct)
+or `-1` (bot finding is a false positive), independent of whether the
+reviewer also keeps an inline comment for additional context or rebuttal.
+
+**This is a mandatory top-level phase, not an optional step.** Reactions are
+how the reviewer signals bot accuracy WITHOUT duplicating bot prose in their
+own comments; thumbs-down on a false positive is how the reviewer discourages
+that bot's noise patterns over time. The reactions list is consumed by
+`/post-review` Step 3.5, which posts the reactions via `gh api .../reactions
+-X POST -f content=<+1|-1>`.
+
+For the full 5-category decision tree, reaction-vs-comment orthogonality,
+endpoint distinction (inline review comments vs issue-level conversation
+comments), and the handoff schema for /post-review, see
+[bot-reactions.md](bot-reactions.md).
+
+**Skip rule**: `--quick` and `--mine` modes skip this phase (no review is
+being posted; no reactions to apply). Default mode always runs it; empty
+reactions list is valid output when no bot comments overlapped.
+
 ## Verification
 
 After synthesis, run a verification pass scaled to PR size to catch false positives.
@@ -472,12 +448,28 @@ Skip for XS/S PRs.
 ## Output
 
 The output MUST follow the structural template in [output-formats.md](output-formats.md) for the
-active mode (default, --mine, --quick). This is not optional and does not depend on PR size,
-specialist dispatch, or number of findings. Even an "Approve" with zero inline comments must
-produce the full template skeleton: header block, Scope, Review Recommendation, fenced Draft
-Review Summary, Draft Inline Comments (or explicit "None"), and Verdict.
+active mode (default, --once, --mine, --quick). This is not optional and does not depend on PR size,
+specialist dispatch, or number of findings.
+
+<!-- summary-from: output-formats.md key: required-sections -->
+A default-mode render must contain, in order: the `## PR #<N>: <title>` header block, Scope, Review Recommendation (metadata lines only), a fenced Draft Review Summary, Draft Inline Comments (or an explicit "None"), and a Verdict. This holds for every size and even for an Approve with zero findings.
+<!-- /summary-from -->
 
 The template is the output contract. Do not narrate findings in free-form prose.
+
+## @claude Verify Loop (default mode)
+
+In default mode, the briefing is not the end. When synthesis produced one or more
+bot-invoked `@claude` questions, default mode posts them (with your OK), waits for the
+GitHub `@claude` bot to answer, reconciles the answer against the local findings, and
+presents a final verdict recommendation. This leverages the bot's repo-HEAD plus fresh
+context to validate falsifiable assertions the local pass can get wrong (PR 9451 Q4).
+The loop is conditional: zero `@claude` questions means it degrades to a one-shot
+briefing. `--once`, `--mine`, and `--quick` never enter the loop. Both outward actions
+(posting the `@claude` comment; the final approval) require explicit user OK; the loop
+never auto-approves under the user's identity. For the full phase spec (gates, polling
+cadence, timeout and fallback, reconciliation, compaction state, non-interactive caller
+path), see [verify-loop.md](verify-loop.md).
 
 ## Section Conditionality
 
@@ -493,7 +485,18 @@ even if clean: "Reviewed for: PII exposure, auth/authz, audit trails, encryption
 - **High signal, no noise.** Only flag things with evidence. False positives erode trust.
 - **Two audiences per finding.** Briefing text (reviewer) and draft comment (PR author).
 - **Depth by default, speed on request.** Specialist dispatch is default. `--quick` for triage.
-- **Don't duplicate existing tools.** No GitHub-posted comments, no `pants` runs.
+- **Don't duplicate existing tools.** No `pants` runs. Posting is delegated to `/post-review`, never reimplemented. The briefing itself is never auto-posted; the only posting `/pr-intel` performs is the default verify loop's `@claude` questions, via `/post-review` and only after your explicit OK (see [verify-loop.md](verify-loop.md)).
+- **a reviewer priority order is the human-reviewer standard.** the engineering lead's
+  [Code Review Guide for Humans](https://<company>.atlassian.net/wiki/spaces/PPET/pages/5684789249)
+  (Mar 2026) defines the priority order: description, then types, then
+  complexity / naming, then boolean / behavior-switching params, then tests,
+  then correctness-via-tests (NOT in-head execution), then static analyzers,
+  then pragma review, then exception design, then large-refactor methodology.
+  Phase 0 (description quality) implements item 1; the specialist dispatch
+  route (`mx2-code-reviewer` Design Judgment Checks) implements items 2-10.
+  When a Phase 0 short-circuit fires, the briefing stops at "send it back"
+  without further specialist dispatch, matching a reviewer's "don't waste your
+  time reviewing without context."
 
 ## Additional Resources
 
@@ -504,4 +507,5 @@ even if clean: "Reviewed for: PII exposure, auth/authz, audit trails, encryption
 - For size-gated verification process, see [verification.md](verification.md)
 - For output format templates for each mode, see [output-formats.md](output-formats.md)
 - For grounding rules and evidence categories, see [grounding.md](grounding.md)
+- For the default-mode multi-phase `@claude` verify loop (post, await bot, reconcile, recommend), see [verify-loop.md](verify-loop.md)
 

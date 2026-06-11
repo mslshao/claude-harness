@@ -19,7 +19,7 @@ The pattern also serves a second purpose. A user under fragmented attention may 
 
 ## The safety-net agent
 
-A specific defensive pattern in this harness: an "adversarial advisor" agent (`mx2-tenth-man.md` in this author's setup) whose job is to ask naive, dumb, or obvious-but-unasked questions about autonomous-pipeline outputs. Designed precisely as a safety net for the fragmented-attention failure mode. The agent is advisory only, never blocks, never participates in approvals. Its only function is to surface what a careful reader would notice but a sampling reader might miss.
+A specific defensive pattern in this harness: an "adversarial advisor" agent (`mx2-skeptic.md` in this author's setup) whose job is to ask naive, dumb, or obvious-but-unasked questions about autonomous-pipeline outputs. Designed precisely as a safety net for the fragmented-attention failure mode. The agent is advisory only, never blocks, never participates in approvals. Its only function is to surface what a careful reader would notice but a sampling reader might miss.
 
 Invoking the safety-net agent on high-blast-radius decisions costs roughly one minute and one model invocation. The cost of missing a load-bearing detail in autonomous-pipeline output is hours of misdirected work. The asymmetry is severe enough that the safety net is worth the cost on every decision where the user's reflexive accept is the failure mode.
 

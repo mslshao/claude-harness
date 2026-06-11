@@ -43,7 +43,7 @@ is 5 AND a second domain-relevant specialist is clearly indicated.
 map): Use the default pair `mx2-tech-lead` + `mx2-code-reviewer`, with
 each agent asked for 2 approaches (yielding 4 total). When the
 approach-count target is 5, add `mx2-pr-precedent` for a third broad
-lens. Do NOT include `mx2-tenth-man` in the divergence roster; that
+lens. Do NOT include `mx2-skeptic` in the divergence roster; that
 agent is reserved for the post-ranking pass in Phase 3c, and conflating
 the two invocations produces ambiguous routing.
 
@@ -51,6 +51,24 @@ the two invocations produces ambiguous routing.
 
 Launch all specialists in a single message with multiple Agent tool
 calls. Do not serialize.
+
+## Minimal-Viable Candidate (Mandatory, Set-Level)
+
+The candidate pool MUST contain a minimal-viable approach, explicitly
+labeled as such in its title: the smallest thing delivering ~80% of the
+STATED goal (extend the existing path, the off-the-shelf option, the
+"do nothing new" path). Reason: every specialist is asked to steelman,
+which biases the pool toward elaborate approaches; without a simple
+anchor on the table, the ranking cannot pick simple even when simple is
+correct.
+
+Source it explicitly: instruct `mx2-tech-lead` (always in the roster)
+to make ONE of its approaches the minimal-viable candidate, steelmanned
+like any other (the strongest case for the ~80% version, not a strawman
+set up to lose). After collection, if no candidate is a genuine
+minimal-viable, the orchestrator synthesizes one and adds it to the pool
+before Phase 3 ranking. It counts toward the 3-5 target and is the
+reference point for the Phase 3 right-sizing flag.
 
 Each specialist gets:
 - The refined problem statement (from Phase 1).
@@ -138,4 +156,4 @@ same roster plus an additional instruction targeting the weak dimension:
   tradeoffs>."
 
 Merge new approaches into the candidate pool. Re-score in Phase 3a-b.
-Re-run tenth-man (Phase 3c). Re-gate (Phase 4a).
+Re-run skeptic (Phase 3c). Re-gate (Phase 4a).

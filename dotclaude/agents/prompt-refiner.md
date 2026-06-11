@@ -197,7 +197,7 @@ Don't refine prompts that already pass the evaluation criteria. The user knows w
 ```
 ## Refined Prompt
 
-Review the diff in `src/python/mx2/<service>/document/processor.py` and the two co-located test files for correctness on the ServiceRetryableException reclassification at line 560 and the `consistent_read=True` additions at lines 427 and 768. This is the sibling fix to PR #8678 (<jira-ticket>). Use `mx2-silent-failure-hunter` for the retry contract review and `mx2-code-reviewer` for structural feedback. Run `gh pr view 8678` for the structural template.
+Review the diff in `src/python/mx2/<service>/document/processor.py` and the two co-located test files for correctness on the QuaeroRetryableException reclassification at line 560 and the `consistent_read=True` additions at lines 427 and 768. This is the sibling fix to PR #8678 (MX2-XXXXX). Use `mx2-silent-failure-hunter` for the retry contract review and `mx2-code-reviewer` for structural feedback. Run `gh pr view 8678` for the structural template.
 
 ## Changes from Original
 - Named the specific files and line numbers from the diff
@@ -219,7 +219,7 @@ Concrete identifiers (file paths, line numbers, PR numbers, bead IDs, ticket IDs
 
 **Output (raw, no scaffolding)**:
 ```
-Review the change at `src/python/mx2/<service>/document/processor.py:560` where the raise was reclassified from `ServiceVersionIdResolutionException` to `ServiceRetryableException`. Verify: (1) `process_message` dispatch at processor.py:142-152 does not catch `ServiceRetryableException` (it propagates to SQS for retry); (2) the audit signal previously carried by `ServiceVersionIdResolutionException.resolution_detail` is preserved via `log.warning(extra={...})` immediately before the raise; (3) the SQS retry budget (visibility=900s, max_receive=3 per `app/<service>/document/tf/queues.tf:18-19`) is sufficient for the read-after-write race window. Output severity-rated findings (BLOCKING/HIGH/MEDIUM/LOW) with file:line citations.
+Review the change at `src/python/mx2/<service>/document/processor.py:560` where the raise was reclassified from `QuaeroVersionIdResolutionException` to `QuaeroRetryableException`. Verify: (1) `process_message` dispatch at processor.py:142-152 does not catch `QuaeroRetryableException` (it propagates to SQS for retry); (2) the audit signal previously carried by `QuaeroVersionIdResolutionException.resolution_detail` is preserved via `log.warning(extra={...})` immediately before the raise; (3) the SQS retry budget (visibility=900s, max_receive=3 per `app/<service>/document/tf/queues.tf:18-19`) is sufficient for the read-after-write race window. Output severity-rated findings (BLOCKING/HIGH/MEDIUM/LOW) with file:line citations.
 ```
 
 No `## Refined Prompt` header, no `## Changes` block, no preamble. The orchestrator pastes this directly into a specialist Agent call.

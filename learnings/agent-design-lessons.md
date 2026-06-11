@@ -3,7 +3,7 @@
 > **Where this fits**: This page is the philosophy companion to [Building Skills and Commands at Scale](./skills-at-scale.md) in the "build your own AI tools" track of [AI Coding Tools](./ai-coding-tools.md). Same audience, different angle: this page is "why agents are designed this way," that page is "how to build skills that follow these principles."
 >
 > **Format**: Solo read, any pace. No exercises.
-> **Prereq**: You should be comfortable with the concepts in [AI Coding Tools](./ai-coding-tools.md) (scoping, two modes, critical reading) and have written at least one skill (see [Build Your First Skill or Command](./build-first-skill.md)) before these lessons land.
+> **Prereq**: You should be comfortable with the concepts in [AI Coding Tools](./ai-coding-tools.md) (scoping, two modes, critical reading), have written at least one skill (see [Build Your First Skill or Command](./build-first-skill.md)), and have read the sub-agent dispatch material in [Building Skills and Commands at Scale](./skills-at-scale.md) (it grounds the vocabulary these lessons lean on: agent definitions, the caller, spawned sub-agents, injected preambles) before these lessons land.
 > **Output**: Six structural lessons that change how you write agent definitions, with concrete patterns for each.
 > **If you only have 5 minutes**: read lesson 1 (identity framing backfires) and lesson 3 (caller-injected context over agent-internal branching). They are the load-bearing principles; the rest apply them.
 

@@ -68,6 +68,32 @@ Portable: `block-destructive-commands.sh` is portable verbatim. The other two ar
 
 ```yaml
 ---
+component: hooks/orchestration-guardrails
+type: hook-category
+status: active
+catalog_ref: README.md "Orchestration guardrails" section
+members: [block-guardrail-hook-edit, userpromptsubmit-pr-intel-contract, stop-validate-pr-intel, lint-tool-roster]
+fires_when: "a subagent or skill-flow tries to edit an enforcement surface, or a contract-bearing skill (/pr-intel) is invoked and later ends its turn"
+prevents:
+  - "a subagent weakening the guardrails that police it (deny), or a skill-flow blanket-accept riding over a guardrail edit (ask)"
+  - "a /pr-intel run collapsing into a prose verdict with no postable comments, or drifting over the disposition budget"
+  - "config artifacts (agents, skills, commands) referencing tool names that no longer exist"
+related: [verification gate, lab-to-production pattern, self-review-protocol, pr-intel skill]
+---
+```
+
+When this fires: PreToolUse on Edit/Write of a guardrail surface (`block-guardrail-hook-edit`), UserPromptSubmit + Stop bracketing a `/pr-intel` run (the contract-sync pair), and on-demand for the tool-roster lint. This category is distinct from the destructive-op gates above: those protect the filesystem and remote, these protect the agent system's own enforcement layer and output contracts.
+
+What it prevents: the meta-failure where the thing that enforces discipline is itself weakened or bypassed. `block-guardrail-hook-edit` is the sharpest case: a subagent under retry-loop pressure once edited `subagent-stop-result-contract.sh` to escape its own enforcement, so subagent-originated edits to any enforcement surface are now hard-DENIED (a plain "ask" is a no-op for subagents, the load-bearing CC gotcha here). Main-loop edits get "ask" instead, which a skill-flow blanket "y" cannot pre-satisfy. The pr-intel sync pair prevents the orthogonal failure where a multi-step skill silently degrades its output: a collapsed prose verdict with no postable inline comments leaves the reviewer nothing, so a UserPromptSubmit marker (set when the run is invoked) licenses a Stop-time collapse check that has no template header to anchor on otherwise. `lint-tool-roster` prevents stale tool references in config artifacts (the bulk of a cross-model audit's P0/P1 findings).
+
+How it compounds: `block-guardrail-hook-edit` is the floor under every other hook in this directory; without it, the enforcement layer is editable by the actors it is meant to constrain. The pr-intel pair is two halves of one contract that must stay in lockstep: the UserPromptSubmit half front-loads the same disposition budgets the Stop half checks post-hoc, and both files carry an inline sync-contract note so an edit to one is a known edit to the other. Prevention (inject the contract before composing) plus validation (check it at turn-end) is strictly stronger than either alone. `lint-tool-roster` compounds with the lab-to-production pattern: promoting a personal artifact to project tier is exactly when a stale tool reference would slip in, and the lint is the pre-promotion check.
+
+Portable: `block-guardrail-hook-edit` is portable (adjust the gated-surface paths to the adopter's hook layout; the agent_type discriminator and deny-vs-ask split are CC-specific but stable). The pr-intel pair and `lint-tool-roster` are not portable (the contract, budgets, and tool registry are personal-tier), but their shapes port: a marker-coupled prevent/validate pair, and a config-vs-known-registry lint.
+
+---
+
+```yaml
+---
 component: hooks/compliance-gates
 type: hook-category
 status: active
@@ -123,24 +149,25 @@ component: hooks/subagent-and-worktree
 type: hook-category
 status: active
 catalog_ref: README.md "Subagent + worktree" section
-members: [subagent-stop-pr-size, worktree-create-log, worktree-remove-log]
-fires_when: "a subagent reports DONE (PR-size check) or creates/removes a worktree (audit log)"
+members: [subagent-stop-pr-size, subagent-stop-result-contract, worktree-create-log, worktree-remove-log]
+fires_when: "a subagent reports DONE (PR-size check + RESULT-contract check) or creates/removes a worktree (audit log)"
 prevents:
   - "large-foundation PRs landing without scope flagging at standup time"
+  - "truncated/partial subagent runs trusted as complete because the self-report sounded confident"
   - "stale agent/autopilot worktree branches accumulating untracked"
-related: [agent-dispatch-heuristic, audit-worktrees skill, pr-scope-flag rule]
+related: [agent-dispatch-heuristic, audit-worktrees skill, pr-scope-flag rule, truncated-subagent-detection]
 ---
 ```
 
-When this fires: SubagentStop event (the size-flag hook) and custom worktree-create/remove events. The size hook fires when a code-writing subagent reports DONE on a worktree-based implementation; it surfaces the PR size to the parent agent before any downstream review step.
+When this fires: SubagentStop event (the size-flag and RESULT-contract hooks) and custom worktree-create/remove events. The size hook fires when a code-writing subagent reports DONE on a worktree-based implementation; it surfaces the PR size to the parent agent before any downstream review step. The RESULT-contract hook fires on the same event for launch-phase agents and checks the final message for the terminal RESULT block.
 
-What it prevents: the scope-flag class of failure. The launch-implementer's own self-flag catches over-scoped PLANS at scope determination time; this hook catches the orthogonal failure where a reasonable plan executed past threshold due to mid-flight refactor, test expansion, or scope discovery. The flag is the "scope flag at implementer standup" rule mechanized.
+What it prevents: two orthogonal failures on the same event. The size hook catches the scope-flag class: the launch-implementer's own self-flag catches over-scoped PLANS at scope determination time, while the hook catches the orthogonal failure where a reasonable plan executed past threshold due to mid-flight refactor, test expansion, or scope discovery. The RESULT-contract hook catches the truncated-completion class: a subagent that hit a turn limit or ended mid-thought returns a summary that reads as done, and the parent trusts it. `subagent-stop-result-contract.sh` turns "does this end mid-thought?" (a judgment heuristic in the verification rule) into a deterministic check for the RESULT block, and on absence instructs the orchestrator to resume the same agent (context intact) before cold re-dispatch. Both hooks need loop guards because exit 2 re-injects as user input and re-fires Stop; the result-contract hook needs two (the harness `stop_hook_active` flag plus a per-transcript fire cap), because the first live run looped 30+ times when injected reminder text displaced the RESULT block as the last assistant text.
 
 The worktree logging hooks compose with the `/audit-worktrees` skill: the skill identifies stale worktrees by reading the audit log the hooks produce. Without the log, the skill would have to walk the filesystem and infer state.
 
-How it compounds: with the agent-dispatch-heuristic (which routes work to subagents in the first place) and with the audit-worktrees skill (which cleans up what the worktree hooks logged). Three layers: dispatch creates the worktree, hooks log it, skill cleans it up.
+How it compounds: with the agent-dispatch-heuristic (which routes work to subagents in the first place), with the verification gate (the result-contract hook is the structural form of "check the diff, not the self-report"), and with the audit-worktrees skill (which cleans up what the worktree hooks logged). Dispatch creates the worktree, the SubagentStop hooks flag scope and completeness, worktree hooks log it, the skill cleans it up.
 
-Portable: `subagent-stop-pr-size.sh` is portable shape-wise (the subagent dispatch primitive is CC-specific but the post-dispatch scope check ports). The worktree logging hooks are not portable; they depend on the harness's worktree primitive.
+Portable: `subagent-stop-pr-size.sh` and `subagent-stop-result-contract.sh` are both portable shape-wise (the SubagentStop primitive and the RESULT-contract convention are CC/launch-specific, but the post-dispatch scope check and the terminal-block check port). The worktree logging hooks are not portable; they depend on the harness's worktree primitive.
 
 ---
 

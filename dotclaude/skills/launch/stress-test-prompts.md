@@ -6,18 +6,22 @@ duplicate content back into either.
 
 ## Parallel Dispatch (Mandatory)
 
-**CRITICAL: Launch both Phase 3a (Challenge) and Phase 3b (Consult) in
-a single message with multiple Agent tool calls. Do not serialize.**
+**CRITICAL: Launch the Phase 3a Challenge subagent and ALL selected
+Phase 3b specialists in a single message with multiple Agent tool
+calls. Do not serialize, and do not interpose a coordinator subagent:
+subagents cannot spawn subagents (no Agent tool inside subagents,
+verified 2026-06-09), so a coordinator would silently roleplay its
+specialists in one context.**
 
-Both subagents receive the draft plan from Phase 2 + the INPUT_MODE
+Every dispatch receives the draft plan from Phase 2 + the INPUT_MODE
 classification from Phase 1. INPUT_MODE-aware framing is built into
-both prompts so mechanism-prescribed inputs trigger enhanced scrutiny
+the prompts so mechanism-prescribed inputs trigger enhanced scrutiny
 on whether the prescription is the right mechanism (the canonical
 Fulfillment-vs-Coverage failure-mode guard).
 
 ## Phase 3a: Challenge
 
-Subagent prompt:
+Dispatch as `Agent(subagent_type="general-purpose", description="Challenge implementation plan", prompt=...)`:
 
 ```
 Apply the challenge embed protocol to this implementation plan.
@@ -55,25 +59,27 @@ over-engineered for the problem scope.
 [Full draft plan here]
 ```
 
-## Phase 3b: Consult
+## Phase 3b: Consult (orchestrator-dispatched specialists)
 
-Subagent prompt:
+YOU (the orchestrator) select and dispatch the specialists directly;
+there is no coordinator subagent. Selection guide (full roster and
+dispatch heuristics: `~/.claude/skills/consult/specialists.md`):
+
+- Plan touches error handling: mx2-silent-failure-hunter
+- Plan touches config/settings: mx2-pydantic-reviewer
+- Plan touches PII/auth/documents: mx2-security-auditor
+- Plan involves infrastructure: mx2-devops-build-deploy
+- Structural review of the decomposition: mx2-code-reviewer
+
+Per-specialist prompt template; each specialist gets only the plan
+items relevant to its domain:
 
 ```
-Act as tech lead coordinator. Review this implementation plan and dispatch
-relevant specialists:
-
-- If the plan touches error handling: mx2-silent-failure-hunter
-- If the plan touches config/settings: mx2-pydantic-reviewer
-- If the plan touches PII/auth/documents: mx2-security-auditor
-- If the plan involves infrastructure: mx2-devops-build-deploy
-- For structural review of the decomposition: mx2-code-reviewer
-
-Focus on design-level concerns, not implementation details. The plan hasn't
-been built yet. Key question for every specialist: "Does the existing pipeline
-already provide this behavior?"
-
-Synthesize findings into: Fix now / Fix next / Defer / Won't fix.
+Review these implementation-plan items in your domain. Focus on
+design-level concerns, not implementation details; the plan hasn't
+been built yet. Author Mode: CI has not run yet, flag everything.
+Key question: "Does the existing pipeline already provide this
+behavior?"
 
 INPUT_MODE: <problem-framed | mechanism-prescribed>
 
@@ -85,14 +91,18 @@ feature of an existing noun? (b) does this mechanism contradict any
 ratified architectural decision in the bead memories? (c) is this
 mechanism over-engineered or under-engineered for the problem scope?
 
-[Full draft plan here]
+[Relevant plan items here]
 ```
+
+When all specialists return, YOU synthesize their findings into:
+Fix now / Fix next / Defer / Won't fix.
 
 ## Output from Phase 3a + 3b
 
-Both subagents return their findings to the orchestrator. Phase 3c
-(Synthesize) in plan-pipeline.md merges them, applies modifications to
-the draft plan, and assigns the DELTA_CATEGORY label.
+The Challenge subagent and the specialists return their findings to
+the orchestrator. Phase 3c (Synthesize) in plan-pipeline.md merges the
+challenge modifications with YOUR consult synthesis, applies
+modifications to the draft plan, and assigns the DELTA_CATEGORY label.
 
 ## Stage Event Writes
 
@@ -116,10 +126,13 @@ bd update "$LAUNCH_BEAD_ID" --append-notes \
   "[LAUNCH_STAGE stage=consult round=$ROUND status=done path=$CONSULT_PATH ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)]"
 ```
 
-The two writes can happen in parallel (separate bd update calls, no
-ordering dependency). The orchestrator waits for both subagents to
-return before proceeding to Phase 3c.
+`$CONSULT_OUTPUT` is YOUR synthesis of the specialist results (the Fix
+now / Fix next / Defer / Won't fix triage plus themes), not a
+subagent's verbatim reply. The two writes can happen in parallel
+(separate bd update calls, no ordering dependency). The orchestrator
+waits for the Challenge subagent and all specialists to return before
+proceeding to Phase 3c.
 
-If a subagent fails (rare but possible), write `status=failed` with
+If a dispatch fails (rare but possible), write `status=failed` with
 `reason=` instead of creating a scratch file. Cold-start treats failed
-subagents as in-flight and re-dispatches them.
+dispatches as in-flight and re-dispatches them.

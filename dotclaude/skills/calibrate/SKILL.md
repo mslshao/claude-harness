@@ -30,8 +30,8 @@ Without this skill, the calibration channel is write-only: subagents emit drift 
 
 ### Phase 2: Harvest
 
-1. Run `bd memories calibration:<agent-short-name>:` to list all calibration drift entries for this agent.
-2. Parse each memory key: `calibration:<agent-short-name>:<category>:<specific-slug>`. Extract category and specific. The remaining body text is the drift content.
+1. Run `bd memories calibration:<agent>: --json` (FULL agent name, e.g. `calibration:mx2-decision-maker:`). `--json` is MANDATORY: plain text output truncates every value at ~124 chars, so merging from it silently corrupts real entries; the JSON values are the authoritative bodies. Then discard any result whose KEY does not start with `calibration:<agent>:` (bd memories substring-matches VALUES too, so unrelated memories that merely mention the prefix appear in results; merging or `bd forget`-ing those would destroy non-calibration records). Note: the memory key uses the full agent name (matching what subagents store), NOT the `<short-name>` used for the file path above. Keys whose second segment is not a known agent (legacy `calibration:pr-intel-*`, `calibration:style:*`, `calibration:user-improvement-stance`) are out of /calibrate scope; triage those manually (`bd forget` or re-key).
+2. Parse each memory key. Standard form is 4-segment: `calibration:<agent>:<category>:<specific-slug>`; extract category and specific-slug. **3-segment fallback**: some emitters (bot-review, provenance-classifier, legacy skeptic entries) use `calibration:<agent>:<short-tag>` with no category segment; treat segment 3 as the specific-slug and route the entry to the agent's default section (`## Rule Overrides`, unless the agent's calibration file documents a different home, e.g. skeptic's `## Example Dismissals`). The remaining body text is the drift content.
 3. If no entries, output: "No unmerged calibration drift for <agent>. Calibration file is current as of last merge." and exit.
 
 ### Phase 3: Present and Decide
@@ -39,7 +39,18 @@ Without this skill, the calibration channel is write-only: subagents emit drift 
 For each entry, in dependency-free order (no inter-entry sequencing required):
 
 1. Read the current calibration file (`~/.claude/agents/calibration/<short-name>.md`).
-2. Locate the section for the entry's category (`## Rule Overrides`, `## Example Decisions`, `## Threshold Notes`, `## False-Positive Patterns`, `## False-Negative Patterns`). Create the section if missing.
+2. Locate the section for the entry's category using this mapping (create the section if missing):
+
+   | Category (key segment 3) | Calibration-file section |
+   |---|---|
+   | `proceed-gate`, `iterate-trigger`, `escalate-condition`, `rule-override` | `## Rule Overrides` |
+   | `threshold` | `## Threshold Notes` |
+   | `false-positive` | `## False-Positive Patterns` |
+   | `false-negative` | `## False-Negative Patterns` |
+   | `dismissal` (skeptic) | `## Example Dismissals` |
+   | 3-segment key (no category) | agent's default section per Phase 2 |
+
+   If the agent's calibration file uses its own documented section names, the file's structure wins; map to the nearest equivalent and say so when presenting the entry. A 4-segment key whose category has no table row (e.g. the gate-context tags `converge`, `ideation`, `launch`, `autopilot` that decision-maker gate prompts use as the category segment) routes to the agent's default section, same as the 3-segment fallback; note the unmapped category when presenting.
 3. Search the section for an existing entry with the same specific-slug. Three sub-cases:
    - **No match**: this is a new entry, will be appended.
    - **Match with same content**: this is a redundant emission, recommend reject (the file already has this rule).
@@ -47,7 +58,7 @@ For each entry, in dependency-free order (no inter-entry sequencing required):
 4. Present to the user (use `AskUserQuestion` for the keep/merge/reject choice):
 
 ```
-Calibration drift entry: calibration:<agent-short-name>:<category>:<specific-slug>
+Calibration drift entry: calibration:<agent>:<category>:<specific-slug>
 Current state in <short-name>.md (section "<category>"):
   <existing entry body, or "(no existing entry)">
 
@@ -72,9 +83,9 @@ For each merge-accepted entry:
 ```markdown
 ## YYYY-MM-DD
 
-- **Source key**: `calibration:<agent-short-name>:<category>:<specific-slug>`
+- **Source key**: `calibration:<agent>:<category>:<specific-slug>`
 - **Category**: <category>
-- **Action**: merge | refinement | new-rule
+- **Action**: new-rule | refinement | reject  (Phase 3 sub-case `new` → new-rule; `refinement` → refinement; reject-accepted entries → reject)
 - **Summary**: <one line: what changed>
 - **Rationale**: <one line: why merged>
 ```
@@ -83,7 +94,8 @@ For each merge-accepted entry:
 
 For each reject-accepted entry:
 
-1. Delete the source memory key with `bd forget "<full-key>"`. Do not write to calibration file or lookback log.
+1. Append a one-line lookback entry (same format as merges, with **Action**: reject and **Rationale**: why rejected) so the producing agent's anti-re-emission contract holds (the calibration scaffolds promise rejected patterns are logged so agents stop re-emitting them).
+2. Delete the source memory key with `bd forget "<full-key>"`. Do not write to the calibration file itself.
 
 For each keep-accepted entry:
 
@@ -93,7 +105,7 @@ For each keep-accepted entry:
 
 Even though Tier 1 does not use scratch fallback, the skill enforces the cleanup contract from day one so Tier 2 is purely additive:
 
-1. Check if the scratch dir exists: `/workspaces/main/.claude/scratch/agent-feedback/<agent-short-name>/`. If not, skip this phase.
+1. Check if the scratch dir exists: `/workspaces/main/.claude/scratch/agent-feedback/<agent>/`. If not, skip this phase.
 2. List files in the dir.
 3. For each scratch file:
    - If a calibration memory entry referenced it AND that entry was merged or rejected this run, delete the scratch file.
@@ -158,10 +170,10 @@ To verify the loop closes from end to end, run the synthetic-drift fixture:
 
 ```bash
 # 1. Inject a known fixture entry
-bd remember --key="calibration:decision-maker:proceed-gate:fixture-test-do-not-merge" "FIXTURE: synthetic drift entry for end-to-end loop test. If this lands in the calibration file, the loop closes."
+bd remember --key="calibration:mx2-decision-maker:proceed-gate:fixture-test-do-not-merge" "FIXTURE: synthetic drift entry for end-to-end loop test. If this lands in the calibration file, the loop closes."
 
 # 2. Confirm channel
-bd memories calibration:decision-maker:proceed-gate:fixture-test-do-not-merge
+bd memories calibration:mx2-decision-maker:proceed-gate:fixture-test-do-not-merge
 
 # 3. Run /calibrate
 # 4. Accept the fixture (the test path always accepts; in real use you'd reject)
@@ -173,10 +185,10 @@ grep "FIXTURE" ~/.claude/agents/calibration/decision-maker.md
 grep "fixture-test-do-not-merge" ~/.claude/agents/calibration/decision-maker.lookback.md
 
 # 7. Verify cleanup (the source memory key should be gone post-merge)
-bd memories calibration:decision-maker:proceed-gate:fixture-test-do-not-merge  # should be empty
+bd memories calibration:mx2-decision-maker:proceed-gate:fixture-test-do-not-merge  # should be empty
 
 # If still present, the skill run didn't call `bd forget`. Manually clean up:
-#   bd forget calibration:decision-maker:proceed-gate:fixture-test-do-not-merge
+#   bd forget calibration:mx2-decision-maker:proceed-gate:fixture-test-do-not-merge
 
 # 8. Cleanup test artifact: manually remove the FIXTURE entry from the calibration file
 ```

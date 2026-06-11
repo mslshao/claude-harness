@@ -5,7 +5,7 @@ description: >
   rough-draft, or free text and dispatches an agent team to BUILD it,
   producing real commits and a draft PR. Pipeline: enrich context, classify
   INPUT_MODE (problem-framed vs mechanism-prescribed), converge on a plan
-  with challenge + consult stress-test, mandatory tenth-man pass, and
+  with challenge + consult stress-test, mandatory skeptic pass, and
   decision-maker proceed/iterate gate before user approval. Detects when
   the ticket prescribes a mechanism that should have been a feature of an
   existing noun (Fulfillment-vs-Coverage protection). The key distinction
@@ -15,7 +15,7 @@ description: >
   generation before a plan exists, use /ideate. For planning only with no
   code, use /converge. For root cause investigation, use /investigate.
 argument-hint: "[MX2-XXXXX | docr-XXXX | description] [--skip-checks]"
-allowed-tools: ["Bash", "Glob", "Grep", "Read", "Agent", "Write", "Edit", "WebFetch"]
+allowed-tools: ["Bash", "Glob", "Grep", "Read", "Agent", "Write", "Edit", "WebFetch", "Skill", "AskUserQuestion"]
 ---
 
 # Launch
@@ -31,7 +31,10 @@ Parse the raw invocation (`/launch $ARGUMENTS`) to extract:
    GitHub PR URL. Everything else is treated as free-text description.
 2. **Flags**: `--skip-checks` skips pants tlc in finalization.
 
-If no identifier is found, stop and ask the user for a Jira ticket number.
+If the invocation contains neither an identifier nor any free-text description
+(empty arguments), stop and ask for one. Otherwise treat the non-identifier text
+as the free-text description; context-enrichment.md routes it through
+prompt-refiner. Do NOT demand a ticket number when a description was given.
 
 ## Pipeline Overview
 
@@ -56,7 +59,7 @@ ticket / bead / Slack / Confluence / transcript / free text
 [Phase 3c: Synthesize] ---------+     |
             |                         |
             v                         |
-[Phase 3.5: Tenth-Man Lens]           |
+[Phase 3.5: Skeptic Lens]           |
             |                         |
             v                         |
 [Phase 3.6: Convergence Gate] --------+
@@ -71,7 +74,7 @@ ticket / bead / Slack / Confluence / transcript / free text
 [Phase 5: Execution]          Worktree + agent team + retry loop.
             |
             v
-[Phase 6: Finalization]       /review fan-out + bot-review + PR creation.
+[Phase 6: Finalization]       /review fan-out (incl bot-review) + PR creation.
 
 Phase 3.6 verdicts:
   PROCEED            -> Phase 4
@@ -92,7 +95,7 @@ Phase 6 is finalization (PR creation).
 - **vs `/converge`**: `/converge` writes a plan and creates beads;
   `/launch` writes code and creates a draft PR. `/launch` internally
   runs the same Phase 2-3.6 pipeline as `/converge` (challenge +
-  consult + tenth-man + decision-maker gate), then continues into
+  consult + skeptic + decision-maker gate), then continues into
   Phase 5 execution. Use `/converge` when you want a plan without
   burning a worktree.
 - **vs `/ideate`**: `/ideate` is upstream of both `/converge` and
@@ -134,23 +137,56 @@ intermediate output to the user.
 
 Run the converge-style plan pipeline against the implementation brief: refine
 plus decompose plus pipeline-reuse gate (Phase 2), then challenge plus consult
-in parallel (Phase 3a/3b), then synthesize (Phase 3c), then tenth-man lens
+in parallel (Phase 3a/3b), then synthesize (Phase 3c), then skeptic lens
 (Phase 3.5), then decision-maker gate (Phase 3.6). Output is an internal
 converged plan + parallelization-strategy YAML + iteration log; not shown to
 the user yet.
 
+### Bypass: pre-converged input
+
+Skip Phases 2-3.6 entirely and go straight to Phase 4 (approval gate) when
+either of the following is true:
+
+1. The user's prompt explicitly states "do NOT re-converge" or "skip
+   convergence" or "convergence already done", AND the input bead's
+   description contains all four elements of a converged plan: (a) work-item
+   scope with file targets, (b) acceptance criteria, (c) verification path,
+   (d) consequence-of-wrong or risk note. Read `bd show <bead-id>` first to
+   confirm.
+2. The input bead carries a `decision:` or `memory:` label AND the description
+   was produced by a prior `/converge` or `/launch` session (the description
+   structure mirrors the Phase 4 template: Summary, Iteration Log, Convergence
+   Delta, Work Items, Dependency Graph). This is a structural check, not a
+   text match; if the bead looks like a converged plan, treat it as one.
+
+When the bypass fires, the iteration log entry for Phase 4 reads
+"Round 0 (initial): N work items from pre-converged input (bead docr-XXXX);
+Phases 2-3.6 skipped per <reason>." The Convergence Delta category is set to
+the prior session's category (preserved on the bead) or CONFIRMED if not
+recorded. Phase 4 approval still gates execution; Phase 5+ proceeds normally.
+
+The bypass exists because re-running challenge + consult + skeptic +
+decision-maker on a plan that was already through that pipeline in a prior
+session produces redundant token cost without new signal. The recurring case
+is a `/launch` invocation that immediately follows a `/converge` whose plan
+was forged into beads. Recurrence context: 2026-05-28 MX2-XXXXX / docr-xii5,
+where the prompt told /launch the convergence was complete and the protocol
+forced a re-run anyway; the orchestrator had to manually skip 1-3.6.
+
 **Load-bearing invariants:**
-- Challenge and consult MUST run as parallel subagents in a single Agent-tool
-  message. Serializing defeats the purpose.
+- The Challenge subagent and all selected consult specialists MUST run as
+  parallel dispatches in a single Agent-tool message (no consult-coordinator
+  subagent; the orchestrator synthesizes consult findings). Serializing
+  defeats the purpose.
 - Phase 3c output includes the DELTA_CATEGORY label (CONFIRMED /
   MINOR_ADJUSTMENTS / MAJOR_REVISIONS / SCRAPPED_AND_REBUILT). CONFIRMED on
   a non-trivial `mechanism-prescribed` input is suspicious; Phase 3.6 gate
   fires ITERATE with WEAK_DIMENSION=mechanism when it sees that pattern
   (canonical Fulfillment-vs-Coverage protection).
-- Phase 3.5 Tenth-Man Lens is mandatory. Runs `mx2-tenth-man` on the
+- Phase 3.5 Skeptic Lens is mandatory. Runs `mx2-skeptic` on the
   converged plan with the DELTA_CATEGORY and INPUT_MODE as input. Output
-  folds into Phase 4 as a `Tenth-Man Lens` block. If dispatch fails, note
-  "Tenth-Man Lens unavailable" and proceed; do not silently drop.
+  folds into Phase 4 as a `Skeptic Lens` block. If dispatch fails, note
+  "Skeptic Lens unavailable" and proceed; do not silently drop.
 - Phase 3.6 Decision-Maker Gate is mandatory. Runs `mx2-decision-maker` with
   `MODE: LAUNCH GATE` preamble. Returns PROCEED / ITERATE / ESCALATE-QUESTIONS
   / ESCALATE-ROUTE. ITERATE cap: 2 rounds; ESCALATE-QUESTIONS cap: 1 round.
@@ -166,10 +202,11 @@ the user yet.
 
 For the orchestration shape (Phase 2 decompose, Phase 3c synthesize +
 DELTA_CATEGORY, parallelization-strategy YAML), see
-[plan-pipeline.md](plan-pipeline.md). For the Phase 3a + 3b Challenge
-and Consult subagent prompt templates (with INPUT_MODE-aware framing),
-see [stress-test-prompts.md](stress-test-prompts.md). For the Phase 3.5
-Tenth-Man Lens dispatch + the Phase 3.6 Decision-Maker Gate dispatch +
+[plan-pipeline.md](plan-pipeline.md). For the Phase 3a Challenge
+subagent and Phase 3b per-specialist prompt templates (orchestrator-
+dispatched, INPUT_MODE-aware), see
+[stress-test-prompts.md](stress-test-prompts.md). For the Phase 3.5
+Skeptic Lens dispatch + the Phase 3.6 Decision-Maker Gate dispatch +
 branch logic + caps + iteration log format, see
 [gate-prompts.md](gate-prompts.md).
 
@@ -177,122 +214,19 @@ branch logic + caps + iteration log format, see
 
 **First synthesis-level output the user sees** (the only earlier user-facing
 output is the narrowing questions from a Phase 3.6 ESCALATE-QUESTIONS, when
-fired). Present the converged plan:
+fired).
 
-```markdown
-## Launch Plan: [topic, 3-8 words]  (low-confidence)?
-
-[Suffix `(low-confidence)` on the H2 IF the Phase 3.6 gate forced a
-low-confidence PROCEED (2 ITERATE rounds hit the cap, or user opted out
-of ESCALATE-QUESTIONS with "you decide"). Add a "Low-confidence reason:"
-line at the end of Summary stating which path triggered it.]
-
-### Summary
-[2-5 sentences: what this builds, design decisions, key constraints]
-
-### Iteration Log
-[Always present even when Round 0 was final, so the user sees the gate
-ran. List each round with verdict + action taken:]
-- Round 0 (initial): N work items drafted; DELTA_CATEGORY=<X>.
-- Round 1 (if any): VERDICT (REASON). Action: <what changed>.
-- Round 2 (if any): VERDICT (REASON). Action: <what changed>.
-- Final verdict: PROCEED | LOW-CONFIDENCE | ESCALATE-ROUTE.
-
-### Convergence Delta  [CATEGORY: CONFIRMED | MINOR_ADJUSTMENTS | MAJOR_REVISIONS | SCRAPPED_AND_REBUILT]
-> [What changed during stress-testing. 2-4 bullets showing modifications
-> from challenge/consult. The CATEGORY tag is load-bearing: CONFIRMED
-> means specialists agreed with concrete evidence (not punted);
-> MAJOR_REVISIONS or SCRAPPED_AND_REBUILT means the original framing
-> did not survive.]
-
-### Prior Thinking Comparison  [only when INPUT_MODE = mechanism-prescribed]
-[Surface how the converged plan compares to the ticket's prescribed
-mechanism. One of:
-- "Specialists agreed the prescribed mechanism is right. <Brief evidence.>"
-- "Specialists refined the prescribed mechanism: <what changed>"
-- "Specialists recommended a different mechanism: <X>. <Why.>"
-- "Specialists recommended scrapping the prescribed mechanism: it
-  should be folded into <Y> as a feature of <Y>, not a new noun."
-  (canonical Fulfillment-vs-Coverage outcome)
-This section makes mechanism-vs-feature decisions visible BEFORE the
-agent team starts writing code. Omit when INPUT_MODE = problem-framed.]
-
-### Tenth-Man Lens
-[Verbatim 🔻 block from Phase 3.5. Always present (the pass is
-mandatory). If returned "🔻 No concerns from this lens", include that
-line verbatim so the user sees the pass ran.]
-
-### Work Items
-[For each item in dependency order:]
-
-#### [N]. [Title]
-**Type**: [task/feature/bug]
-**Agent**: [implementer | tester | flex-{role}]
-**Phase**: [A | B | C | ...]
-**Context**: [greenfield | legacy | hybrid]
-**Depends on**: [item numbers or "none"]
-
-[Description: 2-4 sentences.]
-
-**Acceptance criteria:**
-- [ ] [Observable outcome 1]
-- [ ] [Observable outcome 2]
-
-**Verification path:** [How the implementer (and orchestrator at
-checkpoint gating) will know this is correct BEFORE committing. Cite
-specific test, command, or pattern. 1-2 sentences.]
-
-**Consequence of wrong:** [low | med | high. If high, must have a
-matching Verification path OR explicit risk-reduction note.]
-
----
-
-### Agent Roster
-| Agent | Role | Phase | Specialist access |
-|-------|------|-------|-------------------|
-| implementer | [scope] | [phase] | mx2-code-reviewer, mx2-silent-failure-hunter |
-| tester | [scope] | [phase] | test-quality-reviewer, /test-forge |
-| flex-infra | [scope] | [phase] | mx2-devops-build-deploy |
-
-### Phasing
-[Phase diagram with gates:]
-Phase A: [agents] → Gate: [criteria] → Phase B: [agents] → ...
-
-### Commit Strategy
-[One commit | N commits at behavior boundaries. Explain the gates.]
-
-### Open Assumptions
-[FRAGILE/UNVERIFIABLE assumptions the user should confirm. Include any
-mixed-input disagreements from Phase 1. Omit only if none.]
-
----
-
-### OR: Escalation: No Agent Team Dispatched  [only when final verdict was ESCALATE-ROUTE]
-[Replaces the Work Items / Agent Roster / Phasing / Commit Strategy
-sections when the Phase 3.6 gate fired ESCALATE-ROUTE. 2-3 sentences
-naming the SUGGESTED_NEXT_SKILL and the reason no agent team is being
-dispatched. Format:
-
-"The launch gate fired ESCALATE-ROUTE: <reason from gate>. No agent
-team is being dispatched; the suggested next step is
-<SUGGESTED_NEXT_SKILL: /converge, /ideate, or /investigate>. The draft
-work items are preserved above for reference, but /launch is not the
-right tool for this ticket yet."
-
-The Iteration Log + Convergence Delta + Prior Thinking Comparison +
-Tenth-Man Lens are still shown so the user understands WHY the gate
-refused to launch.]
-
----
-
-[When final verdict is PROCEED or LOW-CONFIDENCE:]
-**Approve?** Reply "yes" to start execution, or provide feedback to revise.
-
-[When final verdict is ESCALATE-ROUTE (replaces "Approve?" line):]
-**No agent team will be dispatched.** Run the suggested next skill
-(`<SUGGESTED_NEXT_SKILL>`) instead, or provide feedback if you believe
-`/launch` is still the right tool here.
-```
+Present the converged plan using the Phase 4 plan template in
+[output-template.md](output-template.md). The template is the structural
+contract for this output: an H2 `## Launch Plan` (with `(low-confidence)`
+suffix when the gate forced a low-confidence PROCEED), then Summary, Iteration
+Log (always present so the user sees the gate ran), Convergence Delta (with
+CATEGORY tag), Prior Thinking Comparison (mechanism-prescribed inputs only),
+the mandatory Skeptic Lens block, Work Items (each with Acceptance criteria +
+Verification path + Consequence-of-wrong), Agent Roster, Phasing, Commit
+Strategy, Open Assumptions, and the ESCALATE-ROUTE-only "No Agent Team
+Dispatched" variant. Populate every applicable section in order; do not
+free-form narrate the plan.
 
 **This is a hard stop.** Do not proceed to Phase 5 without explicit human approval.
 If the user provides feedback, revise and re-present. Max 2 revision rounds - if
@@ -300,94 +234,31 @@ more changes are needed, suggest the user provide consolidated feedback.
 
 When the gate fired ESCALATE-ROUTE, "approval" is not the operative action;
 the user is being told /launch is the wrong skill for this ticket. The
-template above conditionalizes the final prompt accordingly.
+[output-template.md](output-template.md) template conditionalizes the final
+prompt accordingly.
 
 ## Phase 5: Execution
 
 **You (the primary Claude session) are the orchestrator.** You have the full plan
 context, you spawned the agents, you steer the work. Do not be idle.
 
-### 5.0: Durable State Initialization
+The first substeps establish durability and the worktree, then spawn the agent
+team. The bash, exact bead-event writes, and recurrence calibration live in
+[execution.md](execution.md):
 
-Before creating the worktree, establish the bead-based event log target.
-
-**Contract** (full bash and conflict-handling logic in
-[durable-state.md §Bead Acquisition](durable-state.md)):
-- For Jira-ticket launches: find existing bead by ticket ID, or create one.
-- For bead-ID launches: `$LAUNCH_BEAD_ID` is the input argument directly.
-- Surface conflicts when the bead is already claimed by another session
-  (optimistic locking; not a hard block, but the human safety gate).
-- Claim the bead for this session via `bd update --claim`.
-
-After acquisition, store `$LAUNCH_BEAD_ID` and check for a prior session:
-```bash
-PRIOR=$(bd show "$LAUNCH_BEAD_ID" --json | jq -r '.[] | .notes // ""' | grep 'LAUNCH_EVENT')
-```
-- If `PRIOR` is non-empty: run the Cold-Start Protocol in `durable-state.md`. Do not
-  proceed to 5.1 - cold-start handles worktree recovery and phase resumption.
-- If empty: write session start and proceed to 5.1.
-
-```bash
-bd update "$LAUNCH_BEAD_ID" --append-notes \
-  "[LAUNCH_EVENT type=SESSION_STARTED session=$CLAUDE_SESSION_ID ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)]"
-```
-
-### 5.1: Create Shared Worktree
-
-```bash
-WORKTREE_BASE="/workspaces/main/.launch-worktrees"
-mkdir -p "$WORKTREE_BASE"
-WORKTREE_DIR="$WORKTREE_BASE/launch-$(date +%s)"
-BRANCH="launch-$(date +%s)"
-git worktree add "$WORKTREE_DIR" -b "$BRANCH" origin/HEAD 2>&1
-```
-
-**Path constraint**: WORKTREE_BASE must be outside `.git/`. Claude Code treats
-`.git/` as a protected directory - Edit/Write tools are blocked there regardless
-of permission mode. Agents can Read but never write. This is not overridable via
-`mode: "bypassPermissions"` (that controls approval prompts, not tool availability).
-
-Verify: `git -C "$WORKTREE_DIR" log -1 --oneline`
-
-After successful creation, write durability events and store metadata:
-```bash
-bd update "$LAUNCH_BEAD_ID" --append-notes \
-  "[LAUNCH_EVENT type=WORKTREE_CREATED branch=$BRANCH ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)]"
-bd update "$LAUNCH_BEAD_ID" --set-metadata launch_branch="$BRANCH"
-bd update "$LAUNCH_BEAD_ID" --set-metadata launch_worktree="$WORKTREE_DIR"
-```
-
-All agents work in this single worktree. Do NOT use `isolation: "worktree"` on
-agent spawns - that creates per-agent worktrees with no coordination.
-
-### 5.2: Spawn Agents (Phase A)
-
-For each agent in Phase A, use the Retry Loop protocol from
-[durable-state.md](durable-state.md) rather than spawning directly. The retry
-loop handles the `AGENT_SPAWNED` event write, the Agent tool call, verification,
-and retry logic in one coherent block.
-
-Key rules for agent spawn prompts:
-- `name`: addressable name (e.g., "implementer", "tester", "flex-infra")
-- `run_in_background: true`
-- `prompt`: includes worktree path, work items, acceptance criteria, standup
-  protocol, RETRY_CONTEXT block if `iteration >= 2`, **and the bead ID** (so
-  the agent's bead-comment polling channel engages; see "Mid-flight Updates
-  from User" in `~/.claude/agents/launch-*.md`). Mention the bead ID
-  prominently (e.g., "BEAD: docr-XXXX" or "Working on bead `docr-XXXX`").
-
-**User-facing channel**: while agents are running, the user can leave comments
-on the bead via `bd comment <bead-id> "..."` to send course corrections, scope
-changes, or stop instructions. Spawned launch-* agents poll their bead at
-verification/commit/push checkpoints. This is the canonical real-time
-communication channel during long-running parallel work.
-
-**Write `AGENT_SPAWNED` to bead BEFORE the Agent tool call** (Temporal pattern).
-If the orchestrator dies after the write but before the agent completes, cold-start
-treats it as in-flight and increments the iteration count on resume.
-
-Launch all Phase A agents in a **single message** (parallel dispatch) on iteration 1.
-On retries, agents are spawned sequentially per slot (the retry loop serializes).
+- **5.0 Durable State Initialization**: acquire/create the tracking bead, claim
+  it, write `SESSION_STARTED`; if a prior `LAUNCH_EVENT` exists on the bead, run
+  the Cold-Start Protocol (`durable-state.md`) instead of proceeding to 5.1.
+- **5.1 Create Shared Worktree**: one worktree under `.launch-worktrees/`
+  (outside `.git/`, which Claude Code blocks writes to); all agents share it.
+  Do NOT use `isolation: "worktree"` on agent spawns.
+- **5.2 Spawn Agents (Phase A)**: scope each agent to ONE file or
+  tightly-coupled concern (narrow mandate prevents pre-standup truncation);
+  decompose into non-overlapping lanes for parallelism, serialize true
+  conflicts, and assign one integration agent to the seam. Write the
+  `AGENT_SPAWNED` bead event BEFORE the Agent tool call (Temporal pattern).
+  Pass the bead ID prominently so the agent's bead-comment course-correction
+  channel engages. Launch all Phase A agents in a single message on iteration 1.
 
 ### 5.3: Standup Protocol
 
@@ -395,7 +266,8 @@ Every agent template includes this check-in contract:
 
 ```
 After every logical unit of work (function implemented, test file written,
-config file created), send a standup to the orchestrator via SendMessage:
+config file created), emit a STANDUP block in your output (the orchestrator
+reads your output stream; subagents have no messaging tool):
 
 STANDUP:
   DONE: [what you just completed - be specific: file, function, test name]
@@ -404,265 +276,104 @@ STANDUP:
   RISK: [anything that might block you soon, or "none"]
 ```
 
-### 5.4: Orchestration Loop
+### 5.3b: Terminal RESULT Contract + Authority Fence
 
-While agents are running, you are actively:
+Two canonical blocks every launch-phase agent template carries verbatim (the
+agent defs mirror them via `summary-from` marked pairs; `lint-skill-summary-sync.sh`
+keeps the copies in sync). Added 2026-06-09, bd docr-pnx9.
 
-1. **Reading output files** - tail agent output for detailed progress beyond standups
-2. **Processing standups** - parse DONE/NEXT/BLOCKED/RISK from each agent
-3. **Proactive unblocking** - when a standup reports BLOCKED or RISK:
-   - Spawn the relevant specialist sub-agent with the blocking context
-   - Wait for specialist result
-   - Route findings back via SendMessage: "Guidance from [specialist]: [findings]"
-4. **Checkpoint gating** - when all Phase N agents complete (or checkpoint):
-   - Run the gate verification command from the plan's `gate_cmd` field
-   - If met: write `PHASE_GATE_PASSED` event to bead, then spawn Phase N+1 agents
-     with Phase N outputs as context (use the Retry Loop in 5.6 for each slot)
-   - If not met: invoke the Retry Loop (5.6) for the specific agent slot that
-     owns the failed criteria - do not re-run agents that passed
-   - **After each phase gate**: prune standup accumulation from your context by
-     retaining only the final DONE summary per agent. Drop intermediate standups.
-     This limits context growth across multi-phase executions.
-5. **Scope creep handling** - when an agent reports out-of-scope work:
-   - Gather details from the agent's standup/output
-   - Create a linked Jira ticket via `/jira` with enough context for a
-     future cold-start `/launch` invocation
-   - Tell the agent: "Out of scope. Created MX2-XXXXX for follow-up. Continue
-     with the current plan."
-6. **Escalation** - stop and ask the user when:
-   - An agent needs external verification (Superset query, Datadog dashboard,
-     log check) that tools can't provide
-   - 3 failed attempts on the same issue (circuit breaker)
-   - The plan was wrong (tests reveal the approach doesn't work)
+<!-- summary key: result-contract -->
+End your FINAL message with a terminal RESULT block (a SubagentStop hook treats a missing block as truncation, and the orchestrator resumes you to produce it):
 
-### 5.5: Agent Completion
+RESULT:
+  STATUS: done | partial | blocked
+  DONE: [completed work items / acceptance criteria, one line each]
+  REMAINING: [unfinished work and why, or "none"]
+  DISCOVERED: [unforeseen work found en route, one line each, classified as either "blocking-AC: <what> | proposed-fix: <one line> | files: <paths>" or "non-blocking: <what>" (non-blocking goes to a linked ticket; do NOT fix it inline)]
+  NEEDS-DECISION: [questions only the orchestrator or user can answer, or "none"]
+  VERIFICATION: [commands run + outcomes, e.g. "pants tlc <target>: green", or "not run: <why>"]
 
-When all phases complete (all `PHASE_GATE_PASSED` events written for every phase
-in the plan), verify final worktree state:
-1. Confirm all acceptance criteria are met by re-running gate verification commands
-2. If any criterion is unmet at this stage, it means the retry loop exhausted or
-   was bypassed - escalate to the user with the specific failure
+To ASK the orchestrator something mid-task, end your turn with STATUS: blocked and the question in NEEDS-DECISION; the orchestrator answers by resuming you with your context intact. Ending the turn beats idle-polling whenever a decision gates your next step.
+<!-- /summary -->
 
-### 5.6: Retry Loop
+<!-- summary key: authority-fence -->
+AUTHORITY (every launch/autopilot agent):
+- Allowed without asking: edits inside the shared worktree on files within your WORK ITEMS scope; running build/test/lint; local commits; `bd comment` / `bd create` for discovered work.
+- Forbidden unless your startup prompt grants it for this phase: push, PR creation/publish. Forbidden without an explicit per-round user verb relayed by the orchestrator: force-push, rebase, branch deletion, history rewrites.
+- Never: writes outside the worktree; expanding scope beyond WORK ITEMS (route via DISCOVERED instead); fixing a non-blocking discovery inline.
+- End the turn as STATUS: blocked when: 3 fix attempts fail on one cause; an acceptance criterion is ambiguous; predicted or actual diff crosses the scope budget; a blocking-AC discovery requires touching files outside the plan surface.
+<!-- /summary -->
 
-Per-agent retry loop with circuit breaker. Applied for every agent slot in every
-phase. Full algorithm in [durable-state.md §Retry Loop Protocol](durable-state.md).
+### 5.3c: Continuation Channel
 
-Key properties:
-- Max 3 iterations per `(agent, phase)` slot - circuit breaker escalates to user
-- Iteration count derived from `AGENT_FAILED` events in bead (survives cold-start)
-- `AGENT_SPAWNED` written BEFORE the Agent tool call (Temporal pre-execution journal)
-- On iteration 2+, agent receives `RETRY_CONTEXT` block with: prior commit list,
-  exact failure output (500 char truncated), files to not touch, and an
-  orchestrator-synthesized specific directive naming the exact fix needed
-- Phase gate event written only after ALL agents in the phase pass verification
+Agent dispatches return an agent ID; SendMessage to that ID resumes the agent
+with its context intact. Prefer continuation over the legacy alternatives:
+
+- **Adjudication** (SCOPE-CHECK, NEEDS-DECISION turn-ends): answer by resuming
+  the agent. No bead-comment polling round-trip on the agent side.
+- **Course correction between turns**: resume with the correction instead of
+  re-dispatching.
+- **Truncation recovery** (missing RESULT block, mid-thought ending): resume the
+  SAME agent with (a) what is missing and (b) the definition of done. Cold
+  re-dispatch of a new agent with a self-contained handoff prompt is the
+  FALLBACK for when the agent is no longer resumable, not the default.
+
+`bd comment` remains (a) the durable audit trail (mirror adjudications there)
+and (b) the USER's channel into running agents; agents still poll it at the
+named checkpoints because the user cannot SendMessage.
+
+After the agents are running, you orchestrate to completion (full detail in
+[execution.md](execution.md)):
+
+- **5.4 Orchestration Loop**: stay active: read output, process standups,
+  proactively unblock via specialist sub-agents, gate phase transitions on the
+  plan's `gate_cmd`, prune standup accumulation after each gate, route
+  RESULT.DISCOVERED items per the Escalation Protocol (non-blocking to a linked
+  ticket; blocking-AC to one bounded detour agent), escalate on
+  external-verification needs or the 3-attempt circuit breaker.
+- **5.5 Agent Completion**: re-run gate verification once all `PHASE_GATE_PASSED`
+  events are written; escalate any unmet criterion.
+- **5.6 Retry Loop**: per-`(agent, phase)` slot, max 3 iterations (circuit
+  breaker escalates to user), iteration count derived from `AGENT_FAILED` bead
+  events (survives cold-start), `RETRY_CONTEXT` on iteration 2+. Full algorithm
+  in [durable-state.md §Retry Loop Protocol](durable-state.md).
 
 ## Phase 6: Finalization
 
-### 6.1: Verification
+Finalization verifies, commits, runs the broad review gate, creates the draft
+PR, self-reviews, and reports. The bash (commit strategy, PR paths A/B, the
+em-dash guard, the report template) lives in [finalization.md](finalization.md):
 
-Run `pants tlc` against all changed targets in the worktree (skip if
-`--skip-checks` was passed). Route failures to the responsible agent:
-- Lint/style failures -> implementer or flex agent that wrote the code
-- Test failures -> tester (if test is wrong) or implementer (if code is wrong)
-- Type errors -> whoever introduced the untyped code
-
-Iterate until clean or circuit breaker (3 attempts).
-
-### 6.2: Commits
-
-Apply the commit strategy from the approved plan:
-- **Small tasks**: one commit with a clear message
-- **Larger tasks**: separate commits at behavior boundaries, each with a message
-  documenting the behavior contract of that commit state
-
-Commit messages include the Jira ticket ID: `[MX2-XXXXX] <description>`
-
-### 6.2.4: /review Fan-Out (broad pre-PR gate)
-
-After commits land on the worktree branch and BEFORE the bot-review pass,
-invoke the `/review` skill against the worktree diff. `/review` dispatches
-four project review agents in parallel (`code-reviewer` for structural design,
-`test-quality-reviewer` for behavioral test quality, `observability-reviewer`
-for instrumentation gaps, `silent-failure-hunter` for error propagation),
-deduplicates overlapping findings, and produces a severity-grouped report.
-
-Distinct from 6.2.5: `/review` is the broad gate (4-agent fan-out, runs on
-every diff, can emit CRITICAL/WARNING). `bot-review` is the cross-file
-blast-radius specialist (runs only when public surface changes, hard-capped
-at COMMENT/NOTE/SUGGESTION). Both are advisory; PR creation proceeds
-regardless of findings. The operator reads both before flipping the PR
-from draft to ready and resolves CRITICAL/WARNING items before publishing.
-
-Invocation: from the worktree directory so `git diff origin/main..HEAD` is
-the natural scope, then:
-
-```
-Skill(skill="review")
-```
-
-Post the report to the tracking bead:
-
-```bash
-bd comment <tracking-bead-id> "[/review report: PR-pending]
-
-<skill output>"
-```
-
-If `/review` returns CRITICAL findings, surface them to the operator in the
-Phase 6.5 report under a `### /review CRITICAL findings` header so they are
-not missed in the bot-review noise.
-
-### 6.2.5: bot-review Advisory Pass
-
-After 6.2.4 completes and BEFORE PR creation, dispatch `bot-review` on the
-worktree diff. Output is posted to the tracking bead as advisory commentary;
-PR creation proceeds regardless of findings.
-
-Skip when the diff has no public-symbol changes. Compute the
-`changes_public_surface` signal per `~/.claude/skills/pr-intel/SKILL.md` Dispatch
-Signals; if false, post `bd comment <tracking-bead-id> "[bot-review advisory:
-PR-pending] skipped (no public surface change)"` and proceed to 6.3.
-
-When dispatched:
-
-```
-Agent(
-  subagent_type="bot-review",
-  prompt="""
-  REPO STATE: Worktree at $WORKTREE_DIR. Use as <code_root>.
-
-  SCOPE: full diff in the worktree (origin/main..HEAD).
-
-  Apply the verbatim three-citation gate from your agent definition. Severity
-  vocabulary is COMMENT/NOTE/SUGGESTION only. Output FINDING blocks or no-findings
-  line.
-
-  Diff:
-  [git -C "$WORKTREE_DIR" diff origin/main..HEAD]
-
-  Changed file paths:
-  [file path list]
-  """
-)
-```
-
-Post the agent's output to the tracking bead:
-
-```bash
-bd comment <tracking-bead-id> "[bot-review advisory: PR-pending]
-
-<agent output>"
-```
-
-Strict advisory: `bot-review`'s severity hard-bar (COMMENT/NOTE/SUGGESTION only)
-guarantees the output cannot block PR creation. The user reads the advisory
-before flipping the PR from draft to ready.
-
-### 6.3: PR Creation
-
-Always run from the worktree. Never check out the launch branch in the main
-workspace. Two sub-paths depending on whether the launch is **independent**
-(worktree off `origin/HEAD` / main; default) or **dependent** (worktree off a
-non-main parent branch; stacked launch on top of an unmerged parent PR).
-
-> **Em-dash guard**: `~/.claude/hooks/block-em-dash.sh` scans `gh pr create`,
-> `gh api -X POST/PUT/PATCH`, `gh pr comment`, `gh pr review`, and `gh issue
-> comment` for U+2014 and blocks on match. `gt submit` shells out to `gh`, so
-> the same constraint applies. Sanitize the PR body file before invoking
-> either path.
-
-**Step 1: Determine the base branch.** Read the worktree's branch parent:
-```bash
-BASE_BRANCH=$(git -C "$WORKTREE_DIR" rev-parse --abbrev-ref --symbolic-full-name @{upstream} 2>/dev/null | sed 's|^origin/||' \
-  || git -C "$WORKTREE_DIR" log --pretty=%D origin/HEAD..HEAD --decorate=full 2>/dev/null | grep -oE 'origin/[^,)]+' | head -1 | sed 's|^origin/||' \
-  || echo "main")
-```
-For a standard non-stacked launch (worktree created from `origin/HEAD` in Phase 5.1)
-this resolves to `main`. For stacked launches (worktree created from another branch)
-it resolves to that parent. Defaults to `main` if detection fails.
-
-**Step 2: Build the PR body file.** Build `/tmp/pr-body-<branch>.md` BEFORE
-invoking either submit path. Read the repo's PR template FIRST
-(`<repo>/pull_request_template.md` or `<repo>/.github/PULL_REQUEST_TEMPLATE.md`)
-and use its structural skeleton (H1 sections, `Jira issue link:` line,
-`# Checklist` items filled out, `Require-reviewers: all` line). Layer the personal
-style rules from `memory/pr-template.md` on top (H2 subsections within Summary,
-Jira link at the bottom, no hard line-wrapping, clickable markdown links).
-Skipping the repo template breaks Mergify's checklist-fill protection and produces
-a PR description that does not match the team's structural standard. See the
-recurrence note in `~/.claude/CLAUDE.md` PR descriptions rule for the 2026-04-29
-instance.
-
-**Step 3: Submit the PR (path depends on Step 1).**
-
-**Path A: Independent launch (`BASE_BRANCH == "main"`).** Raw `gh` is fine. The
-PR has no parent relationship to register, and Graphite tracking adds no value.
-```bash
-cd "$WORKTREE_DIR"
-git push -u origin HEAD
-gh pr create --draft \
-  --title "[MX2-XXXXX] <description>" \
-  --body-file /tmp/pr-body-<branch>.md
-```
-
-**Path B: Dependent launch (`BASE_BRANCH != "main"`).** Use `gt` so the stack
-relationship is registered with Graphite. Without this, the GitHub-level base
-branch is set correctly (so reviewers see only the new delta), but Graphite is
-unaware: `gt log short` won't show the stack, and `gt restack` / `gt sync` won't
-operate on it. Recurrence context: 2026-05-08 PR #8971 silent-failure-hunter
-launch shipped via Path A and required retroactive `gt track` cleanup.
-```bash
-cd "$WORKTREE_DIR"
-gt track --parent "$BASE_BRANCH"
-gt submit --stack --no-interactive --draft \
-  --body-file /tmp/pr-body-<branch>.md
-```
-- `gt track` is forbidden in the main checkout (CLAUDE.md), allowed in worktrees
-  under the worktree exception.
-- `gt submit --stack` submits this branch and any tracked ancestors that haven't
-  been submitted yet, sets the PR base to the tracked parent automatically, and
-  pushes with `-u`. On already-submitted parent PRs it re-pushes commits but does
-  not clobber existing PR description bodies (verified 2026-05-09 launch-sfh).
-- `--draft` matches the "draft PR always" rule below.
-
-**Step 4: Capture the PR URL** for the report in 6.5:
-```bash
-PR_URL=$(gh pr view --json url --jq .url)
-```
-
-### 6.4: Cleanup
-
-```bash
-git worktree remove "$WORKTREE_DIR" --force 2>&1 || \
-  (rm -rf "$WORKTREE_DIR" && git worktree prune)
-```
-
-### 6.5: Report
-
-Present to the user:
-```markdown
-## Launch Complete: [topic]
-
-**PR**: [URL] (draft)
-**Graphite**: https://app.graphite.dev/github/pr/<org>/<repo>/[number]
-**Branch**: [branch-name]
-**Jira**: [MX2-XXXXX]
-
-### What was built
-[2-4 sentences summarizing what the agents implemented]
-
-### Agents dispatched
-[Agent roster with what each did]
-
-### Scope creep tickets
-[MX2-YYYYY, MX2-ZZZZZ, or "none"]
-
-### Suggested next steps
-- [ ] Review the PR on Graphite
-- [ ] Run `/pr-intel [number] --mine` for self-review
-- [ ] Publish when ready
-```
+- **6.1 Verification**: `pants tlc` on changed targets (skip if `--skip-checks`);
+  route failures to the responsible agent; iterate until clean or circuit breaker.
+- **6.2 Commits**: apply the approved commit strategy; messages carry the Jira
+  ID `[MX2-XXXXX]`.
+- **6.2.4 /review Fan-Out**: invoke `/review` against the worktree diff (it
+  resolves to the more comprehensive personal/project skill; roster is
+  conditional and evolves, do not hardcode a count). Findings are advisory; PR
+  creation proceeds regardless. Post the report to the tracking bead; surface
+  CRITICAL findings in the 6.5 report.
+- **6.2.5 bot-review**: folded into `/review` as a conditional fan-out agent
+  (public-surface changes only, hard-capped at COMMENT/NOTE/SUGGESTION); no
+  separate dispatch.
+- **6.3 PR Creation**: always from the worktree (never check out the launch
+  branch in main). Independent launch (base = main) uses raw `gh pr create
+  --draft`; stacked launch (base != main) uses `gt track` + `gt submit --stack
+  --draft` so Graphite registers the stack. Build the PR body from the repo
+  template FIRST, then layer `memory/pr-template.md`. Draft PR always.
+- **6.3.5 Self-Review Gate**: run `/pr-intel --mine` on the just-created draft
+  (CLAUDE.md heuristic 1b; the orchestrator's job, not a suggestion). It adds
+  AC-compliance trace, CI status, static-analyzer pre-check, and the cross-phase
+  integration-bug check that the 6.2.4 `/review` cannot; review-cache reuse keeps
+  the cost to the AC/CI/static-analyzer delta. Resolve BLOCKING findings and
+  amend before reporting. May be delegated when the user explicitly assigns the
+  review to another session or reviewer; record the delegation on the tracking
+  bead and skip the local run (running both duplicates the roster).
+- **6.4 Cleanup**: `git worktree remove --force` (fallback `rm -rf` +
+  `git worktree prune`).
+- **6.5 Report**: present the Launch Complete report (PR URL, Graphite link,
+  branch, Jira, what was built, agents dispatched, scope-creep tickets, next
+  steps).
 
 ## Escalation Protocol
 
@@ -672,7 +383,8 @@ Present to the user:
 | Agent BLOCKED, needs external verification | Ask user (Superset, Datadog, logs) |
 | 3 failures on same issue | Stop, report what was tried, ask user |
 | Plan was wrong | Stop, explain what the tests/code revealed, suggest revised approach |
-| Scope creep discovered | /jira to create linked ticket, continue with current plan |
+| Non-blocking discovery (RESULT.DISCOVERED) | Linked ticket (/jira or bd create), continue with current plan; never fixed inline |
+| Blocking-AC discovery (RESULT.DISCOVERED) | ONE bounded detour agent per work item: minimum scope to unblock the AC, diff counts against the same scope budget, 3-attempt breaker applies. A second detour on the same work item, or a fix touching files outside the plan surface, escalates instead (to the user here; through the decision-maker gate first in autopilot) |
 
 ## Rules
 
@@ -694,8 +406,8 @@ Present to the user:
   mode (refining and BUILDING the wrong noun because the ticket
   prescribed it without challenge) is the canonical risk this rule
   guards against.
-- **Tenth-man is mandatory.** Phase 3.5 runs always. If the dispatch
-  fails, note "Tenth-Man Lens unavailable" and proceed; do not silently
+- **Skeptic is mandatory.** Phase 3.5 runs always. If the dispatch
+  fails, note "Skeptic Lens unavailable" and proceed; do not silently
   drop the pass.
 - **Decision-maker gate is mandatory.** Phase 3.6 runs always. PROCEED
   is not the default; the gate must affirmatively reach it. ITERATE
@@ -766,8 +478,8 @@ Present to the user:
 
 - [context-enrichment.md](context-enrichment.md) - Phase 1 protocol: input loading (Jira, bead, Slack, Confluence, PR, transcript), INPUT_MODE classification, prompt-refiner dispatch
 - [plan-pipeline.md](plan-pipeline.md) - Phase 2 decompose (with Verification path + Consequence + Context fields), Phase 3c synthesize + DELTA_CATEGORY, parallelization-strategy YAML
-- [stress-test-prompts.md](stress-test-prompts.md) - Phase 3a Challenge + Phase 3b Consult subagent prompts (INPUT_MODE-aware)
-- [gate-prompts.md](gate-prompts.md) - Phase 3.5 Tenth-Man Lens + Phase 3.6 Decision-Maker Gate dispatch prompts, branch logic, iteration caps, iteration log format
+- [stress-test-prompts.md](stress-test-prompts.md) - Phase 3a Challenge subagent + Phase 3b per-specialist prompts (orchestrator-dispatched, INPUT_MODE-aware)
+- [gate-prompts.md](gate-prompts.md) - Phase 3.5 Skeptic Lens + Phase 3.6 Decision-Maker Gate dispatch prompts, branch logic, iteration caps, iteration log format
 - [durable-state.md](durable-state.md) - Phase 5 event log, cold-start protocol, retry loop
 - Agent templates: `~/.claude/agents/launch-implementer.md`, `launch-tester.md`, `launch-flex.md`
 - PR creation: `/pr` command in `.claude/commands/pr.md`

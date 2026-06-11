@@ -16,6 +16,7 @@ The artifacts below were each promoted from personal-tier (`~/.claude/`) to proj
 | `skills/enrich/` | Team-reviewed PR | Context loader for Jira tickets, PRs, or topics; structured briefing from multiple sources |
 | `skills/investigate/` | Team-reviewed PR | Structured production-error investigation; trace backward through call path, AWS state, Datadog signals |
 | `skills/review/` | Team-reviewed PR | Local self-review fan-out to project review agents; grouped severity report before push |
+| `rules/pr-size-discipline.md` | Team-reviewed PR | Promoted RULE: one-concern-per-PR stated unconditionally, the ~250-line size as a one-way trigger (the lab-to-production pattern applied to a `.claude/rules/` rule, not a component) |
 
 ## The personal version still exists
 
@@ -33,6 +34,8 @@ The project-tier versions in the live repo reference internal Atlassian/GitHub U
 
 The genericization preserves the artifact's structural shape (so an adopter can swap in their own identifiers and run) without exposing the original team's tracking surface.
 
-## What this directory does not include
+## A note on the one rules-tier exhibit
 
-Selected project-tier rules from `.claude/rules/` (testing tenets, code-style, verification discipline) originated in personal-tier and earned team adoption. They are not mirrored here as separate files; they are referenced from the personal-tier `dotclaude/CLAUDE.md` and the harness's pattern docs in `patterns/`. The lab-to-production demonstration this directory makes is most legible at the component level (agent, skill); the rules promotion path is documented separately in `patterns/lab-to-production.md`.
+Most project-tier rules from `.claude/rules/` (testing tenets, code-style, verification discipline) originated in personal-tier and earned team adoption. They are NOT mirrored here as separate files; they are referenced from the personal-tier `dotclaude/CLAUDE.md` and the harness's pattern docs in `patterns/`, because the lab-to-production demonstration is most legible at the component level (agent, skill).
+
+The single exception is `rules/pr-size-discipline.md`. It is included because its promotion path is exceptionally legible: the rule was restructured in response to a literal-reading model taking the contrapositive of a nested principle, and the restructure (state the principle unconditionally, mark the threshold one-way) is itself the lesson. The rule, the evidence entry (`evidence/2026-06-11-rules-as-executable-specs.md`), and the generalized pattern (`patterns/contrapositive-proof.md`) form one exhibit across three layers. The broader rules-promotion path stays documented in `patterns/lab-to-production.md`.

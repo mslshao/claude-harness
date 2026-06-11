@@ -1,13 +1,16 @@
 ---
 name: enrich
 description: >
-  Context loader for Jira tickets, beads, PRs, or topics. Gathers ticket details,
-  related beads, codebase references, and domain knowledge into a structured
-  briefing. Use when the user asks about a ticket, wants context before running
-  /challenge or /consult, needs a briefing for meeting prep, or wants to understand
-  what a bead or PR involves. Trigger on: "what's the context on", "brief me on",
-  "enrich", "load ticket", "what do we know about", any Jira ticket ID or bead ID
-  pasted without other instructions.
+  (personal; shadows the project-tier `enrich` and takes precedence) Delta vs the
+  project version: beads-aware - accepts bead IDs as input, gathers related beads
+  and bead memories alongside everything the project version collects. Context
+  loader for Jira tickets, beads, PRs, or topics: ticket details, related beads,
+  codebase references, AWS service state, Datadog error signals, and domain
+  knowledge into a structured briefing. Use when the user asks about a ticket,
+  wants context before running /challenge or /consult, needs a briefing for
+  meeting prep, or wants to understand what a bead or PR involves. Trigger on:
+  "what's the context on", "brief me on", "enrich", "load ticket", "what do we
+  know about", any Jira ticket ID or bead ID pasted without other instructions.
 argument-hint: "[MX2-XXXXX | docr-XXXX | #1234 | topic]"
 ---
 
@@ -41,9 +44,9 @@ Not every source applies to every input - skip what doesn't make sense.
 ### Step 1: Fetch primary source
 
 Per the input type table above. This always runs first because it provides the
-keywords for steps 2-4.
+keywords and service identifiers for the parallel steps below.
 
-### Steps 2-4: Run in parallel after step 1
+### Steps 2-6: Run in parallel after step 1
 
 **2. Discover related beads.**
 Extract keywords from the primary source (ticket summary, bead title, PR title).
@@ -53,17 +56,29 @@ Run `bd search <keywords>`. Take top 5 results. Load each with `bd show`.
 Run `bd memories <keyword>` with 1-3 terms: service name, domain, ticket ID.
 Take first 10 matches.
 
-**4. Grep codebase.**
+**4. AWS context.**
+If step 1 extracted a Lambda function name or ECS service name, fetch service
+config and recent error counts via `mcp__aws__call_aws`. Skip if no service
+identifier was found in the primary source.
+
+**5. Datadog context.**
+If step 1 extracted a service identifier, query recent error events and top
+error patterns via the `mcp__datadog__*` family. Skip if no service identifier
+was found in the primary source.
+
+**6. Grep codebase.**
 Extract file paths or service names from the primary source. Grep for entry
 points, models, settings. Read up to 8 files.
 
 ### Parallel execution
 
-Steps 2, 3, and 4 are independent once step 1 completes. Launch all three
+Steps 2-6 are independent once step 1 completes. Launch all applicable ones
 in a single message to minimize wall-clock time.
 
-If the input is free text (no primary source to fetch), run all four steps
-in parallel using the free text as keywords.
+If the input is free text (no primary source to fetch), beads search (step 2),
+memories (step 3), and codebase search (step 6) always run using the free text
+as keywords. AWS (step 4) and Datadog (step 5) only run if a service identifier
+can be inferred from the free text.
 
 ## Output
 
@@ -83,8 +98,10 @@ needs to know. Include ticket status, assignee, and priority if from Jira.]
 | 1 | [key fact from primary source] | Jira / Bead / PR | Confirmed |
 | 2 | [related context from beads] | Bead docr-xxxx | Confirmed |
 | 3 | [domain gotcha from memories] | Memory | Confirmed |
-| 4 | [code pattern or dependency] | Codebase | Confirmed |
-| 5 | [missing or unclear item] | (none) | Gap |
+| 4 | [AWS service state or recent errors] | AWS | Confirmed |
+| 5 | [Datadog error pattern or quiet signal] | Datadog | Confirmed |
+| 6 | [code pattern or dependency] | Codebase | Confirmed |
+| 7 | [missing or unclear item] | (none) | Gap |
 
 Include 5-10 findings. Each finding is one fact, attributed to its source.
 Mark items that couldn't be verified as "Gap."
@@ -125,7 +142,8 @@ PR about" or need context before reviewing, use `/enrich`.
 - **Parallel gathering.** Launch independent sources simultaneously. The user
   is waiting; wall-clock time matters more than token efficiency.
 - **Respect bounds.** 5 Jira comments, 5 bead search results, 10 memory matches,
-  8 codebase files. See sources.md for the full bounds table.
+  8 codebase files, 1 AWS service, 24h Datadog window. See sources.md for the
+  full bounds table.
 - **Graceful degradation.** If a source fails, note it and continue. A partial
   briefing is better than no briefing.
 - **Don't pad.** If the enrichment produces 3 findings, show 3 findings. Don't

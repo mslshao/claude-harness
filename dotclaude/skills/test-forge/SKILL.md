@@ -1,7 +1,6 @@
 ---
 name: test-forge
 description: Generate behavioral tests with iterative quality review. Use when the user asks to "forge tests", "generate tests", "create tests for this module", or needs tests that verify domain logic, not framework mechanics.
-context: fork
 argument-hint: "[source file or module path]"
 allowed-tools: ["Bash", "Glob", "Grep", "Read", "Agent", "Write", "Edit"]
 ---
@@ -11,6 +10,14 @@ allowed-tools: ["Bash", "Glob", "Grep", "Read", "Agent", "Write", "Edit"]
 Generate high-quality behavioral tests for MX2 modules by running the `test-generator`
 agent and then feeding its output through the `test-quality-reviewer` agent in a feedback
 loop. Stop when the reviewer is satisfied or after 3 iteration cycles.
+
+HARNESS CONSTRAINT (verified 2026-06-09): this skill must run in the main
+conversation, never as a `context: fork` execution; forked skill executions are
+subagent contexts with no Agent tool, so the generator/reviewer loop would
+silently degrade to roleplay. When invoked FROM a subagent (e.g. launch-tester
+via the Skill tool), the Agent dispatches in Phases 2-4 are unavailable: do the
+generation and review in-context yourself and say so in the report; the
+orchestrator's checkpoint review covers the independent-reviewer gap.
 
 ## Input
 
@@ -39,6 +46,24 @@ Invoke the `test-generator` agent via the Agent tool. Your prompt MUST include:
 1. The source file path(s)
 2. Your behavioral inventory from Phase 1
 3. The constraints from [test-constraints.md](test-constraints.md) (copy verbatim)
+4. a reviewer's 4 test review questions as the generation lens (Code Review Guide
+   for Humans, Confluence 5684789249). Tell the generator the tests it
+   produces will be evaluated against these criteria at Phase 3, so write to
+   the bar:
+
+   - Is the behavior being tested obvious just from the test's name?
+     ("test name is a contract" per `.claude/rules/testing.md`)
+   - Is the test tightly coupled to implementation? (The refactor test: a
+     complete rewrite that preserves behavior should not break the test.)
+   - Is every mock/patch/stub necessary? Mocks ONLY for I/O isolation.
+     boto3 is auto-faked via moto; HTTP via `responses` fixture. Do not
+     mock above the infrastructure boundary. `unittest.mock` is banned.
+   - Could someone rewrite the implementation and still have the test
+     verify correctness without modification?
+
+   Baking these into the generation prompt reduces the iteration-loop load
+   at Phase 3-4 (test-quality-reviewer already enforces them; getting them
+   right on first pass shortens the cycle).
 
 ## Phase 3: Quality Review
 
@@ -56,7 +81,12 @@ Invoke the `test-quality-reviewer` agent via the Agent tool with:
 
 ## Phase 5: Verify
 
-Run `pants test <test_file_path>`. Fix failing tests, re-run until green.
+Run `pants test <test_file_path>`. Fix failing tests and re-run, with a cap of
+3 fix attempts; after the third failure, stop and report `pants test: FAIL`
+in the Phase 6 report with the failing output. NEVER loosen, weaken, or delete
+an assertion to force green; that defeats the quality loop this skill exists
+for. If an assertion genuinely must change, change it and re-run the Phase 3
+review on the changed test before counting it green.
 
 ## Phase 6: Report
 

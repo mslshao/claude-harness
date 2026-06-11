@@ -43,7 +43,7 @@ out to be more complex than described, say so and stop.
    imports, and conventions.
 2. **Follow project rules.** The `.claude/rules/` directory contains coding standards.
    Key rules: Pydantic models for all data (no untyped dicts), no `typing.Any`,
-   Google Python Style Guide, 2-space indentation, 108-char line length.
+   Google Python Style Guide, 4-space indentation, 108-char line length.
 3. **Run targeted checks.** After implementing, run `pants check <target>` on the files
    you changed. Fix type errors before reporting back.
 4. **Report what you did.** When done, summarize: files changed, what changed in each,

@@ -30,7 +30,7 @@ the version and updating this manifest in the same PR.
 
 ```
 SKILL_SCHEMA_VERSION=v1
-STAGES=[enrich, decompose, challenge, consult, synthesize, tenth-man, gate]
+STAGES=[enrich, decompose, challenge, consult, synthesize, skeptic, gate]
 ```
 
 Stage names are semantic (not numbered) so we can reorder or insert
@@ -42,7 +42,7 @@ Stage order (used by cold-start to determine resume point):
 3. challenge (Phase 3a)
 4. consult (Phase 3b)
 5. synthesize (Phase 3c)
-6. tenth-man (Phase 3.5)
+6. skeptic (Phase 3.5)
 7. gate (Phase 3.6)
 
 Phases 4, 5, 6 are tracked via `[LAUNCH_EVENT ...]` entries (not stages)
@@ -124,7 +124,7 @@ Rules:
 | `challenge` | `done` / `failed` | `path=` for findings (always; findings are heavy) |
 | `consult` | `done` / `failed` | `path=` for findings (always; findings are heavy) |
 | `synthesize` | `confirmed` / `minor-adjustments` / `major-revisions` / `scrapped-and-rebuilt` | `path=` for converged plan (always) |
-| `tenth-man` | `no-concerns` / `concerns` / `unavailable` | `path=` if concerns (otherwise inline); `reason=` if unavailable |
+| `skeptic` | `no-concerns` / `concerns` / `unavailable` | `path=` if concerns (otherwise inline); `reason=` if unavailable |
 | `gate` | `proceed` / `iterate` / `escalate-questions` / `escalate-route` / `low-confidence` | `verdict_reason=<short>` or `path=` for long reason; `weak_dimension=<enum>` if iterate; `suggested_next_skill=<skill>` if escalate-route |
 
 ### Example Pre-Execution Sequence (with ITERATE)
@@ -135,13 +135,13 @@ Rules:
 [LAUNCH_STAGE stage=challenge round=0 status=done path=~/.claude/scratch/launch-docr-xyz/challenge-0.md ts=2026-05-21T10:03:00Z]
 [LAUNCH_STAGE stage=consult round=0 status=done path=~/.claude/scratch/launch-docr-xyz/consult-0.md ts=2026-05-21T10:03:30Z]
 [LAUNCH_STAGE stage=synthesize round=0 status=confirmed path=~/.claude/scratch/launch-docr-xyz/synthesize-0.md ts=2026-05-21T10:04:00Z]
-[LAUNCH_STAGE stage=tenth-man round=0 status=no-concerns ts=2026-05-21T10:05:00Z]
+[LAUNCH_STAGE stage=skeptic round=0 status=no-concerns ts=2026-05-21T10:05:00Z]
 [LAUNCH_STAGE stage=gate round=0 status=iterate verdict_reason=mechanism-rubber-stamped weak_dimension=mechanism ts=2026-05-21T10:05:30Z]
 [LAUNCH_STAGE stage=decompose round=1 status=drafted n_items=5 path=~/.claude/scratch/launch-docr-xyz/decompose-1.md ts=2026-05-21T10:07:00Z]
 [LAUNCH_STAGE stage=challenge round=1 status=done path=~/.claude/scratch/launch-docr-xyz/challenge-1.md ts=2026-05-21T10:09:00Z]
 [LAUNCH_STAGE stage=consult round=1 status=done path=~/.claude/scratch/launch-docr-xyz/consult-1.md ts=2026-05-21T10:09:30Z]
 [LAUNCH_STAGE stage=synthesize round=1 status=major-revisions path=~/.claude/scratch/launch-docr-xyz/synthesize-1.md ts=2026-05-21T10:10:00Z]
-[LAUNCH_STAGE stage=tenth-man round=1 status=concerns path=~/.claude/scratch/launch-docr-xyz/tenth-man-1.md ts=2026-05-21T10:11:00Z]
+[LAUNCH_STAGE stage=skeptic round=1 status=concerns path=~/.claude/scratch/launch-docr-xyz/skeptic-1.md ts=2026-05-21T10:11:00Z]
 [LAUNCH_STAGE stage=gate round=1 status=proceed ts=2026-05-21T10:11:30Z]
 ```
 
@@ -223,14 +223,29 @@ Acquisition timing:
   then we know the input is valid AND the heavy Phase 1 work has
   already happened (durability matters from this point forward).
 
-The first stage entry written after acquisition is `enrich:0:loaded`
-with the brief either inline (if <2KB) or pointed at via `path=`.
-After that, every subsequent stage writes its own entry on completion.
+The first stage entry written after acquisition is `enrich:0:loaded`,
+ALWAYS pointing at the brief via `path=` (write the brief to
+`~/.claude/scratch/launch-$LAUNCH_BEAD_ID/brief.md` regardless of size;
+`mkdir -p` the directory first, which also guarantees it exists for every
+later stage's scratch write). A cold-start that finds `enrich:0:loaded`
+recovers the brief from that path. After that, every subsequent stage
+writes its own entry on completion.
 
 Also write the schema version stamp on the bead at acquisition:
 ```bash
 bd update "$LAUNCH_BEAD_ID" --set-metadata launch_skill_version=v1
 ```
+
+Input shapes:
+- **Jira-ticket launches**: find existing bead by ticket ID, or create one
+  (bash below).
+- **Bead-ID launches**: `$LAUNCH_BEAD_ID` is the input argument directly.
+- **PR-URL launches**: search by PR number (`bd search "#<pr-number>"`);
+  create if no hit, titled `[PR #<n>] <pr-title>`.
+- **Free-text / Slack / Confluence / transcript launches**: nothing to search
+  on; derive a short slug from the implementation brief's title and create
+  directly: `bd create --title "<slug>" --type task --priority 2
+  --description "Launch execution bead. Event log in notes."`.
 
 ```bash
 # For Jira-ticket launches: find or create a bead
@@ -253,7 +268,12 @@ fi
 # Claiming is optimistic locking (not a hard block) - last write wins in Dolt.
 # This check is the human safety gate before committing to a worktree.
 ASSIGNEE=$(bd show "$LAUNCH_BEAD_ID" --json 2>/dev/null | jq -r '.[] | .assignee // empty' | head -1)
-SELF=$(bd config get user.name 2>/dev/null || echo "")
+# Do NOT use `bd config get user.name` for identity: when the key is unset it
+# prints the literal "user.name (not set)" with exit 0, making SELF a garbage
+# non-empty string that never matches and fires a false conflict on every
+# cold-start resume of your own bead. Derive from the chain bd uses for --claim.
+SELF="${BEADS_ACTOR:-$(git config user.name 2>/dev/null)}"
+SELF="${SELF:-$USER}"  # mirror bd's full default chain: $BEADS_ACTOR, git user.name, $USER
 if [ -n "$ASSIGNEE" ] && [ "$ASSIGNEE" != "$SELF" ]; then
   # Another session holds this bead. Surface options before proceeding:
   # (1) Resume: check bd show $LAUNCH_BEAD_ID for launch_branch metadata
@@ -330,9 +350,9 @@ Compute resume target:
 - If latest is `gate round=N status=escalate-route`: Phase 4 already
   surfaced this; no resume action; user should run the
   SUGGESTED_NEXT_SKILL.
-- If latest is `tenth-man round=N status=*`: resume at gate round=N.
-  Load tenth-man payload from path if needed.
-- If latest is `synthesize round=N status=*`: resume at tenth-man round=N.
+- If latest is `skeptic round=N status=*`: resume at gate round=N.
+  Load skeptic payload from path if needed.
+- If latest is `synthesize round=N status=*`: resume at skeptic round=N.
 - If latest is `consult round=N status=done` and `challenge round=N
   status=done` both exist: resume at synthesize round=N.
 - If latest is `challenge round=N status=done` OR `consult round=N
@@ -349,6 +369,8 @@ loading the prior payload.
 
 ### Step 4: Execution Cold-Start (Phase 5+)
 
+#### Step 4a: Reconstruct Position
+
 Process `$EVENTS` in order to reconstruct orchestrator position:
 
 - **`LAST_COMPLETED_PHASE`**: highest `phase=X` value in `PHASE_GATE_PASSED` events
@@ -356,7 +378,7 @@ Process `$EVENTS` in order to reconstruct orchestrator position:
 - **`IN_FLIGHT_AGENTS`**: `AGENT_SPAWNED` entries with no matching `AGENT_COMPLETED` or `AGENT_FAILED` (same agent+phase+iteration)
 - **`FAILED_ITERATIONS`**: count of `AGENT_FAILED` entries per `(agent, phase)`
 
-### Step 3: Worktree Recovery
+#### Step 4b: Worktree Recovery
 
 ```bash
 BRANCH=$(bd show "$LAUNCH_BEAD_ID" --json | jq -r '.[] | .metadata.launch_branch // ""')
@@ -376,13 +398,13 @@ else
 fi
 ```
 
-### Step 4: Handle In-Flight Agents
+#### Step 4c: Handle In-Flight Agents
 
 For each agent in `IN_FLIGHT_AGENTS`, treat it as failed on its last iteration:
 - Increment `FAILED_ITERATIONS` for that `(agent, phase)` pair
 - It will be re-spawned by the retry loop with appropriate handoff context
 
-### Step 5: Resume Execution
+#### Step 4d: Resume Execution
 
 - Skip all phases where `PHASE_GATE_PASSED` exists
 - Skip all `(agent, phase)` pairs in `COMPLETED_AGENTS`

@@ -196,8 +196,14 @@ bd label add <id> <domain>      # qualifier, cqc-engine, infra, etc.
 # Add dependencies (if any)
 bd dep add <id> <depends-on-id>
 
-# Update with acceptance criteria and design notes
-bd update <id> --notes="Acceptance:\n- [ ] criterion 1\n- [ ] criterion 2\n\nDesign:\n<design notes>"
+# For child-of-epic wiring, use --parent (NOT bd dep add):
+bd update <child_id> --parent <parent_epic_id>
+
+# Update with acceptance criteria and design notes. Prefer the native flags:
+bd update <id> --acceptance "$(printf -- '- [ ] criterion 1\n- [ ] criterion 2')" --design "<design notes>"
+# If writing combined notes instead, pass REAL newlines via printf or $'...'
+# (inside plain double quotes, \n is a literal backslash-n; bd does not unescape):
+bd update <id> --notes "$(printf 'Acceptance:\n- [ ] criterion 1\n- [ ] criterion 2\n\nDesign:\n<design notes>')"
 
 # Append to chronological log if memory/decision/discovery/review (best-effort,
 # non-blocking; helper exits 0 even on failure).
@@ -209,6 +215,15 @@ for any bead where `bd show --json` fails. It produces one line per bead in
 `~/.claude/projects/-workspaces-main/memory/log.md` of the form
 `## [YYYY-MM-DD] <category> | <domain-csv> | bead <id> | <title>`. Bead
 creation must never be blocked by log issues.
+
+**Parent vs dep**: `bd dep add` is for blocks-relationships and rejects
+task-blocks-epic with "tasks can only block other tasks, not epics" (verified
+2026-05-22 on docr-7nrh child wiring). Child-of-epic relationships use the
+`--parent` flag on `bd update` instead. After setting `--parent`, the parent
+epic's `bd show` displays the child in its `CHILDREN` list and the child's
+`bd show` displays the parent in a `PARENT ↑` block. Do not silently treat
+failed `bd dep add <task> <epic>` as a working linkage; the audit-day
+correction on docr-7nrh / docr-dbk9 surfaced this exact failure mode.
 
 **Checkpoint summary format** (for agent-initiated checkpoints):
 

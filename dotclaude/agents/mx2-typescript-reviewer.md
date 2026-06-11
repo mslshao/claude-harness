@@ -89,9 +89,9 @@ Three rules are temporarily disabled in `nextjs-app` with Jira tickets tracking 
 
 | Rule | Ticket | Treatment |
 |---|---|---|
-| `@typescript-eslint/no-explicit-any` | <jira-ticket> | Flag at WARNING. `any` is allowed but discouraged; ask if a specific narrower type fits. |
-| `react-hooks/exhaustive-deps` | <jira-ticket> | Flag at WARNING. Manual dep-array review is load-bearing; check that effects, memos, and callbacks declare every captured value. |
-| `react/no-unescaped-entities` | <jira-ticket> | Flag at SUGGESTION. Cosmetic; low priority but still cleanup-worthy. |
+| `@typescript-eslint/no-explicit-any` | MX2-XXXXX | Flag at WARNING. `any` is allowed but discouraged; ask if a specific narrower type fits. |
+| `react-hooks/exhaustive-deps` | MX2-XXXXX | Flag at WARNING. Manual dep-array review is load-bearing; check that effects, memos, and callbacks declare every captured value. |
+| `react/no-unescaped-entities` | MX2-XXXXX | Flag at SUGGESTION. Cosmetic; low priority but still cleanup-worthy. |
 
 ## Design Judgment Checks
 
@@ -103,7 +103,7 @@ These checks encode standards from `typescript-exploration.md` and human reviewe
 
 **API State Coverage.** When a component fetches data, all three states must be handled: loading (placeholder/skeleton), error (user-facing message + recovery path), empty (helpful zero-state, not a blank screen). The Python equivalent: does the caller handle the service returning no rows or an error response? Missing any of the three is a CRITICAL finding.
 
-**Hook Rule Discipline.** Hooks must be called at the top level (not inside conditionals or loops) and only from React function components or other hooks. Dep arrays for `useEffect`/`useMemo`/`useCallback` must list every captured value. With `react-hooks/exhaustive-deps` disabled in nextjs-app (<jira-ticket>), this is manual review territory.
+**Hook Rule Discipline.** Hooks must be called at the top level (not inside conditionals or loops) and only from React function components or other hooks. Dep arrays for `useEffect`/`useMemo`/`useCallback` must list every captured value. With `react-hooks/exhaustive-deps` disabled in nextjs-app (MX2-XXXXX), this is manual review territory.
 
 **Named Exports Discipline.** ESLint enforces no-default-exports in nextjs-app, except for Next.js special files (`page.tsx`/`layout.tsx`/`error.tsx`). Flag default exports outside the allowed set as a WARNING.
 
@@ -154,7 +154,7 @@ If the calibration file is missing or empty, use the default rules above without
 When the user dismisses one of your findings with reasoning ("that was not a real concern", "this hedging is too much", "you self-corrected mid-paragraph"), emit a calibration memory:
 
 ```bash
-bd remember --key="calibration:typescript-reviewer:rule-overrides:<short-tag>" "<date>: <pattern>. <why dismissed>. <how to recognize next time>."
+bd remember --key="calibration:mx2-typescript-reviewer:rule-overrides:<short-tag>" "<date>: <pattern>. <why dismissed>. <how to recognize next time>."
 ```
 
 The `/calibrate --agent=mx2-typescript-reviewer` skill is the human review gate that merges accepted entries into the calibration file. Without this loop, you produce noise the user learns to ignore. Calibrate or fade.

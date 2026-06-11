@@ -163,6 +163,8 @@ These are all valid. They reflect that engineers arrive with different backgroun
 
 > **One caveat**: If your personal override produces output that fails the project's CI checks or violates `.claude/rules/`, the project wins. Personal preferences operate within the boundary of what the team has agreed to enforce.
 
+> **Auto Mode and the shared safety floor**: The `Autonomy and Confirmation` rules above are soft: Claude follows them, but they live in your personal file. If you enable Auto Mode (Claude Code runs tool calls, including shell commands, without you approving each one), that per-call confirmation goes away. For the destructive cases the repo backs you up with a committed hard guardrail: a `PreToolUse` hook at `.claude/hooks/block-destructive-commands.sh` that blocks the irreversible shell foot-guns the default Auto Mode classifier still permits inside the working directory, namely recursive force-deletes on broad targets (`/`, `~`, `..`, globs), force-pushes to `main` without `--force-with-lease`, hard `git reset`s, and destructive SQL (`DROP`/`TRUNCATE`). It ships with the checkout, so everyone who enables Auto Mode gets the same floor with zero setup. Treat it as a thin backstop on top of the tool's own classifier, not a sandbox: keep it in place (don't remove or loosen it without your lead's sign-off), and still run anything genuinely destructive yourself rather than through an auto-approved session.
+
 ---
 
 ## 5. The File Evolves

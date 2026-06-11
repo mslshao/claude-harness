@@ -1,0 +1,15 @@
+{
+  "purpose": "End-to-end loop closure fixture for /calibrate. See ~/.claude/skills/calibrate/SKILL.md Verification section for the test sequence.",
+  "fixture_entry": {
+    "key": "calibration:mx2-decision-maker:proceed-gate:fixture-test-do-not-merge",
+    "value": "FIXTURE: synthetic drift entry for end-to-end loop test. If this lands in the calibration file, the loop closes."
+  },
+  "expected_landing_section": "## Rule Overrides",
+  "expected_lookback_keys": [
+    "fixture-test-do-not-merge"
+  ],
+  "cleanup_protocol": [
+    "After test pass, manually remove the fixture line from ~/.claude/agents/calibration/decision-maker.md so it does not act as a real rule.",
+    "The lookback log entry for the fixture stays as evidence the loop closed once."
+  ]
+}

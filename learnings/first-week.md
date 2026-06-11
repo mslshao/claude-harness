@@ -6,7 +6,7 @@ A starting point for developers who haven't started yet.
 >
 > **Format**: Solo read, any pace. Each "Try This Today" callout is a 5-10 minute exercise on a real (low-stakes) task.
 > **Output**: One persistent-instruction rule, verified to change the AI's behavior in a fresh session.
-> **If you only have 5 minutes**: read §1 (the one insight nobody tells beginners) and skim §3 (your first rule).
+> **If you only have 5 minutes**: read §4 (the part nobody tells you) and skim §3 (your first rule).
 
 > **Already use AI tools daily?** The [parent page](./ai-coding-tools.md) is the better starting point.
 
@@ -22,7 +22,7 @@ One developer on our team reported: "I'm giving it very little specific directio
 
 This page gets you from zero to your first productive AI-assisted session. No installation guides, no feature tours, no tool-specific instructions. Just three things to try, one habit to build, and the one insight about AI tools that nobody tells beginners.
 
-> 💡 **Try This Today**: Open any AI tool you have access to (ChatGPT, Copilot Chat, Cursor, Claude). Pick a file you're working on right now. Paste it and ask: "What does this code do? Walk me through the logic step by step." Don't ask it to change anything. Just see how well it explains code you already understand. That calibration (seeing where it's right and where it's wrong on code you know) is the foundation for everything else.
+> 💡 **Try This Today**: Open any AI tool you have access to (ChatGPT, Copilot Chat, Cursor, Claude). Pick a file you're working on right now. Paste it and ask: "What does this code do? Walk me through the logic step by step." Don't ask it to change anything. Just see how well it explains code you already understand. That calibration (seeing where it's right and where it's wrong on code you know) is the foundation for everything else. One guardrail before you paste anything: use a company-approved tool and your company account, and never paste client or sensitive data into a personal account. Even approved AI surfaces are generally fine for code and general work text but are not compliance-covered environments, so regulated data (PII, PHI, privileged client material) never goes in.
 
 ---
 
@@ -76,12 +76,12 @@ Examples:
 
 * "We use pytest, not unittest. Do not generate unittest code."
 * "Our line length limit is 100 characters. Do not exceed it."
-* "We use 2-space indentation, not 4-space."
+* "Never log full request or response bodies; log IDs and status codes only."
 * "Do not add `# type: ignore` without a specific error code and justification."
 
 Put it wherever your tool reads persistent instructions. If you're not sure where that is, just paste the rule at the top of your next conversation. It works either way.
 
-**The verification**: Start a new conversation, trigger the same scenario that produced the wrong output. Did the rule fix it? If yes, you've just configured your AI. If not, the rule needs to be more specific (you'll get better at this with practice).
+**The verification**: Start a new conversation, trigger the same scenario that produced the wrong output. If you pasted the rule at the top of your last conversation instead of saving it to a file, paste it again at the top of the new conversation; a persistent file is what removes that step. Did the rule fix it? If yes, you've just configured your AI. If not, the rule needs to be more specific (you'll get better at this with practice).
 
 > 💡 **Try This Today**: Write one rule. One sentence. Put it wherever your tool reads persistent instructions (or paste it at the start of your next session). Verify it works. Congratulations: you are now configuring your AI, not just using it.
 
@@ -134,6 +134,6 @@ You've done your first AI-assisted task and written your first rule. Here are th
 * **Ready for the next level?** [AI Coding Tools (parent page)](./ai-coding-tools.md) is the next read after a few productive sessions. Trust calibration, six failure patterns, the 5-question filter, two-mode review.
 * **Your AI keeps forgetting?** [Teaching AI to Remember](./teaching-ai-to-remember.md). What to persist, rules files across tools, progressive disclosure.
 * **Stuck on a bug?** [AI-Assisted Debugging](./ai-assisted-debugging.md). Investigation mode, the circuit breaker, verification discipline.
-* **Ready to extend Claude with reusable workflows?** [Build Your First Skill or Command](./build-first-skill.md). The entry point for writing your own.
+* **Ready to extend Claude with reusable workflows?** [Build Your First Skill or Command](./build-first-skill.md). The entry point for writing your own. This track uses Claude Code (the developer terminal tool), so you'll want it installed before you start.
 
 The common thread across every page: AI tools are powerful when directed, and unreliable when given open-ended authority. In every domain (coding, reviewing, debugging, configuring, building), the difference between useful and useless is how specific your direction is. That's not a limitation. That's the skill.

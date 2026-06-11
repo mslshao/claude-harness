@@ -57,9 +57,21 @@ ls -1 ~/.claude/scratch/system-prompt-snapshots/*.md 2>/dev/null | sort -V | tai
 
 If no prior snapshot exists, this is the seed capture; skip the diff step at the end.
 
+**Model-variant rule (added 2026-06-11):** prompt shape is MODEL-conditional, not just
+version-conditional (verified: 2.1.170 ships a different prompt under Fable 5 vs Opus
+4.8 on the same build). When model-variant snapshots exist for the version, diff
+against the most recent prior snapshot OF THE SAME MODEL; a cross-model diff compares
+restructurings, not version drift. Comparing across models is a deliberate, separate
+analysis (see `2.1.170-fable5-2026-06-11.md` for the reference cross-model drift table).
+
 ### Step 3: Determine output path
 
-Output path: `~/.claude/scratch/system-prompt-snapshots/<version>-<YYYY-MM-DD>.md`.
+Output path: `~/.claude/scratch/system-prompt-snapshots/<version>-<YYYY-MM-DD>.md`
+when the session's main-loop model matches the most recent snapshot for this version.
+When it does NOT (a model variant on the same build), insert the model slug:
+`<version>-<model-slug>-<YYYY-MM-DD>.md` (e.g., `2.1.170-fable5-2026-06-11.md`).
+The unsuffixed name implicitly means Opus-era main loop for snapshots before
+2026-06-11; the header's "Captured by" line is authoritative.
 
 If a file with that exact name already exists (same version captured today), append
 `-N` suffix starting at `-2` (so `2.1.117-2026-05-05.md`, then `2.1.117-2026-05-05-2.md`,
@@ -67,7 +79,16 @@ etc.). Do not overwrite a same-day capture; treat as a separate observation.
 
 ### Step 4: Capture behavioral sections verbatim
 
-Read the current session's system prompt and extract these sections **verbatim**:
+Read the current session's system prompt and capture **every behavioral / instructional
+section present in THIS version, verbatim**. Do NOT treat the list below as a fixed
+contract: the prompt structure changes across versions (the Opus 4.8 condensation,
+v2.1.162, collapsed four discrete sections into a terse `# Harness` block plus inline
+paragraphs). If the prompt has been restructured, capture the new sections under their
+actual headings and map old->new in the Step 7 drift table; if a previously-captured
+section is gone, record its disappearance as drift rather than silently omitting it.
+
+The 4.7-era reference structure (present through v2.1.153, partially or wholly dropped
+in 4.8) was:
 
 - `# Doing tasks` (the load-bearing behavioral list)
 - `# Executing actions with care` (destructive ops, blast radius, confirmation)
@@ -75,6 +96,16 @@ Read the current session's system prompt and extract these sections **verbatim**
 - `# Tone and style` (style and voice defaults)
 - `# Text output (does not apply to tool calls)` (narration discipline)
 - `# Context management` (operational note about context compression)
+
+Under 4.8 the behavioral content lives in `# Harness`, an inline executing-with-care
+paragraph (no heading), and `# Context management`; capture whatever is actually there.
+Note: this version-agnostic capture matters beyond Opus, and the fleet is now MIXED
+(verified 2026-06-11): IDE/Claude Code windows run Opus 4.8 (org ZDR blocks Fable 5
+there pending 30-day retention; see `memory/model-selection.md`), while CLI sessions
+may run Fable 5, whose prompt restructures the behavioral sections (new
+`# Communicating with the user` with restored comment discipline, expanded
+`# Context management`; see `2.1.170-fable5-2026-06-11.md`). Capture whatever the
+live session actually carries and name the file per the Step 3 model-variant rule.
 
 **Skip** these sections (they are environment-conditional, not version-driven):
 - `# System` (tool-mechanics; per-tool, low behavioral drift)

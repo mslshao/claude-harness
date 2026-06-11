@@ -40,6 +40,23 @@ When promoting a personal-tier agent or skill that should also exist at project 
 
 Before merging any personal-to-project promotion PR, audit the new project-tier file for references to agents that exist only at personal tier; replace with role-neutral phrasings ("out of scope", "route to <project-tier-agent>") rather than introducing broken references.
 
+## The model-tier gate (empirically validated)
+
+Each agent is pinned to a model tier by a deterministic gate, not by feel:
+
+- **Haiku** iff the work is a bounded transform or extraction, the hard parts are pinned by deterministic contracts, blast radius is low, and there is no flag-vs-route or attribution judgment.
+- **Opus** iff the work is multi-source synthesis across conflicting inputs, OR a high-blast autonomous gate.
+- **Sonnet** otherwise.
+
+Corollary: a stronger model does not move tiers. Judgment-vs-mechanical and blast-radius are model-independent axes; upgrading the model does not turn a judgment task into a mechanical one.
+
+A 27-agent audit applied this gate and returned zero tier changes. The two most-mechanical-looking Sonnet agents (a provenance-classifier and a pydantic-settings reviewer) were kept on Sonnet via an untested prediction: "Haiku would miscalibrate." That prediction was then probed empirically (bead docr-k0g4), running worry-case inputs through Haiku-4.5 vs Sonnet-4.6:
+
+- Provenance-classifier: 5/6 parity, but diverged on the safe-asymmetry default (Haiku was wrong AND overconfident).
+- Pydantic-settings reviewer: 4/5 parity, but Haiku false-positived on a correctly-required no-default field.
+
+Verdict: keep both on Sonnet, now evidence-backed rather than asserted. See `evidence/2026-06-04-agent-tier-eval.md`.
+
 ## Why this exists
 
 The two-tier model decouples personal experimentation from team adoption. Personal tier lets the author iterate freely without team-review smoothing. Project tier propagates proven patterns to the team without forcing the author to suspend iteration during promotion review.

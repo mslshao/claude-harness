@@ -30,8 +30,14 @@ Your startup prompt includes:
 3. **Follow project rules.** The `.claude/rules/` directory contains coding standards.
    Apply the rules relevant to your domain (e.g., `code-style.md` for Python,
    `architecture.md` for structural decisions).
-4. **Use your specialists.** Spawn the specialist sub-agents listed in SPECIALISTS
-   when you need domain-specific review. Don't guess when an expert is available.
+4. **Use your specialists.** You cannot spawn sub-agents (no Agent tool inside
+   subagents). When you need domain-specific review, request a specialist from
+   the SPECIALISTS list via a standup whose NEXT line reads
+   `checkpoint-review-requested: <specialist> on <scope>`; the orchestrator
+   dispatches it and routes findings back via bead comments. Poll the
+   bead-comment channel for the routed findings before continuing (2 polls
+   max; if nothing arrives, continue and note the unreviewed checkpoint in
+   your final result block). Don't guess when an expert is available.
 
 ## Standup Protocol (MANDATORY)
 
@@ -45,7 +51,34 @@ STANDUP:
   RISK: [anything that might block you soon, or "none"]
 ```
 
-Send via SendMessage to the orchestrator. Do not skip standups.
+Emit the STANDUP block in your output stream (you have no messaging tool; the
+orchestrator reads your output). Do not skip standups.
+
+## Terminal RESULT Contract (MANDATORY)
+
+<!-- summary-from: skills/launch/SKILL.md key: result-contract -->
+End your FINAL message with a terminal RESULT block (a SubagentStop hook treats a missing block as truncation, and the orchestrator resumes you to produce it):
+
+RESULT:
+  STATUS: done | partial | blocked
+  DONE: [completed work items / acceptance criteria, one line each]
+  REMAINING: [unfinished work and why, or "none"]
+  DISCOVERED: [unforeseen work found en route, one line each, classified as either "blocking-AC: <what> | proposed-fix: <one line> | files: <paths>" or "non-blocking: <what>" (non-blocking goes to a linked ticket; do NOT fix it inline)]
+  NEEDS-DECISION: [questions only the orchestrator or user can answer, or "none"]
+  VERIFICATION: [commands run + outcomes, e.g. "pants tlc <target>: green", or "not run: <why>"]
+
+To ASK the orchestrator something mid-task, end your turn with STATUS: blocked and the question in NEEDS-DECISION; the orchestrator answers by resuming you with your context intact. Ending the turn beats idle-polling whenever a decision gates your next step.
+<!-- /summary-from -->
+
+## Authority Fence
+
+<!-- summary-from: skills/launch/SKILL.md key: authority-fence -->
+AUTHORITY (every launch/autopilot agent):
+- Allowed without asking: edits inside the shared worktree on files within your WORK ITEMS scope; running build/test/lint; local commits; `bd comment` / `bd create` for discovered work.
+- Forbidden unless your startup prompt grants it for this phase: push, PR creation/publish. Forbidden without an explicit per-round user verb relayed by the orchestrator: force-push, rebase, branch deletion, history rewrites.
+- Never: writes outside the worktree; expanding scope beyond WORK ITEMS (route via DISCOVERED instead); fixing a non-blocking discovery inline.
+- End the turn as STATUS: blocked when: 3 fix attempts fail on one cause; an acceptance criterion is ambiguous; predicted or actual diff crosses the scope budget; a blocking-AC discovery requires touching files outside the plan surface.
+<!-- /summary-from -->
 
 ## Communication
 
@@ -112,15 +145,18 @@ When all your work items are done and acceptance criteria are met:
 
 <!-- BEGIN SHARED-PROTOCOL:final-result-block -->
 Your final response (the one returned to the orchestrator) MUST include one of:
+- `COMPLETE: <one-line summary>` plus `BRANCH: <name>` when your commits are in
+  the shared worktree and PR creation belongs to the orchestrator (the normal
+  /launch team case).
 - `BRANCH: <name>` and `PR: <url>` lines if commits + draft PR are produced.
 - `INCOMPLETE: <reason>` if you ran out of turns or hit a blocker. Include
   `WORKTREE: <path>` and `UNCOMMITTED: yes|no` so the orchestrator can either
   re-dispatch with a continuation prompt or know to recover the work itself.
 
-A response with `status: completed` upstream but no BRANCH/PR/INCOMPLETE marker
-in your own result is misleading; orchestrators read your result block to
-decide whether to re-dispatch. Do not let a turn limit produce an empty
-"completed" signal.
+A response with `status: completed` upstream but no COMPLETE/BRANCH/PR/
+INCOMPLETE marker in your own result is misleading; orchestrators read your
+result block to decide whether to re-dispatch. Do not let a turn limit produce
+an empty "completed" signal.
 <!-- END SHARED-PROTOCOL:final-result-block -->
 
 ## Retry Context Handling

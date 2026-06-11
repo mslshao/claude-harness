@@ -25,14 +25,23 @@ Use the domain from the memory key to identify the target file:
 | Domain | Target |
 |--------|--------|
 | `testing` | `.claude/rules/testing.md` |
-| `style` | `.claude/rules/code-style.md` |
+| `style` (Python/code style) | `.claude/rules/code-style.md` |
+| `style` (prose/register: em-dash, catastrophizing, http-verb-caution, mirrored informality, output length) | `~/.claude/CLAUDE.md` Writing Style |
 | `architecture` | `.claude/rules/architecture.md` |
 | `security` | `.claude/rules/security.md` |
 | `debugging` | `.claude/rules/debugging.md` |
-| `verification` | `.claude/rules/verification.md` |
+| `verification` | `~/.claude/CLAUDE.md` Decision-Making (verification rules live there; `.claude/rules/verification.md` only for project-wide gate changes) |
 | `workflow` | `~/.claude/CLAUDE.md` |
+| `communication` | `~/.claude/CLAUDE.md` (Writing Style or Response Behavior, nearest section) |
+| `identity` | `~/.claude/CLAUDE.md` Writing Style |
+| `scope` | `~/.claude/CLAUDE.md` Prompt Interpretation |
 | `skill:<name>` | `~/.claude/skills/<name>/SKILL.md` |
 | `agent:<name>` | `~/.claude/agents/<name>.md` |
+| (domain not in table) | `~/.claude/CLAUDE.md`, matching the nearest existing section |
+
+The style split matters: prose-register corrections (the most common kind)
+must NOT land in the Python style file. Decide by what the correction is
+about, not by the literal domain tag.
 
 ### 2. Read
 

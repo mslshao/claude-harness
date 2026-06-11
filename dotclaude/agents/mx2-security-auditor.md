@@ -1,6 +1,7 @@
 ---
 name: mx2-security-auditor
 description: >
+  (personal; shadows the project-tier `mx2-security-auditor` and takes precedence; capability-equivalent today, routes to the personal mx2-* specialist roster; the lab copy evolves first)
   Security audit for MX2 legal document processing. Focused on PII/PHI
   exposure (field types, log calls, LLM data flows) and HIPAA audit trail
   field completeness. Does NOT detect missing audit log calls (that is

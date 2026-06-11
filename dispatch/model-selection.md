@@ -24,6 +24,12 @@ Net cost is lower than pure-strong-model, with strong-model-quality outcomes.
 
 When unsure: stay on the strong model. The asymmetry (wrong-Sonnet-call means wasted work plus a strong-model rescue) makes strong-model the correct default.
 
+## Surface-map nuance: a newer generation is not an ambient default
+
+A newer model generation (Fable-class) can be available in some surfaces (CLI, web) but blocked in others. In this setup it is blocked in the IDE/editor surface because that model's terms require data retention while the org runs zero-data-retention (ZDR); the strong default model carries no such requirement. So where the newer model is allowed, it is an explicit per-session opt-in, not something the harness reaches for automatically.
+
+Keep the strong model as the deliberate default. The portable lesson: model availability is surface-conditional and policy-conditional, not just capability-conditional. "Newer and more capable" does not make a model the right default if the surface you are in cannot run it under your org's data policy. Confirm the surface and the policy before reaching for a newer generation.
+
 ## When the smaller model alone is fine (Sonnet mode)
 
 When the harness is started in explicit Sonnet mode for an extended session of bounded work:

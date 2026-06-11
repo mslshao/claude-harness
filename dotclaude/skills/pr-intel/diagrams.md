@@ -1,8 +1,8 @@
 # Sequence Diagrams
 
 Auto-renders a Mermaid sequence diagram in `/pr-intel` briefings for M+ PRs touching
-2+ services. Targets the reviewer audience that skims PRs across services (senior
-engineers); a diagram carries more signal than another bullet of prose about call-path
+2+ services. Targets the reviewer audience that skims PRs across services (a teammate, a lead,
+a reviewer); a diagram carries more signal than another bullet of prose about call-path
 changes.
 
 Status: experimental enhancement, personal-tier first per lab-to-production rule.

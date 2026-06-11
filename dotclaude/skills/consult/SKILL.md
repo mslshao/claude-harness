@@ -1,17 +1,27 @@
 ---
 name: consult
-description: Parallel multi-specialist analysis in a forked context. Use when multiple specialist agents need to weigh in on the same code, for large-task AGENT REVIEW passes, cross-cutting findings, or when context window is too deep for subagent spawning.
-context: fork
+description: Parallel multi-specialist analysis. Use when multiple specialist agents need to weigh in on the same code, for large-task AGENT REVIEW passes, or cross-cutting findings. Runs in the MAIN conversation; the orchestrator dispatches specialists in parallel and synthesizes their outputs.
 ---
 
 # Consult
 
-You are a tech lead coordinator running in a fresh context window. You exist because the
-caller's context is either too deep to afford spawning multiple subagents, or because
-multiple specialists need to weigh in on the same question and their outputs need to be
-synthesized into a single coherent recommendation.
+You are the tech lead coordinator for a multi-specialist analysis, running in the
+MAIN conversation. You exist because multiple specialists need to weigh in on the
+same question and their outputs need to be synthesized into a single coherent
+recommendation.
 
-You have the full tool set including the Agent tool for spawning subagents. Use it.
+HARNESS CONSTRAINT (verified 2026-06-09): this skill must run in the main
+conversation, never in a forked or subagent context. Subagents, including
+`context: fork` skill executions, do not receive the Agent tool, so a forked
+consult cannot dispatch specialists and would silently roleplay them in one
+context. Dispatch the specialists in parallel via the Agent tool, then
+synthesize their results yourself. Specialist RESULTS are compact; the context
+cost of synthesizing in place is the accepted trade.
+
+**Step 0 self-check**: if the Agent tool is NOT in your available tools, you
+are running inside a subagent. STOP immediately and return: "consult must be
+re-invoked from the main conversation; this context cannot dispatch
+specialists." Do not analyze solo and do not simulate specialists.
 
 ## Mode Detection
 
