@@ -55,6 +55,18 @@ comment signals reviewer-added-value to the author.
 Every bot inline comment fetched during Data Gathering falls into ONE of
 these categories. Apply in order; first match wins.
 
+**Precondition (resolved/moot gate).** Before classifying, check whether the
+finding still applies to the current HEAD. A comment that was correct WHEN
+POSTED but is now moot (addressed by a subsequent commit, or whose stated
+failure mode no longer holds on the current diff) is NOT a category-1 `+1`:
+it gets NO reaction and is noted in Open Threads as resolved. Reactions
+signal finding accuracy on the CURRENT diff, so a comment with no current
+synthesizer overlap has nothing to react to, even when the original catch
+was valid; the author's own fix is the acknowledgment, not a `+1`. Slip this
+prevents: PR #10049 (2026-06-22), where Copilot's `commit_id`-missing comment
+was correct on commit 1, fixed on commit 2, and still drew an unplanned `+1`
+that had to be removed at post time.
+
 | # | Bot finding | Reviewer's position | Reaction | Comment |
 |---|---|---|---|---|
 | 1 | Correct, material, no further context | I agree, nothing to add | `+1` | None |
@@ -170,7 +182,7 @@ match this phase's name).
 
 ## Recurrence Context
 
-- `bd memories feedback:bot-comment-reaction-the engineering lead-2026-05-20`: a reviewer's
+- `bd memories feedback:bot-comment-reaction-the engineering lead-2026-05-20`: the engineering lead's
   original "thumbs-up instead of repeating" feedback
 - `bd memories calibration:mx2-decision-maker:ideation:pr-intel-cross-cutting`:
   the /ideate gate that ESCALATE-ROUTE'd to instrumentation-first

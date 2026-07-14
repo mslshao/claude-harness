@@ -91,8 +91,11 @@ Trigger: `structural_risk_size: true` (M+ PR: > 200 lines OR > 5 files). Surface
 
 Different from `bot-review` (cross-file consumer-invariant articulation; both are advisory but skeptic asks "what did you not consider" while bot-review asks "what does X consumer assume that breaks"). Different from `mx2-code-reviewer` (structural verdicts) and `mx2-silent-failure-hunter` (error-propagation verdicts) which produce judgments rather than questions.
 
+**Module cohesion & coupling** → `module-cohesion-reviewer`
+Trigger: `has_python_module_change: true` (subject to the standard M+ specialist size gate; not dispatched on XS/S). Cross-file cohesion and coupling lens: which concern a module owns, name-vs-contents, production vs test-only helper separation, a hand-rolled query duplicating a typed accessor a shared module already exposes, cross-service reach-in past a published boundary, and dependency-direction violations. Resolves to the personal-tier variant (shadows the project agent), whose seam defers to the other specialists in this roster by name. Advisory only; every finding is an author-facing question, severity vocabulary limited to QUESTION/SUGGESTION/COMMENT (never BLOCKING/CRITICAL). Different from `mx2-code-reviewer` (within-file SRP), `bot-review` (consumer-invariant blast-radius across call sites), and `mx2-pydantic-reviewer` (Settings patterns): this agent owns the module-and-import-graph layer those do not. If skipped, note "module-cohesion-reviewer: skipped (no Python module changes)" in the output header.
+
 **Inline IaC analysis** → `checkov` (tool call, not subagent)
-Trigger: `has_terraform: true` AND at least one net-new `*.tf` file exists.
+Trigger: `has_terraform: true` AND (at least one net-new `*.tf` file exists OR `has_new_tf_resource`: a modified `.tf` added a `resource`/`module`/`data` block). The range-overlap filter (checkov.md) scopes modified-file findings to the added block, so pre-existing resources are not re-flagged.
 Fires on ALL sizes (including XS), unlike specialist dispatch. It's a bounded tool
 call (5-10s per file), so the cost-vs-signal ratio works even on small PRs.
 Runs alongside the specialist agents (same parallel batch). See [checkov.md](checkov.md)
@@ -117,6 +120,7 @@ Do NOT send the full diff to every specialist. Filter by relevance:
 - **bot-review**: changed public-symbol declarations only (lines matching the `changes_public_surface` regex from `SKILL.md` Dispatch Signals) PLUS the full file path list. Mirrors `mx2-pr-precedent`'s "file path list only" filter shape, NOT the full diff. The agent fetches consumers itself via Grep/Read on the worktree; sending the full diff saturates context on the M+ PRs the agent is most useful for.
 - **mx2-skeptic**: PR description + file path list + summarized diff overview (first 50 lines of each file's diff). The agent asks questions about intent and assumptions; it does not need exhaustive code context. Sending the full diff saturates without improving question quality. Include the Jira ticket AC if available.
 - **mx2-pydantic-reviewer**: only files matching the pydantic_settings sub-rules above (Settings class diffs, os.environ patterns, *settings* / *config* filename diffs) PLUS sibling settings files in the same service directory (to detect duplicate field declarations or cross-service `AppSettings` import attempts).
+- **module-cohesion-reviewer**: changed implementation `.py` files (non-test) PLUS the full file path list of the changeset. The agent reads whole modules and greps the worktree itself to confirm cohesion and duplication, so it needs the path map more than the full diff. Exclude test-only files unless production/test-only mixing is the concern.
 
 ## Specialist Prompt Preamble
 
@@ -182,7 +186,7 @@ Return findings in structured FINDING format with evidence categories.
 Use Grep/Read to verify structural claims against the full file, not just
 the diff hunk. Focus on production impact and maintenance risk.
 
-Surface findings in a reviewer's priority order (Code Review Guide for Humans,
+Surface findings in the engineering lead's priority order (Code Review Guide for Humans,
 https://<company>.atlassian.net/wiki/spaces/PPET/pages/5684789249):
 1. Description / intent (already checked at Phase 0; surface only if you see
    intent drift between description and diff)
@@ -498,6 +502,47 @@ PR overview (summarized diff):
 <first 50 lines of each file's diff>
 ```
 
+
+### module-cohesion-reviewer
+```
+<scope preamble>
+
+Review PR #<number> for cross-file module cohesion and coupling. You judge the
+module-and-import-graph layer, NOT within-file structure. Emit author-facing
+questions, never verdicts.
+
+Yours: which concern a module owns, name-vs-contents, catch-all modules, production
+and test-only helpers sharing an import graph, a hand-rolled query duplicating a typed
+accessor a shared module already exposes, cross-service reach-in past a published
+boundary, dependency-direction violations.
+
+Not yours (other specialists in this run own them; do not restate): within-file SRP
+and call-site readability (`mx2-code-reviewer`), Settings and config
+(`mx2-pydantic-reviewer`), PII and secrets (`mx2-security-auditor`), test
+meaningfulness (`test-quality-reviewer`), error propagation
+(`mx2-silent-failure-hunter`), consumer-invariant blast-radius (`bot-review`).
+Anything a single-file linter (Sonar, Copilot, pylint, mypy) catches is not yours.
+
+Verify before asking: read the full module, grep for the accessor you claim is
+duplicated, read the import you claim reaches across a boundary. A question you could
+answer by reading is one you should have answered.
+
+Constraints:
+- Severity vocabulary: QUESTION, SUGGESTION, COMMENT only. Never BLOCKING/CRITICAL.
+- Each finding cites the rule it rests on (code-style Naming & Organization,
+  `exemplars.md`, or `architecture.md`) and what you read or grepped.
+- Do NOT repeat findings from the specialists above or from existing PR comments
+  (provided below for dedup). If your finding is a sharper version of one of theirs,
+  drop it.
+
+Existing specialist findings and PR comments (for dedup):
+<list of findings from prior specialists in this pr-intel run + PR comments>
+
+PR context: <body>
+
+Files changed (filtered to implementation .py) + full path list:
+<filtered diff + path map>
+```
 
 ## Structured Finding Format
 

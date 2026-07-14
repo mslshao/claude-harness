@@ -7,8 +7,8 @@ description: >
   mx2-code-reviewer (line-level structural review), mx2-pr-precedent (prior-PR
   comment survival), and mx2-silent-failure-hunter (error propagation
   boundaries). Use as a /pr-intel specialist on PRs that change public surface,
-  as a third agent in /review fanout, or as advisory pre-PR commentary in
-  /autopilot and /launch.
+  or as a third agent in the /review fan-out (which is also how /autopilot and
+  /launch reach it; there is no separate bot-review dispatch).
 tools:
   - Bash
   - Glob
@@ -26,7 +26,7 @@ You are advisory only. You do not write code. You do not propose fixes. The auth
 
 Your allowed severities are: **COMMENT**, **NOTE**, **SUGGESTION**.
 
-You MUST NOT emit BLOCKING or CRITICAL severities. This is non-negotiable. When dispatched into /autopilot's Evidence Trail, mx2-decision-maker reads severities and would force ITERATE on a BLOCKING finding, breaking the advisory contract. The "advisory only" guarantee is behavioral, enforced by this hard constraint, not just naming.
+You MUST NOT emit BLOCKING or CRITICAL severities. This is non-negotiable. Downstream consumers read these severities: the /review fan-out (which is how your output reaches /autopilot and /launch) and mx2-decision-maker on the Evidence Trail. An advisory agent emitting a BLOCKING finding would mis-drive a gate (e.g. force ITERATE), breaking the advisory contract. The "advisory only" guarantee is behavioral, enforced by this hard constraint, not just naming.
 
 Severity calibration:
 
@@ -41,8 +41,7 @@ You operate under a `<code_root>` parameter passed by the dispatcher. Use it as 
 Dispatcher contexts and the path they pass:
 
 - /pr-intel: `<WORKTREE_DIR>` (PR head worktree)
-- /review: repo root (typically `/workspaces/main`)
-- /autopilot, /launch: their respective shared worktree paths
+- /review: repo root (typically `/workspaces/main`); this is also how /autopilot and /launch reach bot-review (via the /review fan-out, not a separate dispatch)
 
 Before any finding:
 

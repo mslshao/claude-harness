@@ -2,7 +2,7 @@
 name: pr-intel
 description: Actionable PR intelligence briefing with specialist-backed analysis and draft review comments ready to post. Use when the user asks to review a PR in any phrasing - "review a PR", "analyze PR", "PR intel", "look at PR #123", "check this PR", "thoughts on #456", "can you go through this PR" - or needs a structured briefing before reviewing. Also triggers for self-review with --mine flag when user says "review my PR", "check my changes before I submit".
 argument-hint: "[pr-number] [--mine] [--quick] [--once] [free-text review context]"
-allowed-tools: ["Bash", "Glob", "Grep", "Read", "Agent", "WebFetch", "ScheduleWakeup", "Skill"]
+allowed-tools: ["Bash", "Glob", "Grep", "Read", "Agent", "WebFetch", "Skill"]
 ---
 
 # PR Intel
@@ -18,9 +18,9 @@ Raw invocation: `/pr-intel $ARGUMENTS`
 Parse the raw invocation above to extract:
 1. **PR number**: first numeric token (e.g., `7640`), or a GitHub PR URL
 2. **Mode flags**:
-   - **neither (default)**: full analysis AND the multi-phase `@claude` verify loop (see [verify-loop.md](verify-loop.md)). After producing the briefing, default mode posts the bot-invoked `@claude` questions (with your OK), waits for the GitHub `@claude` bot, reconciles its answer against the local findings, and recommends a verdict. The loop engages only when synthesis produced at least one `@claude` question; with none, it degrades to a one-shot briefing.
-   - **`--once`**: one-shot. Full analysis and briefing (drafting any `@claude` questions) but NO post-and-wait loop. This is the pre-2026-05-29 default; use it to get the briefing now without waiting on the bot, or when you will handle verification yourself.
-   - **`--mine`** (self-review): one-shot, unchanged. No verify loop and no `@claude` bot-routing; an unverified falsifiable claim surfaces as a pre-submission item to check, not an `@claude` question.
+   - **neither (default)**: full analysis, one-shot briefing. The dead multi-phase `@claude` verify loop is retired (PR #9888 removed the self-hosted bot). An unverified falsifiable or cross-system assertion is contained as an UNVERIFIED-ASSERTION finding (synthesis.md "Unverified-Assertion Containment + Cross-System Investigation"), never a posted bot question.
+   - **`--once`**: identical to default (both are one-shot now). Retained as an explicit alias for callers that previously used it to opt out of the post-and-wait loop.
+   - **`--mine`** (self-review): one-shot. An unverified falsifiable or cross-system claim surfaces as a pre-submission item to check (Verdict "Needs work first"), not a bot question.
    - **`--quick`** (triage only): one-shot, no specialist dispatch, no loop.
 3. **Reviewer context**: everything else is free-text instructions from the reviewer.
    Use this to steer your analysis focus, specialist prompts, and output framing.
@@ -42,12 +42,26 @@ This SKILL.md is always read in full. Sub-files load per the table; skipping a "
 |---|---|---|
 | every run | [output-formats.md](output-formats.md) (the output contract; never skippable, any mode, any size) | |
 | `--quick` | nothing further | all other sub-files |
-| default / `--once` / `--mine`, XS-S | [prior-reviews.md](prior-reviews.md) (if prior rounds exist), [compliance-checks.md](compliance-checks.md) (if Jira ticket or CI failures), [provenance-classification.md](provenance-classification.md), [bot-reactions.md](bot-reactions.md) (default mode only) | [dispatch.md](dispatch.md) (no specialist dispatch at XS/S), [synthesis.md](synthesis.md), [verification.md](verification.md), [diagrams.md](diagrams.md) |
+| default / `--once` / `--mine`, XS-S | [prior-reviews.md](prior-reviews.md) (if prior rounds exist), [compliance-checks.md](compliance-checks.md) (if Jira ticket or CI failures), [provenance-classification.md](provenance-classification.md), [bot-reactions.md](bot-reactions.md) (default mode only) | [dispatch.md](dispatch.md) (no specialist dispatch at XS/S, EXCEPT `has_terraform` with a net-new `.tf` OR `has_new_tf_resource` (a modified `.tf` that adds a `resource`/`module`/`data` block): dispatch `mx2-devops-build-deploy` even at XS/S, since IaC blast radius is decoupled from line count AND from whether the file is net-new; mirrors the Checkov net-new-tf-or-new-resource trigger and the size-independent `changes_public_surface` rule), [synthesis.md](synthesis.md), [verification.md](verification.md), [diagrams.md](diagrams.md) |
 | default / `--once` / `--mine`, M+ | all of the above plus [dispatch.md](dispatch.md), [dispatch-mechanics.md](dispatch-mechanics.md), [synthesis.md](synthesis.md), [static-analyzers.md](static-analyzers.md) | [verification.md](verification.md) at M when no BLOCKING-class findings |
 | L+ | plus [verification.md](verification.md) | |
-| trigger-conditional, any size | [checkov.md](checkov.md) (`has_terraform` + net-new tf), [diagrams.md](diagrams.md) (M+ AND `multi_service`), [design-doc.md](design-doc.md) (Confluence link in body), [context.md](context.md) (migration/series triggers), [verify-loop.md](verify-loop.md) (default mode, >=1 `@claude` question), [freshness.md](freshness.md) / [grounding.md](grounding.md) when those checks need their exact commands | |
+| trigger-conditional, any size | [checkov.md](checkov.md) (`has_terraform` + net-new tf), [diagrams.md](diagrams.md) (M+ AND `multi_service`), [design-doc.md](design-doc.md) (Confluence link in body), [context.md](context.md) (migration/series triggers), [freshness.md](freshness.md) / [grounding.md](grounding.md) when those checks need their exact commands | |
 
 The Stop-hook backstop (`stop-validate-pr-intel.sh`) still validates every render, so a misjudged reading path degrades to a caught retry, not a silent miss. Mandatory PHASES (provenance classification, bot reactions) are unaffected by reading paths; only reference depth varies.
+
+**Flagging an unverifiable cross-system or repo-HEAD claim is a first-class outcome of
+the initial pass, not a fallback.** Neither PR size nor "I found no specific unverified
+claim" gates it. When a finding's verdict would rest on a falsifiable cross-system or
+repo-wide-state assertion you have not actually traced (a mirror-table column existing,
+"all callers migrated", a stated end-to-end effect such as "returns 404", a frozen or
+high-blast-radius module touch per architecture.md), do NOT state it as a confident
+verdict: run the local investigation (synthesis.md Cross-System Investigation for the
+mirror-column class) and surface an UNVERIFIED-ASSERTION finding if it does not resolve.
+Surface it during the original synthesis, including at XS-S where dispatch and
+synthesis.md are otherwise skipped, so the verdict reflects the honest result. Default
+toward investigating when in doubt; an XS prefix lowers neither the investigation bar nor
+the verification bar. The dead @claude-bot question is retired; `@claude review once`
+(managed Code Review) is the manual out-of-band escalation for inconclusive cases.
 
 ## Data Gathering
 
@@ -194,9 +208,10 @@ After Jira hydration, run three context-gathering checks before specialist dispa
    classify new exports as referenced or unreferenced across the series.
 2. **Service Context**: scan for service-level CLAUDE.md / README in the changed
    paths and surface a 3-5 line orientation block.
-3. **Migration State** (provisional, added 2026-04-27): when the PR touches an
-   in-flight migration, load operational state from `bd memories <migration-name>`
-   before forming review concerns.
+3. **Migration State** (permanent as of 2026-07-02; 2026-07-01 audit: revisit
+   never ran, check in active use): when the PR touches an in-flight migration,
+   load operational state from `bd memories <migration-name>` before forming
+   review concerns.
 
 **Without these, sibling-PR awareness is missing (orphan-export false positives
 when a peer PR consumes the export), service-level orientation is missing
@@ -232,14 +247,16 @@ Compute these booleans from the diff for specialist dispatch:
 - **security_files**: changed file paths matching `auth|security|token|jwt|permission|rbac|document|upload|download|access|audit|secret|credential|patient`
 - **has_test_files**: changed files matching `*_test.py|test_*|conftest.py`
 - **has_terraform**: changed files matching `*.tf` or `*.hcl`
-- **has_docker**: changed files matching `Dockerfile|docker|BUILD`
+- **has_new_tf_resource**: `has_terraform` is true AND an added line declares a new top-level Terraform block: `^\+(resource|module|data)\s+"`. Set by a MODIFIED `.tf` that appends a block, not only a net-new file. IaC blast radius (a new secret, a new plan-time `data` read against a shared multi-env stack) is decoupled from line count AND from whether the file is new, so this drives `mx2-devops-build-deploy` dispatch at any size, exactly like a net-new `.tf`. (PR #10554: a +18 modified `salesforce.tf` adding one `module` block gated a shared dev+prod secrets stack; the net-new-file trigger alone would have skipped the dispatch.)
 - **has_typescript_files**: changed files matching `*.ts|*.tsx|*.mts|*.cts` AND outside `src/gen-typescript/` (generated TS is excluded; review the generator instead)
 - **structural_risk_size**: diff > 200 lines OR > 5 files changed
+- **has_python_module_change**: changed files include a `src/python/**/*.py` that is added, deleted, or renamed, OR whose added lines declare a net-new top-level `def `/`class ` (column-0 on a `+` line). Drives `module-cohesion-reviewer` dispatch (cross-file cohesion lens). A changeset whose only Python changes are test files (`*_test.py|test_*|conftest.py`) does not set it unless production/test-only mixing is the concern.
 - **has_file_history**: count of merged PRs in last 180 days touching ANY file in the changeset (computed via `gh pr list --state merged --search "<file>" --limit 5` per top-3 changed files, cap at 3 per file). Boolean = aggregate count >= 3.
 - **has_pattern_precedent**: at least one file in changeset has >= 2 prior merged PRs in last 180 days AND the diff adds new public symbols. Symbol detection: added lines matching `^\+\s*(export |def |class |interface |type )`. Reuses the same `gh pr list` calls as `has_file_history`.
 - **changes_public_surface**: added/removed/modified lines declare a public symbol. Detection: lines matching `^[+-]\s*(def |async def |class |interface |type |export )`, OR `^[+-]\s*[A-Z_]+\s*[:=]` (constants, enum values), OR `^[+-]\s*\w+:\s*\w+` inside files matching `*Settings*` or Pydantic model classes (schema/Settings field changes). Excludes private symbols (leading underscore in Python, non-exported in TS). Drives `bot-review` dispatch (cross-file blast-radius lens). Size is a poor proxy for blast radius; an XS PR that changes a public type signature has higher downstream impact than an M PR refactoring internals.
 - **multi_service**: changed files (net-new only) span 2+ distinct top-level service directories. Service directory = first path segment after `src/python/mx2/`, `src/typescript/mx2/`, or `infra/`. Files outside these prefixes (root scripts, generated code) do not contribute. Drives the optional Sequence Diagram briefing section for M+ PRs. See [diagrams.md](diagrams.md).
-- **spot_check_eligible**: ALL of (a) size in {L, XL, 2XL, 3XL}, (b) net-new file count >= 10 AND median per-file diff lines <= 25 (mechanical-pattern proxy: many small uniform edits), (c) PR description contains a methodology statement detectable by regex (`script:|ran (the )?(command|script|tool)|applied (rule|codemod|transform)|using (yapf|ruff|isort|black|sed|jscodeshift|comby|grit)|migration script|codemod`). Drives the spot-check mode under Specialist Dispatch (a reviewer's Code Review Guide #11: "focus your review on the methodology... spot-check a few instances"). Conservative-by-default: when any of (a)/(b)/(c) is uncertain, set to false (full-diff dispatch is the safe default; spot-check trades coverage for speed and that trade only makes sense when the mechanical pattern is unambiguous).
+- **spot_check_eligible**: ALL of (a) size in {L, XL, 2XL, 3XL}, (b) net-new file count >= 10 AND median per-file diff lines <= 25 (mechanical-pattern proxy: many small uniform edits), (c) PR description contains a methodology statement detectable by regex (`script:|ran (the )?(command|script|tool)|applied (rule|codemod|transform)|using (yapf|ruff|isort|black|sed|jscodeshift|comby|grit)|migration script|codemod`). Drives the spot-check mode under Specialist Dispatch (the engineering lead's Code Review Guide #11: "focus your review on the methodology... spot-check a few instances"). Conservative-by-default: when any of (a)/(b)/(c) is uncertain, set to false (full-diff dispatch is the safe default; spot-check trades coverage for speed and that trade only makes sense when the mechanical pattern is unambiguous).
+- **has_observability_signal**, **has_pydantic_settings_signal**: defined in [dispatch.md](dispatch.md); compute them when dispatch.md loads (M+ PRs).
 
 ## Phase 0: Description Quality Check
 
@@ -261,7 +278,7 @@ fail Phase 0):
 
 If the description is absent or inadequate, **short-circuit**: produce a
 brief "send it back" briefing instead of full specialist dispatch. The
-framing is a reviewer's #1 explicitly: "don't waste your time reviewing
+framing is the engineering lead's #1 explicitly: "don't waste your time reviewing
 without context." Skip CI status check, AC compliance, SonarCloud
 pre-check, and specialist dispatch entirely. The output should:
 
@@ -297,7 +314,7 @@ After Phase 0 description quality, run three pre-dispatch checks:
    scoped to the PR. Three sub-tools today: SonarCloud (MCP available),
    Datadog code analysis (MCP via `search_pr_insights`), Sentry (no live
    bot on MX2 PRs; static patterns ride in `mx2-code-reviewer` instead).
-   a reviewer's Code Review Guide #7 explicitly says review these findings
+   the engineering lead's Code Review Guide #7 explicitly says review these findings
    and call out anything that should be blocking.
 
 **Without compliance-checks.md, CI failures are reported without distinguishing
@@ -317,7 +334,7 @@ Three static analyzers post on MX2 PRs (or could): SonarCloud
 (`mcp__sonarqube__*`), Datadog code analysis (`mcp__datadog__search_pr_insights`),
 and Sentry (no live bot on MX2 PRs as of 2026-05-28; static patterns ride in
 `mx2-code-reviewer`). Surface their findings alongside specialist results so the
-reviewer sees a reviewer's #7 in one place rather than scattered across bot comments.
+reviewer sees the engineering lead's #7 in one place rather than scattered across bot comments.
 
 **Always runs** (mode-irrespective, like AC Compliance); `--quick` skips only the
 SonarCloud leak-period diff filter. Static-analyzer findings are **inline-iterate,
@@ -457,19 +474,19 @@ A default-mode render must contain, in order: the `## PR #<N>: <title>` header b
 
 The template is the output contract. Do not narrate findings in free-form prose.
 
-## @claude Verify Loop (default mode)
+## Unverified-Assertion Containment (default mode)
 
-In default mode, the briefing is not the end. When synthesis produced one or more
-bot-invoked `@claude` questions, default mode posts them (with your OK), waits for the
-GitHub `@claude` bot to answer, reconciles the answer against the local findings, and
-presents a final verdict recommendation. This leverages the bot's repo-HEAD plus fresh
-context to validate falsifiable assertions the local pass can get wrong (PR 9451 Q4).
-The loop is conditional: zero `@claude` questions means it degrades to a one-shot
-briefing. `--once`, `--mine`, and `--quick` never enter the loop. Both outward actions
-(posting the `@claude` comment; the final approval) require explicit user OK; the loop
-never auto-approves under the user's identity. For the full phase spec (gates, polling
-cadence, timeout and fallback, reconciliation, compaction state, non-interactive caller
-path), see [verify-loop.md](verify-loop.md).
+Default mode is a one-shot briefing; the multi-phase `@claude` verify loop is retired
+(PR #9888 removed the self-hosted bot, which answered targeted questions; the managed
+Claude Code Review replacement is a full-PR reviewer, not a Q&A bot). A finding whose
+verdict would rest on an unverified falsifiable or cross-system assertion is contained as
+an UNVERIFIED-ASSERTION finding rather than a posted bot question: run the local
+investigation (synthesis.md "Unverified-Assertion Containment + Cross-System
+Investigation"; for the mirror-column class the named Cross-System Investigation recipe),
+and let the result drive the verdict (default/--once Comment, --mine "Needs work first",
+--quick "Warrants careful review" when it does not resolve). `@claude review once`
+(managed Code Review) is the manual out-of-band escalation when local investigation is
+inconclusive; it is operator discretion and never gates the first-round verdict.
 
 ## Section Conditionality
 
@@ -485,8 +502,8 @@ even if clean: "Reviewed for: PII exposure, auth/authz, audit trails, encryption
 - **High signal, no noise.** Only flag things with evidence. False positives erode trust.
 - **Two audiences per finding.** Briefing text (reviewer) and draft comment (PR author).
 - **Depth by default, speed on request.** Specialist dispatch is default. `--quick` for triage.
-- **Don't duplicate existing tools.** No `pants` runs. Posting is delegated to `/post-review`, never reimplemented. The briefing itself is never auto-posted; the only posting `/pr-intel` performs is the default verify loop's `@claude` questions, via `/post-review` and only after your explicit OK (see [verify-loop.md](verify-loop.md)).
-- **a reviewer priority order is the human-reviewer standard.** the engineering lead's
+- **Don't duplicate existing tools.** No `pants` runs. Posting is delegated to `/post-review`, never reimplemented. The briefing itself is never auto-posted, and `/pr-intel` performs no posting of its own; all posting is `/post-review` after your explicit OK.
+- **the engineering lead priority order is the human-reviewer standard.** the engineering lead's
   [Code Review Guide for Humans](https://<company>.atlassian.net/wiki/spaces/PPET/pages/5684789249)
   (Mar 2026) defines the priority order: description, then types, then
   complexity / naming, then boolean / behavior-switching params, then tests,
@@ -495,7 +512,7 @@ even if clean: "Reviewed for: PII exposure, auth/authz, audit trails, encryption
   Phase 0 (description quality) implements item 1; the specialist dispatch
   route (`mx2-code-reviewer` Design Judgment Checks) implements items 2-10.
   When a Phase 0 short-circuit fires, the briefing stops at "send it back"
-  without further specialist dispatch, matching a reviewer's "don't waste your
+  without further specialist dispatch, matching the engineering lead's "don't waste your
   time reviewing without context."
 
 ## Additional Resources
@@ -507,5 +524,4 @@ even if clean: "Reviewed for: PII exposure, auth/authz, audit trails, encryption
 - For size-gated verification process, see [verification.md](verification.md)
 - For output format templates for each mode, see [output-formats.md](output-formats.md)
 - For grounding rules and evidence categories, see [grounding.md](grounding.md)
-- For the default-mode multi-phase `@claude` verify loop (post, await bot, reconcile, recommend), see [verify-loop.md](verify-loop.md)
 

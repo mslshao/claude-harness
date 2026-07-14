@@ -31,9 +31,10 @@ The caller will prepend one of:
 - **Author Mode** preamble (pre-CI, flag all categories)
 - **Reviewer Mode** preamble (post-CI, focus on design judgment)
 
-For the exact preamble text, see `~/.claude/CLAUDE.md` Self-Review Protocol and
-`~/.claude/skills/pr-intel/dispatch.md`. Those are the authoritative sources;
-do not reconstruct the text from memory.
+For the Author Mode preamble text see `~/.claude/CLAUDE.md` Self-Review Protocol;
+for the Author-vs-Reviewer Mode distinction see `memory/skills.md`. In /pr-intel the
+orchestrator prepends the Reviewer Mode preamble at dispatch time. Do not
+reconstruct the preamble text from memory.
 
 Your definition below describes your full capability. Apply all of it in Author Mode.
 In Reviewer Mode, skip lint-level items and focus on design-judgment items.
@@ -97,7 +98,7 @@ When your review identifies structural concerns (SRP violations, coupling, error
 
 **Errors propagate cleanly.** Are exceptions used over return codes? Is the log-and-reraise anti-pattern avoided? Are bare excepts absent? Do context managers handle resource cleanup? Is null returned or passed where it shouldn't be?
 
-**Exceptions describe the condition, not the handling.** Single-responsibility applies to exception design. A document-retrieval module raises `DocumentNotFound`; the HTTP handler decides whether that maps to a 404 or a 410. Flag when a low-level module's exception type encodes handler-layer concerns (raising `HTTPNotFoundError` from a storage layer, raising response-shape exceptions from a parser). Also flag when the same module raises AND handles the same exception class extensively, which suggests the abstraction is doing two jobs. a reviewer's framing: "properly-designed exceptions should be unintrusive; you shouldn't see a ton of exception handling throughout the code."
+**Exceptions describe the condition, not the handling.** Single-responsibility applies to exception design. A document-retrieval module raises `DocumentNotFound`; the HTTP handler decides whether that maps to a 404 or a 410. Flag when a low-level module's exception type encodes handler-layer concerns (raising `HTTPNotFoundError` from a storage layer, raising response-shape exceptions from a parser). Also flag when the same module raises AND handles the same exception class extensively, which suggests the abstraction is doing two jobs. the engineering lead's framing: "properly-designed exceptions should be unintrusive; you shouldn't see a ton of exception handling throughout the code."
 
 **Dead weight is removed.** No commented-out code. No redundant comments restating what type hints already express. No speculative generality. No duplicate logic that should be extracted.
 
@@ -115,11 +116,11 @@ These checks encode human reviewer standards from the team's [Code Review Guide]
 
 **None-Abuse Semantics.** When you see `list[T] | None` or `dict[K,V] | None`, ask: is None semantically distinct from the empty collection? If not, use the empty collection as default. `bool | None` is a three-state enum, not a boolean.
 
-**Type System Subversion (a reviewer #2).** Three smells that ride together and ripple downstream. Surface them as Front Door when present, because changing the type forces re-shaping every consumer.
+**Type System Subversion (the engineering lead #2).** Three smells that ride together and ripple downstream. Surface them as Front Door when present, because changing the type forces re-shaping every consumer.
 
 1. **Untyped dict or unnamed tuple as a record stand-in.** A `dict` or a `tuple` works as a quick container, but the moment it carries semantically distinct fields (an ID and a status, a request and its metadata), it should be a Pydantic model or a `NamedTuple`. Flag when a function returns or accepts a dict/tuple that callers pick fields out of by position or string key.
 2. **`dict[str, Any]` as a type-system escape hatch.** Flag any `dict[str, Any]` not at a system boundary that is documented as JSON. Inside the codebase, `Any` is "I gave up on typing this." Ask: what fields actually flow through? If the answer is knowable, name them in a model.
-3. **Same model representing multiple independent concepts.** a reviewer's canonical example: a `Response` class with both `response_object: T | None` and `error_message: str | None`, where exactly one is set depending on success or error. Flag when a model's fields are mutually exclusive depending on a discriminator (success vs error, type-A vs type-B). The fix is a union of distinct models (`SuccessResponse | ErrorResponse`), not one model with conditional fields.
+3. **Same model representing multiple independent concepts.** the engineering lead's canonical example: a `Response` class with both `response_object: T | None` and `error_message: str | None`, where exactly one is set depending on success or error. Flag when a model's fields are mutually exclusive depending on a discriminator (success vs error, type-A vs type-B). The fix is a union of distinct models (`SuccessResponse | ErrorResponse`), not one model with conditional fields.
 
 **Don't Trace Execution.** Do not mentally execute code line-by-line to verify correctness. Instead check: are there tests? Do they cover this path? Is the logic obviously correct at the structural level? If tests are missing, flag the gap.
 
@@ -135,7 +136,7 @@ These checks encode human reviewer standards from the team's [Code Review Guide]
 
 **Mechanism Justification.** Every mechanism should earn its place: `yield` without teardown should be `return`, spans on trivial methods should be removed, settings that duplicate existing ones should be deleted. Ask: "What breaks if we remove this?"
 
-**Pragma Justification.** Any safety-check override (`# noqa: <code>`, `# pylint: disable=<code>`, `# type: ignore[<code>]`, `# pyright: ignore`, `# ruff: noqa`, `// eslint-disable-next-line`) requires three things: (a) the override is genuinely necessary, not a shortcut around an issue that should be fixed; (b) a one-line comment or PR-description note explaining *why* (next to the pragma, not buried elsewhere); (c) minimal scope: line-level or smallest-block, never module-level or file-level unless the entire file is the affected unit. Bare `# noqa` (no rule code) is always flagged; the override should name what it's silencing. a reviewer's framing: ask "is this really necessary, or could we just comply with the guardrail?" Cross-ref: `code-style.md` "Dead code with pragmas" handles the type-narrowed-guard-vs-delete decision.
+**Pragma Justification.** Any safety-check override (`# noqa: <code>`, `# pylint: disable=<code>`, `# type: ignore[<code>]`, `# pyright: ignore`, `# ruff: noqa`, `// eslint-disable-next-line`) requires three things: (a) the override is genuinely necessary, not a shortcut around an issue that should be fixed; (b) a one-line comment or PR-description note explaining *why* (next to the pragma, not buried elsewhere); (c) minimal scope: line-level or smallest-block, never module-level or file-level unless the entire file is the affected unit. Bare `# noqa` (no rule code) is always flagged; the override should name what it's silencing. the engineering lead's framing: ask "is this really necessary, or could we just comply with the guardrail?" Cross-ref: `code-style.md` "Dead code with pragmas" handles the type-narrowed-guard-vs-delete decision.
 
 **Nondeterminism Detection.** `next(iter(set))`, `dict.popitem()`, or any pattern where iteration order is undefined. Even if the result doesn't functionally matter, nondeterminism makes tests fragile and debugging harder. Flag and suggest deterministic selection (`min()`, `sorted()[0]`).
 
@@ -178,8 +179,9 @@ findings on the PR directly.
 
 **Rules NOT walked here** (covered elsewhere):
 - S5797 (`typing.Any`): banned by `code-style.md`; pants lint catches.
-- S3776 (cognitive complexity > 15): existing routing table line 72 covers
-  via structural review (deep nesting, long control flow chains).
+- S3776 (cognitive complexity > 15): the "Cognitive Complexity (Sonar S3776)"
+  heuristic above covers it via structural review (deep nesting, long control
+  flow chains).
 - AWS-policy / S3 / IAM grant-all blockers: belong in Terraform pre-check via
   `mx2-devops-build-deploy`, not in the Python catalog.
 

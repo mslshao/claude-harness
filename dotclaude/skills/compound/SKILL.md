@@ -102,6 +102,10 @@ grep -iE "$KW_GREP" ~/.claude/projects/-workspaces-main/memory/workflow.md
 grep -riE "$KW_GREP" ~/.claude/projects/-workspaces-main/memory/*.md
 grep -riE "$KW_GREP" /workspaces/main/.claude/rules/
 grep -riE "$KW_GREP" /workspaces/main/CLAUDE.md ~/.claude/CLAUDE.md
+# When the candidate's likely destination is a skill/agent/hook, ALSO grep that
+# artifact's whole directory: prior coverage often lives in a SUB-FILE the
+# memory/rules greps above never touch (missed post-review/post-hooks.md on 2026-06-22).
+grep -riE "$KW_GREP" ~/.claude/skills/<dest-skill>/ ~/.claude/agents/<dest-agent>.md 2>/dev/null
 bash /home/vscode/.claude/scratch/domain-matcher/match.sh "$KW_TEXT" | head -10        # optional related terminology
 ```
 
@@ -122,9 +126,9 @@ The improvement determines its own destination. Match the friction shape to the 
 |---|---|---|
 | PreToolUse hook fires for stakeholder-facing text | A pre-output lint script (callable, not a hook) at `~/.claude/scratch/scripts/` or similar. Hook stays as backstop. | Single source of truth on the wordlist between hook and pre-check. |
 | Recurring MCP-edit gotcha (field nulled, link missed) | New section in the relevant memory file (`memory/jira.md`, `memory/github-api.md`, etc.) | Reference the section from the relevant `/jira` or `/pr` skill so future invocations load the gotcha. |
-| Skill missing a capability the work needed | Mirror as personal-tier override (`~/.claude/commands/<skill>.md`) with the addition; project version stays untouched. | Name-overlap convention from CLAUDE.md. |
+| Skill missing a capability the work needed | Mirror as personal-tier override (`~/.claude/skills/<skill>/SKILL.md`) with the addition; project version stays untouched (use `~/.claude/commands/<name>.md` only when the project artifact is itself a command). | Name-overlap convention from CLAUDE.md. |
 | Recurring convention question I had to ask | Section addition to the topic file or skill so the next instance does not ask. | Update MEMORY.md index if a new topic file is created. |
-| Project-wide rule violation pattern | Project rule file (`.claude/rules/<topic>.md`) | Larger blast radius; gets a PR per the lab-to-production rule. |
+| Project-wide rule violation pattern | Hand off: propose the rule edit and route the landing through `/reflect` conventions (worktree + PR) | Rule files are `/reflect`-owned per the Hard constraint below; `/compound` proposes, never writes `.claude/rules/` directly. |
 | Automation that could replace a manual user step | New skill, hook, or agent. | Larger build; dispatch a subagent unless the surface is tiny. |
 | No buildable improvement, but the work surfaced a pattern worth recording as soft signal | Step 5b fallback: habit-memory bead via /bead-forge memory mode. | Same as the previous /compound primary path. |
 
@@ -136,7 +140,7 @@ For each candidate that passed dedup, propose the concrete edit:
 
 - **Small surface (under ~30 lines)**: present the exact file write or edit diff. On accept, apply directly.
 - **Medium surface (30-150 lines, single file)**: present a sketch. On accept, write the full content via Write tool. Re-present the diff if the result deviates from sketch.
-- **Large surface (multi-file, new skill, new agent)**: dispatch a build subagent (`mx2-executor` for pattern-matching tasks, or a launch-flex agent for larger work) with explicit acceptance criteria. Present the agent's diff before commit.
+- **Large surface (multi-file, new skill, new agent)**: route to `/launch` (worktree agent team) with explicit acceptance criteria; reserve `mx2-executor` for a fully-specified few-file build outside a PR iteration. Present the resulting diff before commit.
 
 **Present format**:
 

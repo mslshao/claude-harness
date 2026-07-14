@@ -9,7 +9,7 @@ point here.
 
 After the main review post succeeds (Step 3), apply bot reactions (thumbs-up
 or thumbs-down) to bot comments that pr-intel classified during its Bot
-Reactions phase. This is the upgraded form of a reviewer's 2026-05-20 "thumbs-up
+Reactions phase. This is the upgraded form of the engineering lead's 2026-05-20 "thumbs-up
 instead of repeat" feedback: a thumbs-up signals the bot's finding was
 correct (whether or not the reviewer also added a comment); a thumbs-down
 signals it was a false positive (whether or not the reviewer also wrote a
@@ -43,9 +43,9 @@ gh api -X POST \
   -f content=<reaction>
 ```
 
-Where `<reaction>` is the literal value from the entry (`+1` or `-1`). The
-reactions endpoint accepts the same auth as the rest of `gh api` (no extra
-setup).
+Where `<reaction>` is the literal value from the entry (`+1` or `-1`). Auth is
+the same as the rest of `gh api`, but in auto mode the classifier may still
+gate the POST on intent (see the classifier-denial bullet below).
 
 **Error handling**:
 - 404: the bot comment was deleted between pr-intel and post-review. Log and
@@ -59,6 +59,17 @@ setup).
   overwrite (changing a reaction requires DELETE on the old reaction ID first).
 - 403: token lacks `repo` scope for reactions. Surface to user and skip; main
   review post already succeeded.
+- **Auto-mode classifier denial** (not an HTTP error): in auto mode the reaction
+  POST is gated on INTENT separately from the review post, so a narrowly-scoped
+  approval ("approve", "shorten the comment") can leave the reactions read as an
+  unrequested external write and denied, even though the review post itself
+  succeeded and `Bash(gh api:*)` is permission-allowed. This is the classifier,
+  not auth: a permission rule does NOT fix it (the broad `gh api:*` allow is
+  already present and gets overridden). Do NOT work around the denial with
+  another tool. Recovery: report the blocked reactions in one line (bot +
+  finding) and offer a verb to apply them ("reply `react` to apply the N
+  reactions"). The signal is low-stakes and deferrable; a second round-trip is
+  fine. Step 3.6 replies share this recovery.
 
 **Skip silently** if `bot_reactions` is empty (no bot overlap on this PR).
 

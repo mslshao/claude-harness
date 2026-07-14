@@ -17,6 +17,14 @@ conclusion `FAILURE`, classify against recent CI history to distinguish PR-speci
 regressions from global flakes.
 
 1. Extract failing checks (name, conclusion, detailsUrl) from `statusCheckRollup`.
+   **First collapse to the latest run per check name.** `statusCheckRollup`
+   accumulates every run, so a check re-triggered by rapid re-pushes appears
+   multiple times: an early `FAILURE` plus a later `SUCCESS`/`CANCELLED`. Keep
+   only the entry with the max `completedAt` per name before classifying; a
+   stale `FAILURE` superseded by a later `SUCCESS` is not a failure. Canonical:
+   PR 9875's `Empty checklist` showed `FAILURE` entries from pre-checkbox pushes
+   while the latest run was `SUCCESS`. Verify with
+   `[.statusCheckRollup[] | select(.name=="<check>")] | sort_by(.completedAt) | .[-1]`.
 2. If failures exist, fetch recent merged PR check results:
    ```bash
    gh pr list --state merged --limit 3 --json number,statusCheckRollup
@@ -72,7 +80,7 @@ amount of code-level analysis would surface.
 **Empty ticket detection (blocking).** Before checking AC, verify the ticket has
 real content. Per project convention (see
 [/workspaces/main/.claude/commands/jira.md](/workspaces/main/.claude/commands/jira.md),
-MX2-XXXXX): non-Salesforce issue types put canonical content in `description`
+MX2-NNNNN): non-Salesforce issue types put canonical content in `description`
 with `customfield_11220` blanked to empty ADF; SF-specific issue types mirror
 content in both fields. Determine which field to check by issue type. If the
 canonical field contains only the default Jira template boilerplate

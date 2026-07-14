@@ -21,6 +21,14 @@ dispatch to a top-level SKILL.md phase with its own dedicated file.
 - **`--quick` mode**: skip entirely (the quick template has no Provenance line
   and no inline comments to classify)
 
+**Zero-findings short-circuit.** When synthesis produced zero Draft Inline
+Comments AND zero substantive Draft Review Summary findings (a clean Approve),
+skip the agent dispatch and populate the header line directly as
+`Speed-amplified: 0 | Bot-surfaced: 0`. The classifier on an empty list is a
+guaranteed no-op, so the dispatch is pure overhead. This is the ONLY case the
+dispatch may be skipped: any non-empty findings list still dispatches, regardless
+of size or specialist outcome.
+
 ## Inputs
 
 The agent receives a JSON array. One entry per surviving Draft Inline Comment
@@ -34,7 +42,7 @@ Each entry has:
   - `mx2-code-reviewer`, `mx2-security-auditor`, `test-quality-reviewer`,
     `mx2-devops-build-deploy`, `mx2-typescript-reviewer`, `mx2-silent-failure-hunter`,
     `observability-reviewer`, `mx2-pr-precedent`, `mx2-git-historian`, `bot-review`,
-    `mx2-pydantic-reviewer`, `mx2-skeptic`
+    `mx2-pydantic-reviewer`, `mx2-skeptic`, `module-cohesion-reviewer`
   - `AC Compliance Check`, `Spec Compliance Check`, `Design Doc Compliance`
   - `sonarcloud-pre-check`, `checkov`
   - `pre-synthesis-analysis-patterns`

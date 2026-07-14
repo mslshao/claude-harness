@@ -1,7 +1,7 @@
 ---
 name: ideate
 description: >
-  (personal; shadows the project-tier `ideate` and takes precedence) Delta vs the project version: adds the mx2-decision-maker iterate gate (ITERATE/ESCALATE loops), accepts bead IDs as input, and hands the winner to /converge rather than stopping at presentation.
+  (personal; shadows the project-tier `ideate` and takes precedence) Delta vs the project version: adds the mx2-decision-maker iterate gate (ITERATE/ESCALATE loops), accepts bead IDs as input, and hands the winner off to /converge as a suggested next step (it stops at presentation; no auto-invocation).
   Divergent approach generation with evaluative ranking, mandatory skeptic
   pass, and a decision-maker iterate gate. Use when you have a problem but
   do not yet know which of N approaches to pursue: "what are my options for
@@ -13,7 +13,7 @@ description: >
   (multi-specialist on SAME code), /challenge (assumption-test of an
   EXISTING plan), /pr-intel (PR review), /investigate (root cause).
 argument-hint: "[problem statement, bead ID, Jira ticket, Slack URL, Confluence URL, or transcript]"
-allowed-tools: ["Bash", "Glob", "Grep", "Read", "Agent"]
+allowed-tools: ["Bash", "Glob", "Grep", "Read", "Agent", "AskUserQuestion"]
 ---
 
 # Ideate

@@ -15,6 +15,7 @@ for service names).
 | `mx2-pydantic-reviewer` | Settings classes, env var management, field typing | sonnet |
 | `mx2-security-auditor` | PII/PHI, auth, audit trails, encryption, compliance | sonnet |
 | `mx2-code-reviewer` | Holistic review, SOLID, structural design, naming, code smells, triage (Python-scoped) | sonnet |
+| `module-cohesion-reviewer` | Cross-file module cohesion and coupling: concern ownership, name-vs-contents, duplicated typed accessors, cross-service reach-in, dependency direction. Across-files complement to mx2-code-reviewer (within-file). Advisory (author-facing questions) | sonnet |
 | `mx2-typescript-reviewer` | TS code review: type safety, React/Next.js patterns, frontend concerns, TS error handling. Sibling to mx2-code-reviewer for TS files | sonnet |
 | `mx2-silent-failure-hunter` | Silent failures, error propagation, boundary errors (TS/Python) | sonnet |
 | `mx2-git-historian` | Regression-of-recent-fix detection, flip-flop pattern, behavioral attribution to prior PRs | sonnet |
@@ -28,6 +29,11 @@ for service names).
 
 - **Code change review**: `mx2-code-reviewer` (holistic triage, Python-scoped), plus any specialists
   it would route to based on what's in the diff
+- **Module cohesion (across-files)**: dispatch `module-cohesion-reviewer` when the change touches a
+  Python module (an added/deleted/renamed `.py`, or a net-new top-level function/class). It owns the
+  module and import-graph layer (catch-all modules, a hand-rolled query duplicating a typed accessor,
+  cross-service reach-in, dependency-direction violations) that `mx2-code-reviewer` (within-file) does
+  not. Advisory: author-facing questions, never blocking; do not dispatch both on the same concern
 - **TypeScript code review**: `mx2-typescript-reviewer` when changed files include
   `src/typescript/**` or `*.ts`/`*.tsx`/`*.mts`/`*.cts` paths (excluding `src/gen-typescript/`).
   Sibling specialist to `mx2-code-reviewer`; do not dispatch both for the same file

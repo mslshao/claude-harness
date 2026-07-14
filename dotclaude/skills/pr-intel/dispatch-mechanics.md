@@ -36,10 +36,15 @@ specialists.
    ```bash
    git worktree remove "$WORKTREE_DIR" --force 2>&1
    ```
-5. If removal fails (e.g., locked), fall back to:
+5. If removal fails (e.g., locked), prune the stale registry entry:
    ```bash
-   rm -rf "$WORKTREE_DIR" && git worktree prune
+   git worktree prune
    ```
+   Do NOT `rm -rf "$WORKTREE_DIR"`: it trips the destructive-command floor
+   (observed 2026-06-26) and is unnecessary (the worktree lives under /tmp,
+   which the OS reclaims; `git worktree prune` clears the registry). If a
+   locked dir genuinely must be force-removed, surface the path to the user
+   rather than running `rm -rf` yourself.
 
 The user's working tree is never modified. No branch save/restore needed.
 
@@ -52,7 +57,7 @@ from a different branch. Rely primarily on the inline diff for analysis."
 
 When `spot_check_eligible: true` AND mode is `default`, the diff sent to
 each specialist is reduced from the full PR diff to N=3 representative
-files. a reviewer's Code Review Guide #11: "Rather than reviewing every single
+files. the engineering lead's Code Review Guide #11: "Rather than reviewing every single
 changed line, focus your review on the methodology... spot-check a few
 instances, but focus your review on the methodology."
 
@@ -138,7 +143,7 @@ you did not produce.
    (mx2-code-reviewer, test-quality-reviewer, observability-reviewer,
    mx2-silent-failure-hunter, mx2-security-auditor, mx2-devops-build-deploy,
    mx2-typescript-reviewer, mx2-git-historian, bot-review, mx2-skeptic,
-   mx2-pydantic-reviewer). Do NOT re-dispatch them. STILL dispatch the
+   mx2-pydantic-reviewer, module-cohesion-reviewer). Do NOT re-dispatch them. STILL dispatch the
    pr-intel-only specialist absent from any `/review` run: `mx2-pr-precedent`
    (queries `gh` server-side). Feed the reused findings into Synthesis exactly
    as if the agents had just returned. Print one line before synthesis:

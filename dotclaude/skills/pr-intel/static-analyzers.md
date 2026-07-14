@@ -1,7 +1,7 @@
 # Static Analyzer Pre-Check
 
 Three static analyzers post on MX2 PRs (or could). Surface their findings
-alongside specialist results so the reviewer sees a reviewer's #7 in one place
+alongside specialist results so the reviewer sees the engineering lead's #7 in one place
 rather than scattered across bot comments. Each sub-section below documents
 the fetch path, severity mapping, and dedup rule against specialist findings.
 
@@ -13,7 +13,7 @@ Per-tool default-mode behavior:
 | Datadog code analysis | `mcp__datadog__search_pr_insights` (verified via `datadog/unblock-pr` skill) | Vulnerabilities: BLOCKING; Quality: DISCUSSION | No |
 | Sentry | N/A (no live bot on MX2 PRs as of 2026-05-28) | (see Sentry sub-section) | No |
 
-Static-analyzer findings are inline-iterate, not Front Door class. a reviewer's
+Static-analyzer findings are inline-iterate, not Front Door class. the engineering lead's
 "send back quickly" framing applies to description and types specifically
 (synthesis.md step 7b). A static-analyzer finding can still be BLOCKING in
 its own severity bucket; that just routes through the regular Recommendation
@@ -40,11 +40,16 @@ the MCP error in the ask so the user can debug their token. The legacy
 
 1. **Primary: query the MCP.** Call
    `mcp__sonarqube__search_sonar_issues_in_projects` with
-   `projects=["mx2_docr"]`, `pullRequestId="<N>"`,
+   `projects=["mx2_docr"]`, `pullRequest="<N>"`,
    `issueStatuses=["OPEN", "CONFIRMED"]`. Call
    `mcp__sonarqube__get_project_quality_gate_status` with
    `projectKey="mx2_docr"`, `pullRequest="<N>"` to get the gate state and
-   the `new_violations` threshold breach count.
+   the `new_violations` threshold breach count. The filter param is
+   `pullRequest` (not `pullRequestId`), and for `mx2_docr` its value is just
+   the GitHub PR number, so pass `<N>` directly. Do NOT call
+   `list_pull_requests` to "discover" the key (the MCP tool descriptions
+   suggest it): its output is large enough to blow the tool-result token
+   budget, and the key is already known.
 
 2. **Leak-period scope filter (mandatory; skipped in `--quick`).** For each
    returned issue, check `textRange.startLine` against the PR's actual
@@ -132,7 +137,7 @@ resolution step.
 
 **Direct-access rule.** Datadog MCP exposes per-PR code-quality and
 code-security counts via `mcp__datadog__search_pr_insights`. Do not parse
-the `datadog-morgan-morgan` bot comment text; query the MCP directly. The
+the `datadog-lawfirm` bot comment text; query the MCP directly. The
 bot comment links to dashboards but does not include the finding details
 inline; the MCP returns the structured counts. The relevant Datadog skill
 guide is `datadog/unblock-pr` (Step 1.5 PR Health subsection); load it on

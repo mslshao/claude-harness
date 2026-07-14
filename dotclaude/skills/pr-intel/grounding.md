@@ -42,6 +42,22 @@ Apply to all findings:
    diff hunks. The `/post-review` skill catches this during verification, but pr-intel
    should not generate unpostable line numbers in the first place.
 
+   **Stacked / merged-base PRs (anchor outside the net diff).** A specialist reads the
+   full file at the PR's HEAD, which on a stacked or recently-main-merged PR includes
+   code already on main or from a downstack PR. A finding about that code is real but
+   anchored on a line outside the PR's net 3-dot diff, so it 422s at post time (and item
+   2's already-on-main check does NOT catch it: the file IS changed, only the anchored
+   line is merge-base content). Confirm each inline anchor sits inside the PR's net diff
+   hunks before presenting it; the `gh api /repos/{owner}/{repo}/pulls/{n}/files` patch is
+   authoritative, and a file showing only +N lines means most of it is merge-base content.
+   When the net-new change that makes the finding live is an exposure point in another
+   file (the router wiring that newly exposes a pre-existing endpoint, the call site that
+   newly invokes a pre-existing helper), re-anchor there and reframe so the finding is not
+   misattributed to code the PR did not change. If no net-new line triggers it, the finding
+   is about unchanged code: move it to the Review Summary. Observed 2026-06-29 on #9665, an
+   auth-chain finding anchored on `app.py` code already on main; the net-new trigger was the
+   coverage router wiring, so it re-anchored to the route handler only at post time.
+
 2. **Already-on-main check.** Files flagged as `already_on_main` during Merge Base
    Freshness (Data Gathering) must not receive inline comments. Findings about these
    files move to the Draft Review Summary with note: "This file's content is already
@@ -89,3 +105,5 @@ an older revision; the code at that file:line may have changed. Treat as potenti
 stale and present under Open Threads with a staleness note.
 
 If all comments share the current head, no staleness check is needed.
+
+**Author self-review notes (content staleness, distinct from the positional check above).** When a comment's author IS the PR author (the author leaving themselves `fix this` / `add annotations` / `replace with X` notes during a self-review pass), the note is a TODO that may already be resolved in the current head: authors routinely note an issue, push the fix, and never mark the comment resolved. Before treating such a note as "PR is mid-iteration" or surfacing it as an open finding, VERIFY the noted issue is still present at HEAD (`git show <headRefOid>:<file>`). Observed 2026-06-26: #10142's noted else-after-return was still present (genuinely open, held the review), while #10141/#10144's noted items were already fixed at HEAD (stale notes, reviewed normally). Assuming open-without-verifying nearly mis-held two ready PRs.

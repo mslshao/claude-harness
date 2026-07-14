@@ -76,9 +76,9 @@ Skip codebase grep here (Phase 4a handles that per-assumption).
 ### Phase 2: Extract Assumptions
 
 Scan the plan using trigger phrases from
-[assumption-taxonomy.md](assumption-taxonomy.md). The taxonomy defines eight
+[assumption-taxonomy.md](assumption-taxonomy.md). The taxonomy defines nine
 categories (codebase, domain, technical, scope, dependency, precedent, reasoning
-chain, scope/completeness) with specific trigger phrases.
+chain, scope/completeness, pipeline bypass) with specific trigger phrases.
 
 After extraction, apply the **relevance gate**: for each assumption, ask "If
 this is wrong, does the plan change in a way that matters?" Drop assumptions
@@ -98,7 +98,7 @@ Scan the plan for fuzzy referents that look concrete but resolve ambiguously:
 - "somehow" / "eventually" / "when needed" (unspecified time/condition)
 
 For each fuzzy term, ask: "which X specifically?" Cite candidates from the
-`Loaded context:` enrich preamble if available, or propose an explicit name.
+enrich preamble context (Phase 1) if available, or propose an explicit name.
 Score using the standard fragility scale:
 
 - **SOFT**: ambiguity is recoverable later (Phase 5 spec, code review,

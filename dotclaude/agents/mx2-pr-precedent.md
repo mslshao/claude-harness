@@ -100,10 +100,9 @@ FINDING:
   verification: <comment URL + current file:line you read>
   severity: BLOCKING | DISCUSSION | MINOR
   recommended_action: <what the reviewer should ask or check>
-  route: design_review_surface
 ```
 
-The `route: design_review_surface` field signals to /pr-intel synthesis that findings belong in the "Design Review Surfaces" section, NOT inline comments. Precedent observations are domain-judgment surfaces by nature.
+/pr-intel synthesis renders surviving precedent findings as draft inline comments (see pr-intel `output-formats.md`); there is no separate Design Review Surfaces routing field.
 
 Severity calibration:
 

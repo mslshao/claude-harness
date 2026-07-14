@@ -14,7 +14,7 @@ description: >
   /launch. For divergent approach generation BEFORE a plan exists, use
   /ideate.
 argument-hint: "[rough idea, feature description, bead ID, Jira ticket, Slack URL, Confluence URL, or transcript]"
-allowed-tools: ["Bash", "Glob", "Grep", "Read", "Agent", "WebFetch"]
+allowed-tools: ["Bash", "Glob", "Grep", "Read", "Agent", "WebFetch", "AskUserQuestion"]
 ---
 
 # Converge
@@ -131,6 +131,15 @@ Using the refined scope, perform the core bead-forge analysis:
 1. **Understand scope**: Read source files mentioned. Search the MX2
    codebase for existing patterns. Identify natural seams.
 
+   **Verify "mirrors/ports from X" claims now, not at Phase 3.** Any work
+   item you draft that says a pattern is "ported from," "mirrors," or
+   "copies" an existing file must be checked against that file directly
+   (Read/Grep) in this same pass, citing the specific section. An
+   unverified mirroring claim is exactly the failure mode Phase 3
+   (Challenge/Consult) and Phase 4.5 (Skeptic) exist to catch, but
+   catching it there costs a full stress-test-and-re-synthesize cycle;
+   catching it here costs one Read call.
+
    **Infrastructure pull-up**: Before scoping to the named service,
    check whether the prompt touches a cross-cutting concern
    (observability, worker lifecycle, error handling, queueing). If so,
@@ -215,9 +224,18 @@ coordinator's):
 2. **Connect**: Find themes across both. Where do challenge and consult
    agree? Where do they contradict?
 3. **Deduplicate**: Multiple sources may flag the same issue. Merge.
-4. **Apply to plan**: Modify the draft plan based on findings:
+4. **Apply to plan**: Rate every finding Fix now / Fix next / Defer /
+   Won't fix BEFORE incorporating (per `consult/specialists.md`'s
+   dispatch heuristics). Do not default every finding to Fix now: a
+   high hit rate on "fix everything" is itself a signal to re-check
+   proportionality before the plan reaches Phase 4.6. Then modify the
+   draft plan:
    - INVALIDATED assumptions: remove or revise affected plan items.
-   - Specialist concerns rated "Fix now": incorporate into plan items.
+   - Fix now: incorporate into plan items.
+   - Fix next / Defer / Won't fix: do NOT incorporate; carry the
+     rated-but-deferred findings into Phase 5's Convergence Delta so
+     the user sees what was consciously left out, not just what was
+     fixed.
    - Gaps identified by either source: add items or acceptance criteria.
    - Contradictions: make the judgment call, note the trade-off. For
      FRAGILE+HIGH contradictions, use the decision record format from
@@ -320,6 +338,25 @@ section in order; do not free-form narrate the plan.
 
 When the user approves:
 
+0. **Self-reference preflight (run BEFORE the first `bd create`).** Every
+   check in Phases 2-4.6 runs on the draft plan TEXT, before this plan's
+   own beads exist, so none of them can see a collision between a label
+   this step is about to mint and an artifact the plan's own work-item
+   text says a later build will create (a runtime bead, a table, a
+   file). Using the FINAL post-synthesis work-item text: extract every
+   forward-reference to an artifact this plan's own future code/runtime
+   will create (bead labels/titles, table names, file paths, function/
+   module names, any phrasing like "the skill/service creates/writes/
+   persists X"), then cross-reference that list against the label/naming
+   scheme THIS invocation is about to apply to the planning beads
+   themselves. If they overlap, or a work item leaves a to-be-created
+   artifact's label unspecified while this step is about to claim the
+   obvious default name, surface it and get a disambiguated pair before
+   executing any `bd create`. Added 2026-07-10 after a plan's 7 planning
+   beads were labeled `--labels=overwatch` while a work item's own text,
+   written in the same session, described a runtime tracking bead the
+   skill would create at first run with no label specified; the two
+   would have collided under the obvious default name.
 1. Create beads via `bd create` for each work item. Use `--title`,
    `--description`, `--type`, `--priority`. Include AC, design notes,
    verification path, and consequence-of-wrong in the description.

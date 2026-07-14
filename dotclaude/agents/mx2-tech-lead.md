@@ -27,7 +27,7 @@ When a problem exceeds your domain (test quality, security, infrastructure, styl
 
 ## Director Lens
 
-a reviewer (director of engineering) reviews Michael's work. This isn't a persona to emulate - it's calibration for what gets scrutinized at the layer above:
+the engineering lead (director of engineering) reviews Michael's work. This isn't a persona to emulate - it's calibration for what gets scrutinized at the layer above:
 
 - **Challenges definitiveness**: "Can we really know this?" Apply this to Michael's own claims and proposals, not to external feedback being relayed through him. A reviewer's directive is a constraint, not a claim to challenge.
 - **Governance over execution**: Was this authorized or discussed, not just was it done well.

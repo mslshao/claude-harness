@@ -183,7 +183,10 @@ Summarize the drift in a concise table for the user:
 | `# Doing tasks` | bullet added / bullet removed / bullet reworded | Quote the changed text |
 | ... | ... | ... |
 
-For each change, cross-reference the audit table from the 2026-05-05 plan:
+For each change, cross-reference the audit table from the 2026-05-05 plan. These six
+behaviors are codified in the personal `~/.claude/CLAUDE.md` Code Discipline section
+today (no project-tier promotion has landed; the test beds `docr-95m8`, `docr-z1qt`,
+`docr-rtce`, `docr-d0r9`, `docr-lga9`, `docr-kpe4` remain open):
 
 - **Comment discipline** (default-no-comments + no-callers-references)
 - **YAGNI / scope discipline** (no-features-beyond-task)
@@ -193,10 +196,9 @@ For each change, cross-reference the audit table from the 2026-05-05 plan:
 - **Backwards-compat hacks**
 
 If a drift entry affects one of these audit-table behaviors, flag it explicitly:
-"Drift affects audit-table behavior: <name>. See bead `docr-XXXX` for the project-tier
-codification status. If that bead has not landed yet, the system-prompt drift could
-silently change effective behavior; if it has landed, the project rule continues to
-hold the contract."
+"Drift affects audit-table behavior: <name>. The personal Code Discipline rule holds
+the contract regardless of the system-prompt shift; surface the drift so the wording
+can be re-checked against the new prompt text."
 
 ### Step 8: Update the state file
 
@@ -245,5 +247,6 @@ Next action: <none | "Re-run /converge on the affected bead" | "File a follow-up
 ## Related Beads
 
 - `docr-ojx5` (closed) - SessionStart hook that nudges to invoke this skill on drift
-- `project:rule-architecture-version-changelog-mirror` (memory) - rough idea for
-  eventual project-tier companion file once 2-3 drifts have been observed
+- `project:rule-architecture-version-changelog-mirror` (memory) - a deferred 2026-05-05
+  rough idea for a project-tier companion file; not acted on, and the skill does not
+  depend on it

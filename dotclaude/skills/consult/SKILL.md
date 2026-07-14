@@ -1,6 +1,7 @@
 ---
 name: consult
 description: Parallel multi-specialist analysis. Use when multiple specialist agents need to weigh in on the same code, for large-task AGENT REVIEW passes, or cross-cutting findings. Runs in the MAIN conversation; the orchestrator dispatches specialists in parallel and synthesizes their outputs.
+argument-hint: "[question or file paths] [optional: specialists to involve]"
 ---
 
 # Consult

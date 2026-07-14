@@ -16,17 +16,32 @@ do NOT leave the type implicit (`mx2-tech-lead` is forbidden in this
 roster per `decision:tech-lead-not-in-automation-2026-04-30`). The prompt
 provides the draft plan and instructs the subagent to:
 
-1. Extract assumptions using the challenge taxonomy triggers:
-   - "We'll use..." / "We should..." (approach assumptions)
-   - "The existing..." / "There's already..." (codebase state)
-   - "This will..." / "This should..." (outcome assumptions)
-   - References to code not Read in this conversation (codebase)
-   - What's NOT mentioned (scope/completeness)
+1. Extract assumptions by reading the full taxonomy at
+   `~/.claude/skills/challenge/assumption-taxonomy.md` and applying its
+   9 categories and their subtriggers (Serialization Safety, Infrastructure
+   Completeness, Identity/Uniqueness Key, Control-Verb State-Transition
+   Completeness, Mechanism-Homogeneity, and any added since). Do NOT
+   re-derive a condensed trigger list from memory: a prior version of
+   this dispatch embedded its own 5-bullet summary inline, which meant
+   the taxonomy file's own subtriggers (Serialization Safety,
+   Infrastructure Completeness) never actually reached this dispatch, and
+   the 3 subtriggers below were added to the file 2026-07-10 specifically
+   because a converge run (the overwatch skill) hit all 3 gaps and none
+   were covered by the condensed list. Reading the file directly is the
+   only way a future taxonomy addition reaches this dispatch without a
+   second edit here.
 2. Apply the relevance gate: "If wrong, does the plan change?" Drop
    irrelevant assumptions. Target 3-7.
 3. Score on fragility (SOLID/SOFT/FRAGILE) and impact (HIGH/LOW).
 4. For FRAGILE assumptions: gather evidence via tools. Record searches
-   and findings.
+   and findings. Before asserting a cited fact "doesn't exist" or "is
+   fabricated," check whether it could be a same-session artifact (a
+   file the orchestrator wrote earlier in THIS conversation, not yet
+   part of your training data or prior context, but fully readable via
+   Read/Grep right now). A grep that misses because it searched the
+   wrong file, not because the citation is false, is a false-negative
+   absence claim; verify against the freshest matching file before
+   concluding fabrication.
 5. Produce a modification table: what needs to change based on evidence.
 
 Include in the subagent prompt:
@@ -82,8 +97,12 @@ Include in EACH specialist's prompt:
 > hasn't been built yet. For each plan item in your domain, probe for:
 > Pipeline Bypass (does this add a new code path when the existing
 > pipeline could serve?), Reasoning Chain gaps (do the steps actually
-> follow from each other?), and Scope/Completeness (what production
-> concerns - rollback, observability, migration - does this plan omit?).
+> follow from each other, and if the item names 2+ parallel-looking
+> cases under one mechanism, does each case's actual detection shape
+> match the others, per the Mechanism-Homogeneity subtrigger in
+> `~/.claude/skills/challenge/assumption-taxonomy.md`?), and
+> Scope/Completeness (what production concerns - rollback, observability,
+> migration - does this plan omit?).
 > BEFORE forming findings, run `bd list --status=in_progress` and
 > `bd show` any bead in the same domain. A ratified architectural
 > decision in a sibling bead supersedes the draft plan; surface that
@@ -134,6 +153,14 @@ Agent(
   scope-signal words (lightweight / simple / minimal / quick / for most
   users), name the minimal-viable variant and what each extra component
   buys.
+  (f) Control-verb completeness: for any item describing operator
+  control over a recurring or background mechanism (start/stop/pause/
+  resume/restart/cancel), ask whether a leftover or already-queued
+  action from a PRIOR state can silently undo the most recent operator
+  action. This is a standing category, not a per-run addition, because a
+  round given a custom focus elsewhere has otherwise crowded out this
+  question organically (observed 2026-07-10, overwatch skill: 3 skeptic
+  rounds each had a different assigned focus and none asked this).
 
   Converged plan + convergence delta:
   <plan block>

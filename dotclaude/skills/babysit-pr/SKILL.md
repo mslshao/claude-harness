@@ -37,6 +37,14 @@ Extract from `$ARGUMENTS`:
 
 If no PR number is found and the current branch has an associated PR, infer it via `gh pr view --json number,isDraft --jq '.number'`. Otherwise stop and ask.
 
+## Stack mode (multiple PR numbers)
+
+When the invocation passes more than one numeric token (a Graphite stack, e.g. `/babysit-pr 10059 10043 10044`), watch the whole stack from ONE tracking bead, polling every PR each cycle. Keep `processed_issue_comments` / `processed_inline_comments` / `processed_reviews` as per-PR maps keyed by number. The single-PR loop body otherwise runs unchanged.
+
+- **Auto-remediate only the tip** (the branch with no descendants). A mechanical fix on a downstack PR requires amending its commit and then restacking plus force-pushing every descendant; that exceeds the single-file/single-hunk bound and is a stack operation, not an amend. Classify any downstack fix ESCALATE even when the suggestion is mechanical. Only the tip can be auto-amended safely.
+- **The operator's own reply-wrappers are not human reviews.** Posting an inline reply creates a review-submission wrapper (`PRR_*`) authored by the operator; that is the loop's own action, not reviewer feedback. SILENT-IGNORE it, do not ESCALATE it as a human review.
+- **Allowlisted-bot delete-and-repost churn is noise.** SonarCloud and similar bots delete and re-post their summary comment on every CI run, so the latest issue-comment ID churns each cycle. Treat an allowlisted-bot re-post as no new activity for the quiet-state backoff; only genuinely new inline/review activity (or a non-allowlisted commenter) re-tightens the cadence.
+
 ## Preflight
 
 Run these checks in order before scheduling the first wakeup. Fail fast on any blocker.
@@ -123,7 +131,7 @@ Each wakeup runs these steps in order. The body must complete inside one turn so
 bd show <bead-id>
 ```
 
-Parse the most recent `[PR_BABYSIT_STATE]` block. Extract `window_end`, `last_check_ts`, `processed_issue_comments`, `processed_inline_comments`, `escalations`, `actions_taken`, `classification_policy`.
+Parse the most recent `[PR_BABYSIT_STATE]` block. Extract `window_end`, `last_check_ts`, `processed_issue_comments`, `processed_inline_comments`, `processed_reviews`, `escalations`, `actions_taken`, `classification_policy`.
 
 If `now >= window_end`, jump to Termination (window expired).
 
@@ -190,7 +198,7 @@ Append a new `[PR_BABYSIT_STATE cycle=N]` block as a comment on the bead with:
 - Updated `actions_taken` (entries for each AUTO-REMEDIATE and REPLY-ONLY this cycle)
 - Updated `escalations` (entries for each ESCALATE this cycle)
 - `ci_snapshot: <success_count> SUCCESS / <failure_count> FAILURE / <pending_count> PENDING`
-- `review_state: <one-line summary, e.g. "approved by a teammate; awaiting a teammate">`
+- `review_state: <one-line summary, e.g. "approved by a peer reviewer-forthepeople; awaiting a teammate">`
 
 ```bash
 bd comment <bead-id> "[PR_BABYSIT_STATE cycle=N]
@@ -205,6 +213,8 @@ Use `bd comment` (append-only) rather than `bd update --notes` (replace). The cy
 If `escalations` was populated this cycle: STOP. Do not schedule another wakeup. The operator must adjudicate before the loop continues.
 
 Default cadence is `270 seconds` (cache-warm; sits just under the 300-second prompt-cache TTL). This is both the steady-state value and the post-traffic value; there is no separate "adaptive band" because 270 is already the cache-warm maximum. If new comments arrived in the cycle that just ran, the next cycle still fires at 270; no need to drop lower (under 60 burns cache without benefit; the bot publishing rate rarely exceeds one comment per 270s anyway).
+
+**Quiet-state backoff (dead-wait widening).** If the last 3 cycles were all no-op (zero new issue comments, inline comments, and reviews; zero auto-remediations; zero escalations) AND the only non-SUCCESS checks are operational gates (`check_reviewers`, mergify config, branch-protection awaiting an out-of-band action) AND no human review is pending, the loop is in a pure wait-on-human state: nothing it polls for can change without a human action it cannot take. Widen the cadence to `1200 seconds`, re-tightening to `270` the first cycle that surfaces ANY new activity. Rationale: each wakeup re-injects the full SKILL.md (a fixed per-cycle token cost, independent of the conversation prompt-cache), so in a no-traffic state fewer cycles is net cheaper than cache-warm re-entry. This is NOT the post-traffic "adaptive band" the 270s value replaced; it is a dead-wait widening for when cadence cannot affect the outcome. The window-end rule below still caps the final wakeup.
 
 If `now + 270 >= window_end`: schedule the final wakeup at `max(60, window_end - now)` so the loop terminates cleanly on the window. The 60-second floor avoids the under-60 cache-thrash anti-pattern even when the window is closing.
 
@@ -307,6 +317,14 @@ gh api -X POST /repos/<owner>/<repo>/pulls/<number>/comments/<parent-comment-id>
 gh pr comment <number> --body "<comment text>"
 ```
 
+### Keep bd and gh in separate bash calls
+
+Each cycle both posts to the PR (`gh`) and logs state (`bd comment`). Never put a `bd`
+invocation and a `gh` invocation in the same bash command line: `block-personal-tier-vocab.sh`
+(PreToolUse Bash) scans `gh` command lines for personal-tier vocab (`bd`, skill names) and
+hard-DENIES the call, forcing a re-issue. Run the `gh` reply/post and the `bd` state-log as
+two separate Bash tool calls.
+
 ### Sanitization (mandatory before every post)
 
 Before any `gh` call that writes to the PR, run the reply body through these checks. Block the post and reclassify as ESCALATE if any check fails:
@@ -340,10 +358,11 @@ The loop terminates in any of:
    The distinguishing question: "would this check pass automatically if we just waited and re-ran the workflow, or does the operator need to do something specific to the repo or PR to make it pass?" If the latter, it's operational; skip the escalation.
 6. **Operator explicitly stops**: if the operator types `/babysit-pr <number> --stop` or sends a stop signal, emit `[PR_BABYSIT_TERMINATED]` with `terminal_reason: operator-stopped`.
 
-After termination, clean up the worktree:
+After termination, clean up ONLY a worktree this skill created. If the worktree was REUSED (Step 4 case 1 = an agent-spawned `.launch-worktrees/` worktree, or case 2 = a prior babysit worktree), do NOT remove it: it belongs to /launch, /autopilot, or a future babysit run. Remove only a fresh worktree this run created (Step 4 case 3), at the resolved path recorded in the bead:
 
 ```bash
-git worktree remove /tmp/babysit-pr-<number> --force 2>&1 || true
+# only when this run CREATED the worktree (Step 4 case 3); use the recorded path "$WORKTREE_DIR", not a hardcoded /tmp path
+git worktree remove "$WORKTREE_DIR" --force 2>&1 || true
 ```
 
 The bead stays open until the operator closes it manually (the audit trail is the point).
@@ -381,6 +400,8 @@ Mitigation: state lives in the tracking bead's notes (durable across compactions
 The prompt-cache TTL is 300 seconds. Sleeping past 300 incurs a cache miss; sleeping at exactly 300 incurs the miss without amortizing it (worst-of-both); sleeping under 60 burns cache constantly for no benefit.
 
 Mitigation: cadence is `270 seconds` for every wakeup, steady-state or post-traffic alike. 270 sits just under the TTL so each cycle re-enters cache-warm; there is no longer a separate steady-state-vs-adaptive split (the older 600/300 numbers in pre-2026-05 versions of this doc are obsolete). Final wakeup at window close uses `max(60, window_end - now)` to honor the under-60 floor.
+
+The one sanctioned widening is the Step 7 quiet-state backoff (`1200s` after 3 consecutive no-op cycles in a pure wait-on-human state): there the per-cycle skill-doc re-injection cost dominates and cache-warmth is moot, so fewer-but-colder cycles win. It re-tightens to `270s` on the first new activity.
 
 ## Principles
 

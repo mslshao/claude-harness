@@ -161,7 +161,7 @@ Surface the verdict in the 6.5 report. If it returns BLOCKING findings, resolve
 and amend before reporting; do not leave a known-blocking PR for the user to
 discover at flip time.
 
-Recurrence context: 2026-05-29 MX2-XXXXX / PR #9461, where the orchestrator
+Recurrence context: 2026-05-29 MX2-NNNNN / PR #9461, where the orchestrator
 declared the launch done after creating the draft plus posting to Jira, and the
 user had to prompt "did you run /pr-intel --mine?" The self-review confirmed the
 PR was sound, but the step belongs in the flow.

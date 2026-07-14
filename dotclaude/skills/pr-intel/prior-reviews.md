@@ -1,12 +1,13 @@
-# Prior Reviews (bd memories + DynamoDB)
+# Prior Reviews (bd memories + DynamoDB + own live GitHub review)
 
 This file documents how /pr-intel discovers prior review history for a PR and folds it into the current review's data-gathering, specialist preamble, dedup context, and default recommendation.
 
-Two channels are checked in parallel:
+Three channels are checked in parallel:
 1. `bd memories pr-<number>` for terminal-side review memories (`/post-review` writes these).
 2. DynamoDB `pr-review` table for cross-modality state (terminal sessions and the Slack bot share this).
+3. The reviewer's OWN live GitHub review, re-checked just before render (not only at data-gathering): scan `reviews[]` for an entry whose `author.login` is the running reviewer (`mslshao`). A review posted MANUALLY (GitHub UI, not via `/post-review`) lands in neither channel 1 nor 2, and one posted CONCURRENTLY during the run is absent from the initial metadata fetch, so a late re-check (`gh pr view <n> --json reviews`) right before producing the briefing catches both. When a self-review is found that channels 1-2 do not already cover, surface it BEFORE the briefing ("You already have a <STATE> review on this PR posted <date>, not via /post-review; read it first, this run may duplicate it") and default to a delta/confirm posture rather than a fresh full briefing. (Observed 2026-06-24 on #9926: a manual `mslshao` APPROVE landed mid-run, the briefing did not account for it, producing "read what I wrote instead.")
 
-If both channels fail, the review proceeds as first-round.
+If all three channels fail or are empty, the review proceeds as first-round.
 
 ## Prior Review Memory (bd memories)
 
@@ -27,6 +28,12 @@ Parse the output for entries matching `review:pr-<number>:*`. For each prior rou
 
 Store as `prior_reviews` list, sorted oldest to newest.
 
+**Full-detail fallback**: `bd memories pr-<number>` lists matching keys with truncated one-line previews (enough to parse `findings_summary`). To read the FULL content of a specific prior round (complete findings, not the preview), use `bd recall <key>`:
+```bash
+bd recall review:pr-<number>:<YYYY-MM-DD>
+```
+Reach for this when a steer says "look at the prior review for #N", or when delta-aware dedup needs the verbatim prior findings. Fall back to the posted GitHub review (`gh api .../pulls/<number>/reviews` and `.../comments`) only when you need inline-comment thread positions or bot comments beyond what the memory captured.
+
 **Downstream effects** when one or more prior reviews exist:
 
 1. **Revision delta**: Compute `current_commit_count - latest_prior.commit_count`.
@@ -39,6 +46,22 @@ Store as `prior_reviews` list, sorted oldest to newest.
    Specialists are instructed to prioritize this delta; the full PR diff is secondary
    context. This is the single highest-value signal on re-reviews; it is the actual
    "what's new since we last looked."
+
+   **Rebase caveat (the 2-dot delta lies on a rebased branch).** The command above is
+   a 2-dot diff, clean only while `<latest_prior.head_sha>` is still an ancestor of
+   `<headRefOid>`. If the branch was rebased since the prior review (common), the old
+   SHA is no longer on the branch's line of history, and `git diff <prior> <head>`
+   folds in every main-branch change merged during the rebase, producing a garbage
+   delta (observed 2026-07-13: a ~1700-file / ~100k-line "delta" on a PR whose real
+   3-dot diff was +36). Guard before trusting it:
+   - `git merge-base --is-ancestor <latest_prior.head_sha> <headRefOid>`: exit 0 means
+     no rebase (2-dot delta is clean); non-zero means rebased (2-dot delta is polluted).
+   - Cheap alternative: if `git diff <prior> <head> --stat` reports far more files than
+     the PR's own `changedFiles`, the branch rebased.
+   - On a rebased branch, do NOT send the 2-dot delta. Use the current PR 3-dot diff
+     (`gh pr diff <N>`) as the primary scope and verify each prior-round finding against
+     current file state (grep the specific issue at HEAD), since "what changed since
+     last review" is not cleanly expressible via git diff across a rebase.
 3. **Dedup input**: Append the `findings_summary` bullets from prior rounds to the
    dedup context so specialists do not re-raise points we already posted.
 4. **Briefing header**: Add a `Prior Reviews` section listing each round with date,
@@ -51,8 +74,64 @@ Store as `prior_reviews` list, sorted oldest to newest.
 5. **Default recommendation shift**: If the latest prior review was APPROVE and the
    delta is small (<= 3 commits, no structural file changes), the default
    recommendation should bias toward APPROVE unless new evidence says otherwise.
-   Prior approval is signal, not noise. Conversely, if the prior review was
-   REQUEST_CHANGES, verify the requested changes landed before any new approval.
+   Prior approval is signal, not noise. This bias is a tie-breaker applied after
+   fresh specialists read the delta (see Re-review anti-anchoring below), not a
+   reason to skip that read. Conversely, if the prior review was REQUEST_CHANGES,
+   verify the requested changes landed before any new approval.
+
+**Re-review anti-anchoring (fresh perspective over carried opinion).** On a
+re-review with a real content delta (not the empty/rebase short-circuit below),
+the orchestrator is the most anchored input present: it carries its own
+prior-round verdict and drifts toward confirming it. That pull is strongest
+exactly when the delta looks trivial or "resolves my prior finding," which is
+when skipping a fresh read is hardest to notice.
+
+- Fresh specialist dispatch on the delta is mandatory; the orchestrator must NOT
+  substitute its own read for a specialist pass, however small or mechanical the
+  change. A trivial delta changes WHICH specialists trigger, never WHETHER any
+  run. Specialists have no memory of the prior rounds, so their delta read is the
+  independent perspective the orchestrator cannot supply.
+- The item-5 prior-approval bias is a tie-breaker applied AFTER the fresh read,
+  not a license to skip it.
+- Treat a specialist read that diverges from the orchestrator's carried
+  expectation as signal to investigate, not noise to reconcile against the prior
+  verdict.
+
+(2026-07-13, #10483 round 3: the orchestrator skipped dispatch on a real code
+delta because it "resolved my round-2 finding," self-verified by grep, and
+approved. The delta was clean, but the path was the anchored one and a fresh read
+was owed.)
+
+**Behavior when the delta is empty (re-review short-circuit)**: When prior reviews
+exist but the delta-focused diff (item 2) has no content change (the PR's changed
+files are identical between `<latest_prior.head_sha>` and `<headRefOid>` because the
+new commits are a pure rebase or `Merge ... origin/main`), do NOT dispatch specialists
+or render a full briefing. Short-circuit with a one-line result: `No review needed:
+delta empty since the <date> review (rev <prior> to <current> is a rebase or
+main-merge, no content change).` Scope the emptiness check to the PR's changed-file
+paths (`git diff <latest_prior.head_sha> <headRefOid> -- <changed paths>`), not the
+whole tree, since a main-merge touches many unrelated files. This is the re-review
+analogue of the Merge Base Freshness all-files-already-on-main short-circuit: the
+prior review still stands, so re-running it spends a full specialist pass on unchanged
+code.
+
+**Sub-case: zero new commits since the running reviewer's own approval.** The
+strongest empty form is `headRefOid` equal to the exact commit the running
+reviewer already self-approved (channel 3 above found a self-`APPROVE` whose
+`commit.oid` is the current head, with no commits added since). There is no
+delta at all, not even a rebase, so the one-line short-circuit applies even
+harder. Do NOT render the full template; it buries the only fact that matters
+and reads as "why am I reviewing my own approved PR again?" (observed
+2026-06-29 on #10113: a full render with the self-approval folded into a
+lead-in note still drew "wait, we already approved it?"). Lead with the
+one-liner instead: `Already approved: your APPROVE on <date> is on the current
+head <short_sha>; nothing has changed since. No re-review needed.`, then list
+only the still-open threads from that round. This overrides the pre-fired
+`userpromptsubmit-pr-intel-contract.sh` message (that hook runs at invocation,
+before the delta is known, so it cannot exempt this case itself); keep the
+one-liner free of the structured-template headers and the collapse-pattern
+tokens (`Action:`, `Blocking: N`, `#N reviewed`) so `stop-validate-pr-intel.sh`
+reads it as a clean short-circuit, not a collapsed render.
 
 **Behavior when `prior_reviews` is empty**: This is a first-round review. No delta
 available. Proceed with normal first-round defaults (see

@@ -24,11 +24,12 @@ re-invented each time. See bd memories `gotcha:orphaned-worktrees-2026-05-07`.
 
 ## Scope (do check)
 
-All worktree branches under `/workspaces/main/.launch-worktrees/` matching:
-- `launch-<timestamp>` (ephemeral /launch worktrees) and `<user-prefix>/<jira-or-bead>` (e.g. `mslshao/mx2-...`)
+All worktrees in `git worktree list` except the main checkout (homes: `/workspaces/main/.launch-worktrees/` and `/workspaces/main/.claude/worktrees/`), with branch names matching:
+- `agent/*` (WorktreeCreate-hook agent worktrees, the dominant current pattern) and `<user-prefix>/<jira-or-bead>` (e.g. `mslshao/mx2-...`)
 - `autopilot/*` (autopilot bead-driven runs)
 - `MX2-NNNNN/*` (Jira-prefixed feature branches)
 - `chore/*`, `fix/*` (bead-driven chores)
+- `launch-<timestamp>` (legacy /launch worktrees; the current hook produces `agent/*` instead)
 
 ## Scope (do NOT touch)
 

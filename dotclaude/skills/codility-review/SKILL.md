@@ -102,7 +102,7 @@ Calibration:
 2. Pass 1 decision
 3. Pass 2 score table (only if Pass 1 cleared) with cited evidence per row
 4. Pass 2 level recommendation
-5. Final recommendation against target level
+5. Final recommendation against target level (screening signal ONLY: informs the go/no-go to interview; it must NOT anchor an actual leveling or debrief decision, which requires behavioral + live code-review + judgment evidence per `bd memories correction:workflow:codility-not-primary-signal`)
 6. Optional: draft Slack reply for recruiter (plain text, no markdown bullets per Slack convention, 1-3 sentences, name-first or they-first if referring to the candidate)
 
 ## Calibration anchor: Noyal Binu (Apr 2026)

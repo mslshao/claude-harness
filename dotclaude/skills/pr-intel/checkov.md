@@ -13,7 +13,7 @@ Tracked in bead `docr-kfjv`.
 
 Run Checkov when ALL of:
 1. `has_terraform: true` (changed files match `*.tf` or `*.hcl`)
-2. At least one `*.tf` file is net-new (not in `merge_base_freshness.stale_files`)
+2. At least one `*.tf` file is net-new (not in `merge_base_freshness.stale_files`), OR `has_new_tf_resource` (a modified `.tf` added a `resource`/`module`/`data` block). The range-overlap filter below already scopes findings to the added block, so scanning a modified file surfaces only the new resource, not pre-existing ones.
 3. Mode is `default` or `--mine` (skip for `--quick`)
 
 Skip when:
@@ -28,7 +28,7 @@ Checkov is a Python CLI (`pip install checkov`). Verify availability before runn
 command -v checkov >/dev/null 2>&1 || pip install --user checkov >/dev/null 2>&1
 ```
 
-For each net-new Terraform file in the worktree, run:
+For each net-new Terraform file (and each modified `.tf` that added a block, per `has_new_tf_resource`) in the worktree, run:
 
 ```bash
 checkov \
@@ -246,6 +246,6 @@ Its value-add on this PR is zero. It would catch other classes of IaC regression
 (public S3, open security groups, missing encryption, literal `*` resource) - those
 require separate validation on PRs that exhibit those patterns.
 
-**Decision deferred** (per bead AC): dispatch-trigger vs CI-gate. Soak the feature
-on the next 5 IaC PRs before committing to either. If 0 of 5 surface a useful finding,
-demote priority and consider closing.
+**Trigger settled**: dispatch-trigger (this pass fires inside the `/pr-intel` flow per
+the "When to invoke" rules above), not an always-on CI gate. A CI gate remains the
+lift-to-project-tier promotion path if the feature proves broadly valuable.

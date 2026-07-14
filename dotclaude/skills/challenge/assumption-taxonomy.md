@@ -2,7 +2,7 @@
 
 ## Categories
 
-Eight categories. Use the trigger phrases to extract assumptions from plans,
+Nine categories. Use the trigger phrases to extract assumptions from plans,
 then filter through the relevance gate (see Extraction Discipline below).
 
 ### Codebase
@@ -32,6 +32,34 @@ Assumptions about technology capabilities, performance, or compatibility.
 API response, EventBridge event, SQS message). Challenge: "Does this data survive
 serialization? Are there Enum values, datetime objects, or custom types that
 `json.dumps()` can't handle without `mode='json'`?" Sentry catches these routinely.
+
+**Subtrigger - Identity/Uniqueness Key**: any work item that gathers, stores,
+diffs, merges, or deduplicates a collection of items/records/entities sourced
+from 2+ upstream systems, feeds, or namespaces (cross-repo, cross-tenant,
+cross-service). Challenge: "What is the uniqueness/identity key for these
+items? Is the raw identifier unique only within its source namespace, and if
+so does the plan's key include a namespace qualifier (e.g. `<repo>#<number>`
+rather than a bare `<number>`)? Could two distinct real-world items from
+different sources collide under the stated key?" Added 2026-07-10: a plan
+that said a gather step "returns items" for a cross-repo GitHub PR search
+never specified the key; a bare PR number collides across repos and would
+have silently dropped a genuinely new review request.
+
+**Subtrigger - Control-Verb State-Transition Completeness**: item text
+contains an operator control verb (stop/start/pause/resume/restart/cancel)
+applied to a recurring, scheduled, or background mechanism. Treat the
+claimed control guarantee as FRAGILE by default. Challenge: "Enumerate every
+{prior-state} x {action} combination this item implies (e.g. ACTIVE+stop,
+ACTIVE+resume, STOPPED+resume, STOPPED+stop). For each, does the underlying
+tool's actual cancellation/queuing semantics support it, or only appear to
+because the plan's prose reads as complete?" Verify against the tool's real
+behavior (does it cancel an in-flight scheduled action, or only suppress
+future scheduling?), not against a codebase pattern citation. Added
+2026-07-10: a plan's "resume path" conflated two different meanings of
+resume (a fresh session cold-starting into an ACTIVE loop, vs. restarting a
+STOPPED loop) under one word; the tool in question queues rather than
+cancels, so the naive reading would have let a stopped loop silently
+un-stop itself.
 
 **Example**: "DynamoDB can handle this query pattern efficiently at our scale."
 
@@ -70,6 +98,22 @@ conclusion builds on another.
 **Example**: "Because we're using Pydantic models, validation is handled
 automatically." (The "therefore" may not follow if the models lack validators
 for the specific constraints that matter.)
+
+**Subtrigger - Mechanism-Homogeneity**: item text names 2+ cases, categories,
+or triggers as producing one outcome via one described mechanism ("category
+X/Y/Z each produce a named alert via mechanism M"). Challenge: "Tag each
+named case with its actual detection algorithm shape (membership-diff /
+threshold-crossing / rate-of-change / other). Does every case's real shape
+match the others, or does the plan gloss a structurally different case as
+uniform prose?" A case that needs its own state machine (e.g. "alert once
+per item when it crosses an age threshold, without re-alerting every cycle
+it stays over") is not a diff, even when the plan describes it in the same
+sentence as two cases that are. Added 2026-07-10: a plan named "aged
+in-progress item" alongside two membership-diff categories with no
+distinction; the aged case actually needed a non-trivial state machine
+(seed only already-aged items at baseline, union newly-aged into the known
+set, intersect against current membership to stay bounded) that the plan
+never specified.
 
 ### Pipeline Bypass
 Assumptions that new code is needed when an existing pipeline or mechanism

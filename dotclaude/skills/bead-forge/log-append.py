@@ -80,9 +80,20 @@ def format_entry(bead: dict) -> str | None:
   labels = bead.get("labels") or []
   category = category_for(labels)
   if category is None:
+    print(
+      f"log-append: bead {bead.get('id', '?')} has no category label "
+      f"(memory/decision/discovery/review); skipping log.md append. "
+      f"Add one first, e.g.: bd label add {bead.get('id', '<id>')} memory",
+      file=sys.stderr,
+    )
     return None
   date = (bead.get("created_at") or "")[:10]
   if not date:
+    print(
+      f"log-append: bead {bead.get('id', '?')} has no created_at date; "
+      f"skipping log.md append.",
+      file=sys.stderr,
+    )
     return None
   return (
     f"## [{date}] {category} | {domain_csv(labels)} "
@@ -106,6 +117,11 @@ def main() -> int:
     return 0
   bead = fetch_bead(sys.argv[1])
   if bead is None:
+    print(
+      f"log-append: could not fetch bead {sys.argv[1]} "
+      f"(not found or bd error); skipping log.md append.",
+      file=sys.stderr,
+    )
     return 0
   entry = format_entry(bead)
   if entry is None:

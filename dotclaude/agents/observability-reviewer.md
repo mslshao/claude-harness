@@ -113,7 +113,7 @@ Detection:
 - Diff adds an `aws_lambda_function`, `aws_ecs_task_definition`, or `aws_apigatewayv2_api` resource
 - The same diff (or sibling `*.tf` files in the same service directory) lacks an `aws_cloudwatch_log_group` with `retention_in_days`
 
-Verification: read the sibling `*.tf` files. If retention is configured at the module level (e.g., `infra/module/ecs/main.tf`), flag at MINOR rather than WARNING.
+Verification: read the sibling `*.tf` files. If retention is configured in a sibling file or by a module-level `aws_cloudwatch_log_group` that sets `retention_in_days`, flag at MINOR rather than WARNING.
 
 ## Advisory Question Patterns (QUESTION Tier)
 
@@ -172,7 +172,7 @@ Question to flag: "Service emits CloudWatch metrics; verify the IAM policy and s
 - **MetricsCollector lifecycle gotcha**: `MetricsCollector.__exit__` calls `post_to_cloudwatch()` which clears `self._metrics` but NOT `self._dimensions`. If the same MetricsCollector instance is reused across requests, dimensions leak between metric emissions. See `bd memories metrics-collector-testing`.
 - **Datadog hot-tier retention**: ~7 days. For investigation queries beyond 7 days, the reviewer must use `storage_tier: flex_and_indexes`. Not your concern at PR review time, but flag if a PR description claims long-window historical analysis.
 - **ddtrace/OTel propagation footguns**: Reference `bd memories architecture:ddtrace-otel-hijack` for the two-propagator interaction patterns.
-- **PR #7841 / MX2-XXXXX**: doc_chunk MetricsCollector → DatadogProvider migration. Reference for understanding the dual-stack landscape. See `bd memories mx2-18435-pr`.
+- **PR #7841 / MX2-NNNNN**: doc_chunk MetricsCollector → DatadogProvider migration. Reference for understanding the dual-stack landscape. See `bd memories mx2-18435-pr`.
 
 ## Output Format
 

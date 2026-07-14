@@ -67,13 +67,42 @@ wrap with `str(...)` or `write_review` raises a Pydantic `ValidationError`.
 
 Populate the placeholders from the review you just posted:
 - `<PR_NUMBER>`: integer PR number
-- `<UTC_ISO_TIMESTAMP>`: ISO-8601 UTC timestamp for this write (e.g. `2026-04-17T14:00:00Z`)
+- `<UTC_ISO_TIMESTAMP>`: the review's `submitted_at` from the Step 3 reviews POST
+  response (authoritative review time, and the record's range key, so use the real
+  value rather than approximating). Fall back to current UTC only if the POST
+  response is unavailable.
 - `<HEAD_SHA>`: the `headRefOid` from PR metadata (same as the `<head_sha_short>` source in Step 5)
 - `<PR_TITLE>`, `<PR_AUTHOR>`, `<SIZE>`: from PR metadata and size classification
 - `<FULL_BRIEFING_MARKDOWN>`: the full text of the briefing produced by /pr-intel
-- `proposed_comments`: one `ProposedComment` per inline comment that was posted,
-  using the `id` (GitHub comment ID) returned by Step 3
+- `proposed_comments`: one `ProposedComment` per inline comment that was posted.
+  The reviews POST in Step 3 returns the REVIEW id, not per-comment ids, so fetch
+  each `posted_comment_id` from `/pulls/{n}/comments` filtered by that review id:
+
+  ```bash
+  gh api /repos/{owner}/{repo}/pulls/{n}/comments \
+    --jq '.[] | select(.pull_request_review_id==<STEP_3_REVIEW_ID>) | {id, path, line}'
+  ```
+
+  Filter by `pull_request_review_id`, NOT by author+path. A concurrent same-author
+  review on the same PR (Michael runs multiple windows) contaminates an author+path
+  filter: observed on PR #9838, where a parallel-window review posted a comment on
+  the same file ~5s before this one and an author+path fetch returned both.
 
 **Behavior on write failure**: Log the exception, continue. Do not surface the DynamoDB
 error to the user as a review failure. The GitHub post is the authoritative action;
 DynamoDB is supplementary state for cross-modality coordination.
+
+**Reusable helper (preferred over hand-writing the heredoc/script).** Write a
+params JSON (`{repo, pr, timestamp, head_sha, title, author, size, briefing_path,
+comments: [{id, path, line, body}]}`, comments omitted for body-only) and the
+briefing markdown, then run:
+
+```bash
+AWS_PROFILE=dev AWS_DEFAULT_REGION=us-east-1 uv run --with boto3 --with 'pydantic>=2' \
+  python3 ~/.claude/scratch/scripts/pr_review_ddb_writeback.py <params.json>
+```
+
+The helper encapsulates the `sys.path` insert, the `str()`-wrapping of comment ids
+(the Pydantic ValidationError gotcha above), and the Review/ProposedComment build,
+so each writeback is a data file, not reconstructed code. The heredoc above remains
+the from-scratch fallback if the helper is unavailable.

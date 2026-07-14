@@ -20,7 +20,7 @@ After specialist results return, synthesize into the final briefing.
    on 2026-05-20, is canonical: 'TypeAdapter(Trigger) version-dependent on
    Pydantic' was reworded to 'Pydantic 2.4+ follows __value__ for
    TypeAdapter, worth a smoke check' and posted as a fresh top-level inline,
-   surfacing a reviewer feedback 'you posted the same comment with different
+   surfacing the engineering lead feedback 'you posted the same comment with different
    wording twice in 2 separate threads on the same line'). The rule:
    - If the new finding restates the prior comment with no new context: drop
      the finding entirely (do NOT post a second top-level inline on the same
@@ -69,14 +69,14 @@ After specialist results return, synthesize into the final briefing.
      the same code post-update: **keep it** as a fresh assessment.
 3. **Resolve disagreements** - surface both perspectives, don't silently pick sides
 4. **Categorize by GitHub surface** - specific file+function = inline comment; architectural = review summary
-4b. **CI-catchable filter** (a reviewer 2026-05-26 mx2-eng fortnightly: "find things that the linter's gonna catch anyway, or SonarCloud's gonna catch anyway, and then it's like, it's not really worth commenting on, necessarily"): for each finding heading to an inline comment, check whether merged-CI tooling will catch the same issue on the same diff lines. If yes, drop the inline emission entirely and demote to a single-bullet acknowledgment in the Draft Review Summary "Smaller notes" subsection (referencing the CI check by name). The author will see the CI failure with the canonical message; an inline comment that restates it is duplication.
+4b. **CI-catchable filter** (the engineering lead 2026-05-26 mx2-eng fortnightly: "find things that the linter's gonna catch anyway, or SonarCloud's gonna catch anyway, and then it's like, it's not really worth commenting on, necessarily"): for each finding heading to an inline comment, check whether merged-CI tooling will catch the same issue on the same diff lines. If yes, drop the inline emission entirely and demote to a single-bullet acknowledgment in the Draft Review Summary "Smaller notes" subsection (referencing the CI check by name). The author will see the CI failure with the canonical message; an inline comment that restates it is duplication.
 
    Catchable patterns (drop the inline, demote to summary if useful):
    - **Ruff**: any finding that maps to a Ruff rule code (E, F, W, I, N, UP, B, SIM, PL, etc.). Ruff runs in `pants tlc` and CI.
    - **MyPy / `pants check`**: typing.Any usage, missing return annotations, incompatible types, untyped function calls. These fail `pants check` and block merge.
    - **SonarCloud rules** (`python:S<NNNN>`): findings that match a rule in `~/.claude/projects/-workspaces-main/memory/sonarcloud-rules.md`. SonarCloud posts these as inline issue comments on the PR. Exception: when SonarCloud has NOT posted on the PR yet (rule reports lag) AND the finding is BLOCKING-class, the inline can stand; otherwise demote.
    - **Pants lint rules**: `pants lint` violations (banned imports, em-dash detection, etc.).
-   - **Project-rule violations enforced by hooks**: em-dashes (block-em-dash.sh), `typing.Any` (banned-import.sh), bare except (lint rule). These fail at edit time or in CI.
+   - **Project-rule violations**: em-dashes are blocked at edit time (block-em-dash.sh). `typing.Any` and bare except are not edit-time-hooked; they surface via MyPy / `pants check` / lint in CI.
 
    When in doubt about CI coverage, KEEP the finding. The filter is for clear-cut cases where the duplication is wasteful, not for "the linter might possibly catch this."
 
@@ -104,39 +104,43 @@ After specialist results return, synthesize into the final briefing.
     - 9: Strip meta-observation preamble (V1), both-sides-with-concession framing
       (V2), trailing "since/because" justification (V3). These are reviewer-pad
       patterns; the diff line carries the context.
-    - 10: Convert the postable text to a bot-invoked `@claude` question per the
-      "Bot-Invoked Comment Form" section below when EITHER (a) the post-compression
-      draft genuinely does not fit the Comment-Shape Decision Table ceilings AND the
-      verdict requires multi-file tracing (`default` mode only), OR (b) the verdict
-      rests on a falsifiable framework/library/repo-wide-state assertion not confirmed
-      locally with high confidence (`default` mode only; size-independent, fires even on
-      XS/S where the verification pass is gated off). See the first and second triggers
-      in that section; rule 11 below adds a third, portfolio-level floor for large PRs.
-    - 11: **Size-scaled collaborative-routing floor (the poker discipline).** A
-      portfolio-level pass, run ONCE after rule 10 has been applied to every finding,
-      not a per-finding rule. Default: zero bot-invoked questions is the correct
-      outcome, and stays correct on XS/S PRs and on any PR whose findings are all
-      mechanical/rule, all CI-catchable, all bot-dedup confirmations, or all
-      defect-class BLOCKINGs with a single visible anchor (citing the rule is the
-      load-bearing posture there). The floor is a re-examination prompt that fires ONLY
-      when (a) the PR is M+ (size in {M, L, XL, 2XL, 3XL}), AND (b) rule 10 produced
-      zero bot-invoked questions, AND (c) at least one substantive net-new finding
-      exists that is none of the excluded classes above. When it fires, you MAY route
-      the strongest 1-2 such findings through `@claude` per the "Bot-Invoked Comment
-      Form" third consideration; prefer findings whose verdict `@claude` can trace
-      against repo HEAD (root cause, cross-file contract, "fails because X"), since that
-      is where bot routing adds value. This is permission to route, NOT an instruction:
-      never manufacture a question to clear the floor; if nothing genuinely qualifies,
-      zero stands. Cap at 2 so the review does not become all bot-questions. Disposition
-      surfaced across the 2026-06-04 parallel reviews (9646/9627/9641), whose first-pass
-      briefings each produced zero `@claude` questions despite substantive local analysis.
+    - 10: When a finding's verdict rests on a falsifiable framework/library/repo-wide
+      or cross-system-state assertion not confirmed locally with high confidence, do NOT
+      emit it as a confident verdict. Run the local investigation (verification.md; for
+      the cross-system column/field class, the named Cross-System Investigation recipe in
+      the "Unverified-Assertion Containment + Cross-System Investigation" section below),
+      and let the RESULT drive the finding: confirmed -> state it directly; unresolved or
+      contradicted -> emit an explicit UNVERIFIED-ASSERTION finding (honest uncertainty,
+      never a confident verdict) and bind the recommendation per output-formats
+      (default/--once Comment, --mine "Needs work first", --quick "Warrants careful
+      review"). Size-independent: fires even on XS/S where the verification pass is gated
+      off (the exact gate #9896 fell through). The dead @claude-bot question form is
+      retired; the manual `@claude review once` (managed Code Review) is the out-of-band
+      escalation when local investigation is inconclusive. Rule 11 below adds a
+      portfolio-level re-examination floor for large PRs.
+    - 11: **Size-scaled re-examination floor.** A portfolio-level pass, run ONCE after
+      rule 10 has been applied to every finding, not a per-finding rule. Default: no
+      action on XS/S PRs and on any PR whose findings are all mechanical/rule, all
+      CI-catchable, all bot-dedup confirmations, or all defect-class BLOCKINGs with a
+      single visible anchor (citing the rule is the load-bearing posture there). The
+      floor fires ONLY when (a) the PR is M+ (size in {M, L, XL, 2XL, 3XL}), AND (b) at
+      least one substantive net-new finding exists that is none of the excluded classes
+      above. When it fires, re-examine those findings to confirm none shipped a
+      falsifiable framework/repo or cross-system assertion AS A CONFIDENT VERDICT without
+      the rule-10 investigation having run; any that did downgrades to an
+      UNVERIFIED-ASSERTION finding per rule 10. This is a self-audit of the reviewer's own
+      output (the dead @claude collaborative-routing form is retired); it never posts a
+      bot question. Disposition surfaced across the 2026-06-04 parallel reviews
+      (9646/9627/9641), whose first-pass briefings each produced zero `@claude` questions
+      despite substantive local analysis.
 
     The compression target: design-judgment findings default to ≤ 25 words and
-    ≤ 2 sentences (calibrated 2026-05-13 against the a reviewer corpus ceiling),
+    ≤ 2 sentences (calibrated 2026-05-13 against the the engineering lead corpus ceiling),
     often a bare question. Defect-class BLOCKING and design-judgment findings
     that require a named alternative are the only legitimate paths to longer
-    comments. When even those don't fit, rule 10 routes to bot-invoked form
-    rather than wall-of-text in reviewer voice.
+    comments. When even those don't fit, the finding renders as a longer direct inline
+    comment (the dead bot-invoked form is retired); rule 10 governs only the
+    unverified-assertion case, not comment length.
 
 5c. **Hunk-edge pre-check** - for each remaining inline comment after step 5b,
     verify the target line falls within at least one diff hunk in the changed
@@ -224,6 +228,7 @@ provenance-classification.md):
     | `mx2-pr-precedent` | bot-surfaced | bot-surfaced (historical PR comment retrieval) |
     | `mx2-git-historian` | bot-surfaced | bot-surfaced (git log/blame historical analysis) |
     | `bot-review` | bot-surfaced | bot-surfaced (cross-file blast-radius is the agent's whole job) |
+    | `module-cohesion-reviewer` | bot-surfaced | speed-amplified only if the smell is reachable from the single-file diff (e.g. a filename that lies about its contents) |
     | `mx2-pydantic-reviewer` | bot-surfaced | speed-amplified only if finding is reachable from the single-file diff |
     | AC Compliance Check | bot-surfaced | bot-surfaced (Jira AC trace required reading the ticket) |
     | Spec Compliance / Design Doc | bot-surfaced | bot-surfaced (multi-page design doc synthesis required) |
@@ -267,7 +272,7 @@ provenance-classification.md):
     are not orphaned; reclassify as a design review surface question, not a finding.
 7. **Assign severity** - BLOCKING / DISCUSSION / MINOR
 7b. **Tag Front Door findings** - independent of severity, tag findings that
-    match a reviewer's explicit "send back quickly" classes:
+    match the engineering lead's explicit "send back quickly" classes:
     - **Type/model smells**: untyped dicts, `dict[str, Any]`, Literal-key
       dict access (`response["matter_id"]`), `| None` on collections
       (`list[T] | None`, `dict[K,V] | None`), `bool | None`, same model
@@ -284,13 +289,13 @@ provenance-classification.md):
     orthogonal: a type smell can be FRONT-DOOR + DISCUSSION (cheap to fix,
     but ripples), a security finding is NOT-FRONT-DOOR + BLOCKING (just
     fix inline). Boolean-param smells, pragma misuse, and exception-design
-    smells are NOT Front Door; they're iterate-inline findings. a reviewer
+    smells are NOT Front Door; they're iterate-inline findings. the engineering lead
     explicitly puts the "send back quickly" framing on description (#1)
     and types (#2); the rest are inline-iterate.
 
     Description-quality issues do not flow through this step because Phase 0
     short-circuits before specialist dispatch. If Phase 0 passed and Front
-    Door is empty, the PR is past a reviewer's send-back gate.
+    Door is empty, the PR is past the engineering lead's send-back gate.
 
 8. **Assess consequence** - for each DISCUSSION finding, evaluate reversibility
    and consequence to determine whether it affects the review recommendation.
@@ -329,7 +334,7 @@ provenance-classification.md):
     PR #11 of the day) lets stupid findings ship under his name. If the output
     exceeds his own review-capacity at posting time, it cannot serve the trust
     signal it was built for. The 5-decision ceiling is calibrated against the
-    a reviewer corpus pattern (median ~3 substantive comments per PR with headroom
+    the engineering lead corpus pattern (median ~3 substantive comments per PR with headroom
     for AC + design surfaces) and against working-memory limits.
 
     The gate fires AFTER provenance classification (step 5d) so compression
@@ -347,12 +352,6 @@ provenance-classification.md):
     one line). Both together means the body is restating, and restating doubles the
     author's reading cost.
 
-    Exception (load-bearing): the `@claude` trigger sentence required by the "Bot-Invoked
-    Comment Form" posting-side rule is NEVER subject to this pass. Preserve any body
-    sentence containing the literal token `@claude` unconditionally. Dropping it strips
-    `@claude` from `review.body` and silently suppresses every bot-invoked inline in the
-    batch (the 9325 failure).
-
     The body's positive job is everything with NO inline home: the overall assessment, AC
     deviations, PR-description and process notes, and cross-cutting framing that ties
     several inline findings together. This pass compresses restatement; it does not shrink
@@ -367,7 +366,7 @@ provenance-classification.md):
     fatigue-proof structural backstop). The 9304 anti-pattern is canonical: the
     `sqlworkbench:ListDatabases` question rendered in BOTH the body's numbered list AND
     inline:37 with ~80% prose overlap. The 9646 instance (2026-06-04) is the recurrence
-    that forced promotion: a body paragraph previewed the inline `@claude` finding and was
+    that forced promotion: a body paragraph previewed an inline finding and was
     deleted by hand at emit time. See `bd memories
     calibration:pr-intel-voice-body-inline-duplication-2026-05-21`.
 
@@ -463,7 +462,7 @@ trust the diff.
    string literals matching base64 patterns (≥ 16 chars, `^[A-Za-z0-9+/]+=*$`),
    numeric constants without a named identifier, or unexplained env-var defaults,
    emit a "where does this come from?" finding with VERIFIED + DISCUSSION severity.
-   a reviewer's two highest-leverage moves on PR #8931 were both provenance questions
+   the engineering lead's two highest-leverage moves on PR #8931 were both provenance questions
    on opaque base64 IDs (`arize_space_id = "U3BhY2U6..."`, prompt_ids in
    `prompt_client.py`). This is mechanical to detect and the highest-frequency
    missing question in pr-intel output today. The draft comment shape: "where does
@@ -507,125 +506,108 @@ The link preserves `bot-review`'s advisory-only stance (no proposed fix in the
 comment text itself) while making the finding actionable. If `bot-review` produced no
 findings, no Fix-this link appears anywhere.
 
-## Bot-Invoked Comment Form
+## Unverified-Assertion Containment + Cross-System Investigation
 
-Multi-paragraph trace comments in reviewer voice have three failure modes: (a) they
-consume reviewer drafting bandwidth, (b) they read as wall-of-text to PR authors who
-must reckon with a senior peer writing seven paragraphs of code tour, (c) they lock
-the reviewer into a conclusion before the author can respond. The bot-invoked form
-decouples these: the reviewer asks a short anchored question, the GitHub `@claude`
-bot does the trace, the reader receives bot-voice analysis, and the reviewer's
-actual verdict stays in the briefing context for follow-up if the bot's response is
-incomplete or wrong.
+The job this section does, preserved from the retired @claude-bot form: keep pr-intel from
+posting a confident-but-wrong verdict on a claim it could not verify. The mechanism is no
+longer a bot question (PR #9888 removed the self-hosted @claude Q&A bot, and the managed
+Claude Code Review replacement is a full-PR reviewer, not a question-answerer). The
+mechanism is now an explicit UNVERIFIED-ASSERTION finding whose result drives the verdict,
+plus a forced local investigation for the one class that has a named recipe.
 
-**When to convert**: rule 10 in step 5b fires. Concretely, the post-compression
-draft genuinely does not fit the Comment-Shape Decision Table ceilings (>25 words
-or >2 sentences for design-judgment, >3 sentences for defect-class BLOCKING) AND
-the verdict requires multi-file tracing (≥2 files OR cross-referencing a contract:
-IAM policy ↔ runtime call, settings field ↔ consumer, type signature ↔ caller
-assumptions) AND the conclusion is not trivially visible at the anchor line.
+**Why a positive trip-wire, not self-flagged doubt.** PR #9896 was CONFIDENT
+INCORRECTNESS, not recognized uncertainty: the review read a Pydantic field name
+(`OCR_Detected_Type__c`) and confidently asserted the Redshift mirror column existed; it
+does not (the mirror uses the simplified snake_case `ocr_detected_type`). A containment
+that fires only when the agent volunteers doubt never fires on a confidently-wrong agent.
+So the trip-wire below keys on an OBSERVABLE DIFF SIGNAL, not on the agent's self-assessed
+certainty.
 
-**Second, independent trigger (falsifiable-assertion verification)**: convert to the
-bot-invoked form REGARDLESS of comment size when the finding's verdict rests on a
-falsifiable assertion about framework/library behavior or repo-wide state ("all
-callers migrated off the old kwarg", "field X is unused", "the default TestClient is
-loopback", "Pydantic v2 rejects field X") that has not been confirmed locally with
-high confidence. Two ways that happens: on XS/S PRs the verification pass
-(verification.md) is size-gated off entirely, so any load-bearing falsifiable
-assertion is unconfirmed by definition; on M+ PRs, verification.md step 2's local
-check came back inconclusive. The `@claude` bot reads repo HEAD with fresh context and
-empirically catches confident-but-wrong local assertions that a code-only specialist
-pass would otherwise ship; routing the claim as a neutral `@claude` question both
-validates it and keeps the reviewer off the hook for a claim they could not verify.
-Canonical instance: 9451 (S-sized, so verification was skipped), where a wrong
-"Starlette default TestClient is loopback" claim drove a false test-gap finding the
-`@claude` bot corrected from repo HEAD. This trigger is OR-ed with the size/trace
-trigger above: either path alone suffices to convert.
+### Cross-System Investigation (CSC) trip-wire
 
-**Third consideration (collaborative-routing floor, the poker discipline)**: the two
-triggers above are reactive and per-finding; each fires only when a specific finding hits
-a size/trace ceiling or rests on an unverified falsifiable claim. On a larger PR where
-every finding verified cleanly and compressed to direct form, both can stay silent,
-leaving the whole review in direct voice with ZERO `@claude` questions. The default is
-that zero is correct: a genuinely clean PR earns no manufactured questions. The floor
-guards only the case where zero co-occurs with substantive findings on a larger PR, and
-the rationale is trust, not verification (these findings are already verified locally). A
-larger PR returned as a wall of verified verdicts with zero questions reads as a
-fully-revealed hand: nobody plays against face-up cards, it looks like showing off
-everything found, and it leaves the author nothing to engage, none of which builds the
-back-and-forth that earns review trust. An anchored `@claude` question invites the author
-into a discussion (the bot does the trace; the author answers a question, not a verdict)
-and keeps the analysis honest by validating it against repo HEAD in the open.
+FIRES when ALL of the following are observable in the diff under review:
+- (a) the diff adds or modifies a query (SQL `SELECT`/`JOIN`/`WHERE`, a dyntastic/boto3
+  `FilterExpression`, or any column-dependent path), AND
+- (b) it targets a Salesforce/DynamoDB-mirror surface: a `sf.<schema>.<table>` qualified
+  name (literal OR env-templated like `sf."{SF_ENV}".table`), a `*-sf_sync-cache_dyn-*`
+  DynamoDB table, or a dyn2red replica, AND
+- (c) a finding OR an implicit APPROVE rests on a specific NAMED column/field existing in
+  that table.
 
-Apply as a portfolio-level check (step 5b rule 11): after the two triggers above have run
-across all findings, if the bot-invoked count is ZERO AND the PR is M+, you MAY route the
-strongest 1-2 substantive net-new findings through `@claude`, preferring those whose
-verdict `@claude` can trace against repo HEAD. Permission, not a quota: it applies only to
-a substantive net-new finding that is NOT a defect-class BLOCKING with a single visible
-anchor (the rule citation is load-bearing; see "When NOT to convert" below), NOT a
-CI-catchable nit, and NOT a bot-dedup confirmation. Never manufacture a question to clear
-the floor; if nothing qualifies, zero stands. Cap at 2. `--mine` and `--quick` are exempt
-(no post-and-wait step).
+The fire condition is the REFERENCE in the diff, not the agent volunteering doubt: the
+agent does NOT get to classify the column as "confirmed locally" and skip the
+investigation. Does NOT fire on: columns the same diff defines (CREATE TABLE / migration),
+key-only DynamoDB lookups, a reformat of an unchanged query, or non-mirror application
+tables. Env-templated `sf` schema queries fire the SAME as literal (correct-fire; the
+mirror-table reference is the discriminator, not literal-vs-interpolated schema).
 
-**When NOT to convert** (stay in direct voice):
-- Finding compresses cleanly to the Comment-Shape Decision Table ceilings, AND the
-  falsifiable-assertion trigger does not fire. An unverified falsifiable claim
-  converts even when it compresses cleanly; size only governs the first trigger.
-- Defect-class BLOCKING with a single visible anchor (rule violation, runtime
-  crash visible in the diff itself). The reviewer citing the rule is the
-  load-bearing posture; bot mediation dilutes it.
-- `--mine` mode. The author is the reviewer; routing through a bot adds latency
-  without depersonalizing anything. The falsifiable-assertion trigger does not
-  bot-route in `--mine` either: surface an unverified framework/repo-state claim as a
-  pre-submission item to check before review, not as an `@claude` question (the
-  `--mine` path has no post-and-wait step to consume one).
-- `--quick` mode does not emit inline comments.
+### CSC investigation (worktree-executable; the result drives the verdict)
 
-**Form**: the bot-invoked comment is a neutral question (not a leading one) that:
+When the trip-wire fires, run this BEFORE stating the column exists with confidence:
 
-- Anchors at the suspect code (same line target as the direct form would have used)
-- Opens with `@claude` plus an open verb (`can you trace`, `could you check`,
-  `does this`)
-- Names the specific files, symbols, or contracts the bot should examine
-- Asks for the bot's verdict at the end; does NOT pre-state the reviewer's
-  conclusion (the bot may reach a different answer; pre-stating bias the response)
-- Stays to one paragraph in the postable text; the bot's response is the long form
-- Omits the Tool-source attribution prefix. The `@claude` invocation IS the
-  attribution; readers see bot-voice provenance directly in the response thread.
+1. **Resolve the expected mirror column name.** If the asserted name is a raw Salesforce
+   field (has `__c` or PascalCase), call `simplify_sf_name` (a pure worktree function,
+   `src/python/mx2/salesforce/utilities.py`) to get the snake_case form
+   (`OCR_Detected_Type__c` -> `ocr_detected_type`). If it is already snake_case, use as-is.
+2. **Confirm via a sibling query in an UNCHANGED file.** Grep for the resolved name against
+   the SAME table in a file NOT changed by this diff (exclude `git diff --name-only` to
+   avoid circular self-confirmation: in #9896 the only repo match was
+   `med/review/matter_sync.py:24`, which was itself in the diff under review).
+3. **The result drives the finding** (there is no "cap" to hold or clear):
+   - asserted name matches the resolved-and-grep-confirmed name -> column confirmed; state
+     it directly; the verdict may be Approve on its own merits.
+   - mismatch (raw field name vs snake_case, casing) -> UNVERIFIED-ASSERTION finding; the
+     verdict reflects it (default/--once Comment, --mine "Needs work first", --quick
+     "Warrants careful review").
+   - unresolvable (no consuming model with a generator, hand-written SQL, no sibling in an
+     unchanged file) -> UNVERIFIED-ASSERTION finding + the manual escalation note below.
 
-**Briefing context preservation**: the finding's full briefing context (severity,
-classification, specialist source, verification path, the reviewer's own read of
-the expected answer) stays in the briefing-context section per output-formats.md.
-The reviewer reads the briefing to decide whether to post and to validate the bot's
-eventual response. If the bot reaches a different conclusion than the briefing
-indicated, that is a calibration signal worth surfacing (and a reply slot for the
-reviewer to correct on-thread).
+Reading a consumer model's `model_config` `alias_generator` is a SECONDARY hint only,
+never the primary resolver: the Redshift query's reader is often a dyntastic model with no
+`alias_generator` (the generator lives on the SF-sync write model in another service), so
+"find the consuming model and read its alias_generator" does NOT resolve the seed case.
 
-**Posting-side trigger**: the GitHub `Claude Code` workflow filters on
-`contains(github.event.review.body, '@claude')` for `pull_request_review` events
-and on `contains(github.event.comment.body, '@claude')` for
-`pull_request_review_comment` events. When inline comments are submitted as part
-of an atomic review (`POST /pulls/N/reviews` with `comments` array), GitHub
-fires the review event and may suppress per-inline events. The Draft Review
-Summary body MUST therefore contain literal `@claude` whenever any bot-invoked
-draft inline comments exist in the batch; otherwise the workflow skips and no
-bot response fires (canonical failure: 2026-05-27 9325 review batch; review body
-contained "Pinged Claude" without the @-prefix; six bot-invoked inline comments
-posted, zero workflow runs fired, manual wake-up issue comment required).
+### General falsifiable claims (no named recipe)
 
-The simplest body shape that triggers reliably: append one sentence to the
-Draft Review Summary like "Some inline questions are tagged for `@claude` to
-trace on this round." The sentence is natural in human voice, contains the
-literal `@claude` token, and signals to the PR author that bot responses will
-land in those threads.
+For a falsifiable framework/library/repo-wide assertion outside the cross-system column
+class (e.g. "all callers migrated", "field X is unused", the 9451 "Starlette default
+TestClient is loopback" case), there is no named recipe and no local oracle. Surface it as
+an UNVERIFIED-ASSERTION finding (honest uncertainty, verdict capped per mode); the manual
+`@claude review once` is the out-of-band escalation. PRESERVE-DISSENT: retiring the bot is
+a genuine coverage reduction for this general class (the bot was a repo-HEAD oracle for
+arbitrary claims). The COMMENT-on-uncertainty finding is the long-tail substitute, strictly
+weaker than a fresh repo-HEAD read. Track recurrence; do NOT re-animate the bot. Grow named
+recipes from observed failures instead.
 
-Reference: this section was added 2026-05-27 after the 9325 incident demonstrated
-both the load-bearing value of the form (specialist findings landed as @claude
-questions read more neutrally than as reviewer monologues) and the posting-side
-gotcha (the workflow-filter mismatch).
+### Growth rule
 
-See `output-formats.md` for the bot-invoked draft template and the Comment-Shape
-Decision Table override note.
+The CSC recipe is one named entry, seeded by #9896 (mark it Observed). Add a new named
+recipe ONLY from an observed failure (mirror the static-analyzers.md Growth rule: tag each
+entry Preventive vs Observed so provenance stays auditable). Do not pre-populate guessed
+classes; a generic "verify column names" prompt yields "looks correct" and catches nothing.
+
+### Manual escalation (live confirmation)
+
+When local investigation is inconclusive (a live-table check is needed, or a general-class
+claim has no recipe), the briefing carries a one-line note: post `@claude review once` as a
+top-level PR comment (managed Code Review; NEVER bare `@claude review`, which subscribes the
+PR to a paid review on every push) to get an out-of-band repo-HEAD pass. This is operator
+discretion, not an autonomous pr-intel action; it never gates or withholds the first-round
+verdict.
+
+### Form of an UNVERIFIED-ASSERTION finding
+
+Renders as a normal Draft Inline Comment at the suspect line, opening with the
+tool-attribution lede (the `block-unattributed-review-comment*` hooks require it), stating
+the resolved-name reasoning and what was and was not confirmed. No `@claude` token is
+required in the review body (the dead posting-side workflow filter is retired). The full
+briefing context (severity, classification, specialist source, the resolved name, what the
+grep confirmed) stays in the briefing-context section per output-formats.md. `--mine`
+renders it under "Issues to Fix Before Review" as a pre-submission column-confirm item;
+`--quick` (no inline section) expresses it only as the Verdict nudge.
+
+See `output-formats.md` for the unverified-assertion draft template and the Comment-Shape
+Decision Table note.
 
 ## Consequence Assessment
 
@@ -678,6 +660,14 @@ For XS/S/M PRs with low risk, no external dependencies, and clean findings, firs
 Approve is fine. The gate is not size alone but complexity and verifiability: a 200-line
 PR that renames a variable in an external system contract is higher risk than a 500-line
 PR that adds straightforward test coverage.
+
+"Clean findings" here means no BLOCKING or high-consequence findings, not zero findings.
+A first-round XS/S PR whose only findings are non-blocking (MINOR or low-consequence
+DISCUSSION) defaults to Approve-with-comments via approve-while-logging-dissent
+(output-formats.md), not Comment: log the nit inline and approve. Reserve first-round
+Comment for L+/novel/external-contract PRs, for any BLOCKING/high-consequence finding,
+or when a finding is a genuine open question the author must answer before the change
+is sound.
 
 To detect first-round status: check the `reviews` array from PR metadata. If no prior
 review exists from this user (mslshao), or all prior reviews are from bots, this is
@@ -735,11 +725,26 @@ large-refactor methodology gap; see step 7b) is not always a runtime defect,
 but downstream review effort depends on it being right. Approving with
 inline comments invites the author to address the type smell in the same
 round as 5 other comments on code that may itself need re-shaping once the
-type is fixed. a reviewer's framing: "send them back, and quickly." The
+type is fixed. the engineering lead's framing: "send them back, and quickly." The
 recommendation lands at Comment with the Draft Review Summary opening
 "the priority for this round is X; let's iterate on that before deeper
 review." BLOCKING + FRONT-DOOR still resolves to Request Changes (BLOCKING
 is more restrictive). FRONT-DOOR + DISCUSSION/MINOR resolves to Comment.
+
+**Settled-type carve-out.** The Comment default assumes the smell is
+UNSETTLED and would ripple: the author re-shapes the type, surrounding code
+shifts, so a deeper read is premature. When the type decision is already
+settled (author self-reviewed and it is in HEAD), the review is otherwise
+complete, behavior is verified benign, and the only live front-door item is
+an inaccurate description line plus non-blocking type polish, Front Door does
+NOT override approve-while-logging-dissent: route to Approve with the
+description correction and type nits logged as non-blocking. The test is
+whether the finding still forces a re-shape before deeper review can proceed;
+if the review is already done and nothing ripples, it is a followup, not a
+gate. Pairs with calibration:pr-intel-re-review-approve-default-2026-05-27
+(same over-default-to-Comment outcome, different mechanism). Recurrence:
+2026-06-26 PR #10143 (a settled, self-reviewed typing pass mis-described as
+"pure move" drew a Comment default; the proportionate call was Approve).
 
 ### Coverage Gate Exception
 

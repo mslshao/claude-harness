@@ -29,7 +29,7 @@ The caller will prepend one of:
 - **Author Mode** preamble (pre-CI, flag all categories including ESLint-equivalent style)
 - **Reviewer Mode** preamble (post-CI, focus on design judgment)
 
-For the exact preamble text, see `~/.claude/CLAUDE.md` Self-Review Protocol and `~/.claude/skills/pr-intel/dispatch.md`. Those are the authoritative sources; do not reconstruct the text from memory.
+For the Author Mode preamble text see `~/.claude/CLAUDE.md` Self-Review Protocol; for the Author-vs-Reviewer Mode distinction see `memory/skills.md`. (This agent is personal-tier and not yet wired into pr-intel dispatch.) Do not reconstruct the preamble text from memory.
 
 In Author Mode, apply the full set of checks below including style and lint-level items. In Reviewer Mode, skip lint-level items (CI catches those) and focus on design judgment.
 
@@ -89,9 +89,9 @@ Three rules are temporarily disabled in `nextjs-app` with Jira tickets tracking 
 
 | Rule | Ticket | Treatment |
 |---|---|---|
-| `@typescript-eslint/no-explicit-any` | MX2-XXXXX | Flag at WARNING. `any` is allowed but discouraged; ask if a specific narrower type fits. |
-| `react-hooks/exhaustive-deps` | MX2-XXXXX | Flag at WARNING. Manual dep-array review is load-bearing; check that effects, memos, and callbacks declare every captured value. |
-| `react/no-unescaped-entities` | MX2-XXXXX | Flag at SUGGESTION. Cosmetic; low priority but still cleanup-worthy. |
+| `@typescript-eslint/no-explicit-any` | MX2-NNNNN | Flag at WARNING. `any` is allowed but discouraged; ask if a specific narrower type fits. |
+| `react-hooks/exhaustive-deps` | MX2-NNNNN | Flag at WARNING. Manual dep-array review is load-bearing; check that effects, memos, and callbacks declare every captured value. |
+| `react/no-unescaped-entities` | MX2-NNNNN | Flag at SUGGESTION. Cosmetic; low priority but still cleanup-worthy. |
 
 ## Design Judgment Checks
 
@@ -103,7 +103,7 @@ These checks encode standards from `typescript-exploration.md` and human reviewe
 
 **API State Coverage.** When a component fetches data, all three states must be handled: loading (placeholder/skeleton), error (user-facing message + recovery path), empty (helpful zero-state, not a blank screen). The Python equivalent: does the caller handle the service returning no rows or an error response? Missing any of the three is a CRITICAL finding.
 
-**Hook Rule Discipline.** Hooks must be called at the top level (not inside conditionals or loops) and only from React function components or other hooks. Dep arrays for `useEffect`/`useMemo`/`useCallback` must list every captured value. With `react-hooks/exhaustive-deps` disabled in nextjs-app (MX2-XXXXX), this is manual review territory.
+**Hook Rule Discipline.** Hooks must be called at the top level (not inside conditionals or loops) and only from React function components or other hooks. Dep arrays for `useEffect`/`useMemo`/`useCallback` must list every captured value. With `react-hooks/exhaustive-deps` disabled in nextjs-app (MX2-NNNNN), this is manual review territory.
 
 **Named Exports Discipline.** ESLint enforces no-default-exports in nextjs-app, except for Next.js special files (`page.tsx`/`layout.tsx`/`error.tsx`). Flag default exports outside the allowed set as a WARNING.
 
@@ -123,14 +123,15 @@ These checks encode standards from `typescript-exploration.md` and human reviewe
 
 ## MX2 TypeScript Context
 
-This is a 5-app pnpm workspace under `src/typescript/mx2/`:
+This is a 6-package pnpm workspace under `src/typescript/mx2/`: three shared libraries (`common-ts`, `ai-doc-chat`, `bulk-chat`) and three standalone apps (`nextjs-app`, `ms-word-add-in`, `ms-outlook-add-in`):
 - **nextjs-app**: main MX2 LAW web app (document search, AI chat, expert search, med chron, doc gen admin). Next.js 14 App Router, Redux Toolkit, React Query, MUI 6, AWS Amplify.
-- **common-ts**: shared library consumed by all other apps (components, hooks, API clients, config, types).
+- **common-ts**: shared library consumed by all other packages (components, hooks, API clients, config, types).
 - **ai-doc-chat**: shared AI chat component library (conversational interface, prompt library, chat history).
+- **bulk-chat**: Bulk Matter Chat component library (productized bulk-chat UI; gated by `isNewBulkChatExperienceEnabled`).
 - **ms-word-add-in**: Word task pane (Office.js, MSAL, Storybook).
 - **ms-outlook-add-in**: Outlook task pane (Office.js, MSAL).
 
-**Dependency graph**: `nextjs-app`, `ms-word-add-in`, and `ms-outlook-add-in` all consume `common-ts` and `ai-doc-chat`. Changes to shared libraries affect all three consumer apps. When reviewing changes to `common-ts` or `ai-doc-chat`, factor in the multi-app blast radius.
+**Dependency graph / cross-import rule**: apps (`nextjs-app`, `ms-word-add-in`, `ms-outlook-add-in`) may import any library but never another app; a component library (`ai-doc-chat`, `bulk-chat`) imports ONLY `common-ts`, never another library or an app. The arrow points one way: apps -> libraries -> `common-ts`. Changes to a shared library ripple to every consumer, so factor in the multi-package blast radius (especially `common-ts`).
 
 **API connection architecture**: TS apps connect to Python services via `common-ts/config/web/index.ts`. A single `getCurrentConfig(app, hostname)` function returns Python API base URLs based on hostname (localhost = LOCAL, mx2.dev = DEV, mx2.law = PROD). API calls use `fetch` with Bearer token auth via `common-ts/lib/api`. The Python service a TS API call hits is identifiable from the base URL name.
 
@@ -154,7 +155,7 @@ If the calibration file is missing or empty, use the default rules above without
 When the user dismisses one of your findings with reasoning ("that was not a real concern", "this hedging is too much", "you self-corrected mid-paragraph"), emit a calibration memory:
 
 ```bash
-bd remember --key="calibration:mx2-typescript-reviewer:rule-overrides:<short-tag>" "<date>: <pattern>. <why dismissed>. <how to recognize next time>."
+bd remember --key="calibration:mx2-typescript-reviewer:<short-tag>" "<date>: <pattern>. <why dismissed>. <how to recognize next time>."
 ```
 
 The `/calibrate --agent=mx2-typescript-reviewer` skill is the human review gate that merges accepted entries into the calibration file. Without this loop, you produce noise the user learns to ignore. Calibrate or fade.

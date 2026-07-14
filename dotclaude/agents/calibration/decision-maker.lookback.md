@@ -55,7 +55,7 @@ Format per entry:
 - **Category**: false-negative
 - **Action**: new-rule
 - **Summary**: Pin reversals / reopened structural conflicts tip confirmation-mode delta to MAJOR regardless of addition count.
-- **Rationale**: No confirmation-mode DELTA_CATEGORY rubric existed; concrete same-day false-negative instance (MX2-XXXXX).
+- **Rationale**: No confirmation-mode DELTA_CATEGORY rubric existed; concrete same-day false-negative instance (MX2-NNNNN).
 
 - **Source key**: `calibration:mx2-decision-maker:ideation:pr-intel-cross-cutting`
 - **Category**: ideation (gate-context tag, routed to Rule Overrides)

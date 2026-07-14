@@ -102,7 +102,7 @@ parallelism across non-overlapping lanes; serialize only the true conflicts.
 All lanes share the one Phase 5.1 worktree, so an integration agent sees the
 prior pieces already on disk.
 
-**Mandate-scoping recurrence context.** 2026-05-29 MX2-XXXXX / docr-0wf0: a
+**Mandate-scoping recurrence context.** 2026-05-29 MX2-NNNNN / docr-0wf0: a
 single tester given a 4-file mandate (enum + settings + span + metric tests)
 truncated at ~147K tokens / 55 tool-uses mid-write of the last file. The test
 files landed but the final standup did not, and the orchestrator recovered by

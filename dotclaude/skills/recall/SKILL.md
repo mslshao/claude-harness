@@ -1,6 +1,7 @@
 ---
 name: recall
-description: "BFS-first cross-corpus search for information another session produced. Use when the user references past work without a current-session referent ('what we discussed about X', 'remind me about Y', 'the thing with Z', vague pronouns following a session gap, named entities not introduced this turn). Searches beads (titles + descriptions via bd search --desc-contains), memories (keys + values), and topic files in ~/.claude/projects/-workspaces-main/memory/. Returns ranked one-line previews with IDs and recency; agent DFSs into specific hits as needed. Consumer-side complement to the producer-side bd-recency-surface hook."
+description: "BFS-first cross-corpus search for information another session produced. Use when the user references past work without a current-session referent ('what we discussed about X', 'remind me about Y', 'the thing with Z', vague pronouns following a session gap, named entities not introduced this turn), AND at cold start when the user pastes a SESSION HANDOFF prompt (from /handoff): run with the handoff's 'Run /recall <seeds>' line, or derive 2-4 seeds from its CONTEXT section if it predates seed lines. Searches beads (titles via bd search, descriptions via a bd list | jq pass), memories (keys + values), and topic files in ~/.claude/projects/-workspaces-main/memory/. Returns ranked one-line previews with IDs and recency; agent DFSs into specific hits as needed. Consumer-side complement to the producer-side bd-recency-surface hook."
+argument-hint: "<2-4 seeds: keywords, bead IDs, memory keys>"
 ---
 
 # /recall
@@ -16,6 +17,12 @@ Trigger when the user prompt suggests past-session work:
 - Named entities (a person, project, ticket) referenced without current-session context
 - Vague pronouns ("that bug", "the doc") with no in-session referent
 - Cold-start sessions where the user assumes context that this session does not have
+- A pasted SESSION HANDOFF prompt (produced by /handoff) at session start: use its
+  "Run /recall <seeds>" line verbatim; if the handoff predates seed lines, derive
+  2-4 seeds from its CONTEXT and IN-FLIGHT STATE sections. The handoff prose is
+  lossy compression of the prior session; the recall pass surfaces the sibling
+  beads, memories, and topic files it compressed away. Run it before substantive
+  work, alongside the handoff's own first actions.
 
 Do NOT trigger when:
 - The query has a clear current-session referent (just answer from context)
@@ -28,7 +35,7 @@ Do NOT trigger when:
 
 Extract from the user's prompt:
 - **Topic keywords**: free-text terms that might match bead titles, memory keys, topic file names.
-- **Named entities**: people (teammates, execs, reviewers), projects/services (e.g. dyn2red, <service>, folio), tickets (MX2-NNNNN), beads (docr-XXXX).
+- **Named entities**: people (a teammate, a solo-team engineer, a team lead), projects (dyn2red, <service>, folio), tickets (MX2-N), beads (docr-XXXX).
 - **Time hints**: "yesterday", "last week", "earlier" suggest a time-narrowed window.
 
 If the query is too vague to extract seeds, ask ONE clarifying question; otherwise proceed with the best-guess seed.

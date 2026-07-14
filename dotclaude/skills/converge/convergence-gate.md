@@ -53,7 +53,15 @@ Agent(
   quick / for most users) OR the plan is materially heavier than a
   minimal-viable 80/20 version, the extra complexity must be justified
   component-by-component; if it is not, do not PROCEED, fire ITERATE with
-  WEAK_DIMENSION=proportionality.
+  WEAK_DIMENSION=proportionality. For any work item describing operator
+  control semantics (start/stop/pause/resume/restart/cancel), a
+  verification path that only exercises the primary happy-path action
+  (e.g. "stop halts the loop") does NOT satisfy the verification bar; it
+  must exercise every transition named in that item's State-transitions
+  table (work-item-structure.md), including the reverse/ambiguous one
+  (e.g. "resume after stop"). Added 2026-07-10 after a plan item passed
+  this gate with a verification path that tested only the stop action,
+  leaving resume-after-stop completely unverified until build time.
 
   ITERATE if the plan is uncertain BUT another challenge+consult pass
   with a focused weak-dimension target would plausibly resolve it.

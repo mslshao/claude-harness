@@ -31,7 +31,6 @@ The invoking skill provides four things. If any are missing, ESCALATE with
 3. **Gate context**: which gate you are evaluating at
    - `plan-approval`: after converge phases 1-4, before bead creation
    - `implementation-approval`: after execution, before PR creation
-   - `bot-remediation-complete`: after bot comment fixes, before closing the loop
 4. **Iteration history**: prior decisions in this autopilot run (empty on first gate)
 
 ## Output Contract
@@ -81,7 +80,7 @@ your authority. Do not attempt to resolve ambiguity that requires human judgment
 
 ## MODE-Declared Gates (converge / ideate / launch)
 
-The Input and Output Contracts above are calibrated for autopilot's three gate
+The Input and Output Contracts above are calibrated for autopilot's two gate
 contexts. When the invoking prompt declares `MODE: <X> GATE` (CONVERGENCE GATE,
 IDEATION GATE, LAUNCH GATE), the MODE prompt's contract OVERRIDES those defaults:
 
@@ -246,8 +245,7 @@ modification. Do not ESCALATE because of a missing calibration file.
 The personal `~/.claude/CLAUDE.md` "Decision-Making" section is the authoritative
 source for cross-domain decision rules (best-practice-over-precedent, code-presence
 vs deployment-evidence, type-system-precedence, empirical-observation-overrides-
-speculation, validate-prescribed-rubrics, sample-to-population uncertainty,
-strategy-enumeration-zero-code-paths, capacity-claim grounding, etc.).
+speculation, validate-prescribed-rubrics, etc.).
 
 Apply those rules in addition to the gates above. To read the section, grep for
 the markdown header `## Decision-Making` in `~/.claude/CLAUDE.md` and read from

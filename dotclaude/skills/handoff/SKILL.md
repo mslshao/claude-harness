@@ -113,6 +113,14 @@ Pull every "no but yes-to-lose" item into the handoff's **ADJACENT IN-FLIGHT WOR
 
 Substitute placeholders; drop sections that genuinely don't apply (do NOT include empty sections as boilerplate).
 
+Pick 2-4 **recall seeds** for the SUGGESTED FIRST ACTIONS `/recall` line: the
+domain keywords and entity names (project/hook/epic slugs, not generic nouns) a
+`/recall` BFS needs to surface this session's sibling context: related beads,
+memories, and topic files the prose above compresses away. Concrete beats
+generic: "worktree guardrail, tool-registry" beats "hooks, testing". This line
+is not optional boilerplate; the handoff is lossy compression and the seeds are
+the next session's decompression pointer.
+
 ### Cold-start template
 
 ```
@@ -136,6 +144,9 @@ CALIBRATION SHIFTS THIS SESSION
 - correction:<domain>:<topic>: <one-line rule body>, not just the key
 
 SUGGESTED FIRST ACTIONS
+- Run /recall <2-4 concrete seeds from Step 3> and skim the BFS surface before
+  substantive work (surfaces sibling beads/memories/topic files this prompt
+  compressed away)
 - Run `bd ready` to surface unblocked work
 - Read `bd show <bead-id>` for the active item
 - [Any domain-specific pointer that matters for the next move]
@@ -163,6 +174,7 @@ Wrap the template in a fenced code block in the output so the user can copy-past
 - **Cross-surface freshness is not optional.** Beads, GitHub, Slack, Jira, Confluence are all sources of in-flight state. The handoff is incomplete if it only reflects the conversation. Pull from every surface; cross-reference for adjacent work; surface anything that would be lost.
 - **Don't pad.** If a section has nothing to say, drop it. A boilerplate-heavy handoff buries the actual deltas. The cross-surface rule above produces ADDITIONS only when genuine adjacent work exists; cold beads and stale tickets get dropped.
 - **Reference durable artifacts.** Beads, PR numbers, commit SHAs, Jira keys, Confluence page IDs, memory keys. The next session fetches fresh state from these; the handoff just points the way.
+- **Ratified claims carry a verify-pointer, not a bare assertion.** When the handoff states a load-bearing architectural premise as settled (a "ratified"/"settled" decision, a hard constraint), attach the source it was ratified in (decision-memory key, bead, Jira) so the next session re-checks freshness before building on it. Decisions get superseded; a handoff that encodes a stale "ratified" premise as fixed fact costs the successor a full verification cycle to discover it was overturned (e.g., a "ratified two-Lambda demux" premise that a later sibling decision had already replaced with a single-Lambda registry).
 - **Test the prompt.** Read your own output as if you were a cold-start agent: would you know what to do next? If you'd ask "what's the active topic" or "where did we leave off", the prompt failed.
 - **Substantive over comprehensive.** A 15-line handoff that names the active topic, the in-flight PR, and the one calibration shift that matters is better than a 60-line dump of every bead in the repo.
 - **No personal-tier paths in shared-artifact-bound output.** The handoff prompt itself stays local (user pastes it into their own new session), but if the user is going to paste it into anything shared, scrub bead IDs and personal paths first.

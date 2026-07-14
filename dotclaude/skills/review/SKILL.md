@@ -2,7 +2,7 @@
 name: review
 description: >
   (personal; shadows the project-tier `review` and takes precedence) Delta vs
-  the project version: twelve review agents instead of five, adding devops,
+  the project version: thirteen review agents instead of six, adding devops,
   typescript, git-historian, pydantic, python-style, bot-review, and skeptic
   lenses with conditional triggers. Local self-review fan-out for uncommitted
   or branch-relative changes: parallel dispatch, deduplicated overlapping
@@ -10,16 +10,18 @@ description: >
   to GitHub or fetch external context. Use before opening or pushing a PR.
   Trigger on: "review my changes", "review this branch", "self-review",
   "/review".
-argument-hint: "[--staged | --all | <range>]"
+argument-hint: "[--staged | <range>]"
 ---
 
 # Review (personal tier)
 
 Local self-review via parallel fan-out to personal-tier review agents. The
-personal /review is a superset of the project /review: it inherits the four
-project review agents and adds five personal-only specialists (security,
-infrastructure, TypeScript, git-history regression, cross-file blast-radius)
-behind conditional dispatch triggers. Read-only and local-only: no GitHub
+personal /review is a superset of the project /review: it inherits the six
+project review agents (code-reviewer, test-quality-reviewer, observability-reviewer,
+silent-failure-hunter, mx2-security-auditor, module-cohesion-reviewer) and adds
+seven personal-only specialists (devops, TypeScript, git-history regression,
+pydantic, python-style, cross-file blast-radius, skeptic) behind conditional
+dispatch triggers. Read-only and local-only: no GitHub
 posting, no Jira/Confluence fetch, no code modification.
 
 ## Why personal-tier expansion
@@ -68,7 +70,7 @@ bucket above Critical. The framing is "send back to author" rather than
 "iterate line-by-line": fixing these typically invalidates the downstream
 review effort, so we surface them first. Pragma misuse (#8), boolean
 parameters (#4), and exception design (#9) are inline-iterate findings,
-not Front Door; a reviewer's explicit "send back quickly" framing applies to
+not Front Door; the engineering lead's explicit "send back quickly" framing applies to
 description and types specifically.
 
 ## Input
@@ -99,7 +101,7 @@ If the diff is empty, stop and report "No changes to review against
 1a. **Commit-message intent pre-check (Front Door).** Walk the captured
     commit log. The branch's commit messages are the analog of the PR
     description before the PR exists: if they fail to convey intent, the
-    PR description that gets written from them will also fail a reviewer's #1
+    PR description that gets written from them will also fail the engineering lead's #1
     gate.
 
     Flag as a Front Door finding when ANY of:
@@ -124,7 +126,7 @@ If the diff is empty, stop and report "No changes to review against
     the methodology (the script, command, or rule applied). If absent,
     flag as a Front Door finding: large mechanical changes need a
     methodology statement so reviewers can spot-check rather than read
-    every line. (a reviewer #11.)
+    every line. (the engineering lead #11.)
 
 2. **Pre-evaluate dispatch signals** (once, before fan-out):
 
@@ -141,8 +143,9 @@ If the diff is empty, stop and report "No changes to review against
    | `structural_risk_size` | Diff > 200 lines OR > 5 files changed |
    | `has_pydantic_settings_signal` | Diff adds/modifies a class inheriting from `BaseSettings`, `pydantic_settings.BaseSettings`, or `Singleton`; OR contains `os.environ.get`, `os.environ\[`, `os.getenv\(`; OR adds/modifies a field on a class whose filename matches `*app_settings*`, `*settings*`, `*config*` |
    | `has_python_files` | Diff includes any `*.py` file outside `src/gen-python/` |
+   | `has_python_module_change` | A `src/python/**/*.py` file is added, deleted, or renamed, OR added lines declare a net-new top-level `def `/`class ` (column-0 on a `+` line). Test-only Python changes (`*_test.py`, `test_*`, `conftest.py`) alone do not set it unless production/test-only mixing is the concern |
 
-3. **Fan out in parallel.** Single message with up to twelve Agent tool calls.
+3. **Fan out in parallel.** Single message with up to thirteen Agent tool calls.
    Build each prompt with these elements, in order:
 
    a. **Code root** path (worktree or repo root).
@@ -157,9 +160,9 @@ If the diff is empty, stop and report "No changes to review against
       would come back from CI or a careful reviewer."
    e. **Commit log for intent context**: the captured `git log` output.
    f. **Citation requirement**: file:line on every finding.
-   g. **a reviewer priority order (mx2-code-reviewer only)**: append a one-line
+   g. **the engineering lead priority order (mx2-code-reviewer only)**: append a one-line
       preamble naming the order so the agent surfaces findings in the
-      reviewer-priority sequence: "Surface findings in a reviewer priority
+      reviewer-priority sequence: "Surface findings in the engineering lead priority
       order: description, types, complexity / naming, boolean params,
       tests, correctness-via-tests (not in-head exec), static analyzers,
       pragmas, exception design, large-refactor methodology. Tag findings
@@ -186,11 +189,14 @@ If the diff is empty, stop and report "No changes to review against
    | `mx2-skeptic` (advisory) | `structural_risk_size` | file list + commit log + first 50 diff lines/file |
    | `mx2-pydantic-reviewer` | `has_pydantic_settings_signal` | Settings/config files + sibling Settings files |
    | `mx2-python-style` | `has_python_files` | Python files only (Author Mode / pre-CI only) |
+   | `module-cohesion-reviewer` (advisory) | `has_python_module_change` | implementation `.py` files + full file list |
 
    Each non-always agent emits a skip note when its signal is absent (e.g.
-   "test-quality-reviewer: skipped (no test files in diff)"). The two advisory
+   "test-quality-reviewer: skipped (no test files in diff)"). The three advisory
    agents are severity-capped and emit non-verdict output: `bot-review` to
-   COMMENT/NOTE/SUGGESTION, `mx2-skeptic` to QUESTION only (max 5). Coordination:
+   COMMENT/NOTE/SUGGESTION, `mx2-skeptic` to QUESTION only (max 5), and
+   `module-cohesion-reviewer` to QUESTION/SUGGESTION/COMMENT (every finding an
+   author-facing question, never BLOCKING/CRITICAL). Coordination:
    when both `mx2-code-reviewer` and `mx2-typescript-reviewer` fire, send each
    only its language-relevant files. `mx2-python-style` duplicates CI signal
    (pylint/yapf/isort/autoflake); its value is the pre-push catch, so skip it
@@ -235,7 +241,7 @@ If the diff is empty, stop and report "No changes to review against
 6. **Synthesize.** When all dispatched agents and the Sonar pre-check return:
    - Dedup overlapping findings (same file + line + theme is one entry,
      attributed to all sources that flagged it).
-   - **Promote to Front Door** any finding that matches a reviewer's
+   - **Promote to Front Door** any finding that matches the engineering lead's
      sent-back-quickly classes: description/intent gate failure (from
      step 1a), large-refactor methodology gap (from step 1b), and
      type/model smells (untyped dicts, `dict[str, Any]`, Literal-key
@@ -243,7 +249,7 @@ If the diff is empty, stop and report "No changes to review against
      representing multiple states; typically surfaced by
      `mx2-code-reviewer` Design Judgment Checks). Pragma misuse,
      boolean-parameter smells, and exception-design findings stay in
-     their severity buckets; a reviewer's "send back" framing applies to
+     their severity buckets; the engineering lead's "send back" framing applies to
      description and types specifically, not all design judgment
      findings. Front Door findings render above Critical with framing
      that signals "fix this before deeper review is worth doing."
@@ -254,6 +260,10 @@ If the diff is empty, stop and report "No changes to review against
      other explains why it is not a concern in this context).
    - `bot-review` findings go in their own "Advisory (cross-file)" subsection
      to preserve the COMMENT/NOTE/SUGGESTION distinction.
+   - `module-cohesion-reviewer` findings render in "Open questions" (every
+     finding is an author-facing question); a finding the agent tags SUGGESTION
+     or COMMENT (an actionable cohesion fix such as a duplicated typed accessor)
+     may instead surface in Suggestion so it is not skimmed past.
    - Sonar findings get attribution `Source: SonarCloud (MCP)` or
      `Source: SonarCloud (catalog detector)` so the author can see which
      path produced the signal.
@@ -312,7 +322,7 @@ sections. The author decides what to fix.
 Agents: {comma-separated list of agents that ran and their state}.
 
 ### Front Door
-[Present ONLY when at least one finding from a reviewer's sent-back-quickly
+[Present ONLY when at least one finding from the engineering lead's sent-back-quickly
 classes exists: description/intent gate failure, type/model smell, or
 large-refactor methodology gap. Omit entirely when empty.]
 
@@ -343,7 +353,7 @@ fixing them often invalidates the downstream review.
 
 ### Open questions
 - {one-line question grounded in file:line or commit context}
-  Source: mx2-skeptic
+  Source: mx2-skeptic | module-cohesion-reviewer
 
 ### Positive
 - {short callouts; cap at 3}
@@ -355,7 +365,7 @@ empty, report "No findings; ready to push."
 
 Severity rules:
 
-- **Front Door**: a reviewer's sent-back-quickly classes (description/intent,
+- **Front Door**: the engineering lead's sent-back-quickly classes (description/intent,
   type/model smell, large-refactor methodology). Render above Critical.
   Empty bucket is omitted entirely. The author should fix these before
   deeper review iteration. Pragma, boolean-param, and exception-design
@@ -416,14 +426,16 @@ uninterrupted runs, pre-approve the read-only set in
   `~/.claude/scratch/review-cache/<branch>.json` (raw per-specialist findings,
   for `/pr-intel --mine` dedup per bead `docr-xvnr`). Does not write task
   trackers, persistent memory, the repo, or GitHub. The Sonar MCP query is a read.
-- **Bounded fan-out.** Up to twelve review agents with conditional dispatch.
-  Maximum ten verdict-emitting specialists fire on a single diff (the four
-  always-or-conditional agents from project /review, plus six personal-only
-  conditional agents: security, devops, typescript, git-historian, pydantic,
-  python-style). Two advisory-only agents fire conditionally and produce
+- **Bounded fan-out.** Up to thirteen review agents with conditional dispatch.
+  Maximum ten verdict-emitting specialists fire on a single diff (five of the
+  six always-or-conditional agents from project /review, mx2-security-auditor
+  included and the advisory module-cohesion-reviewer excluded,
+  plus five personal-only conditional agents: devops, typescript, git-historian,
+  pydantic, python-style). Three advisory-only agents fire conditionally and produce
   non-verdict output: `bot-review` (cross-file invariant questions, fires on
-  public-surface changes) and `mx2-skeptic` (adversarial questions, fires
-  on M+ diffs).
+  public-surface changes), `mx2-skeptic` (adversarial questions, fires
+  on M+ diffs), and `module-cohesion-reviewer` (cross-file cohesion and coupling
+  questions, fires on Python-module changes).
 
 ## Roster Differentiation
 

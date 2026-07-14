@@ -34,6 +34,11 @@ gate ran. List each round with verdict + action taken:]
 > concrete evidence (not punted); MAJOR_REVISIONS or
 > SCRAPPED_AND_REBUILT means the original framing did not survive.]
 
+> **Findings triaged but not incorporated** [only when any exist]:
+> [One line per Fix-next / Defer / Won't-fix finding from Phase 4 step 4,
+> so the user sees what was consciously left out, not just what was
+> fixed. Omit this block entirely when every finding was Fix-now.]
+
 ### Minimal-Viable Comparison  [only when SCOPE_SIGNAL present or the right-sizing flag fired]
 [Show the minimal-viable 80/20 version of the goal next to the proposed
 plan: what the minimal plan would deliver, and what each extra work item

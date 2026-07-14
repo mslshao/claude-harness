@@ -40,7 +40,7 @@ expected structure.
   - File path: from the `#### \`file.py\`` heading
   - Line number: from the `**Line N**` marker (this is file-relative, use directly)
   - Ready-to-paste text: content of the fenced block ONLY
-  - Classification: `speed-amplified` or `bot-surfaced` from the briefing-context section's classification line (synthesis.md step 5d). Used to populate audit counts in Step 5.
+  - Classification: `speed-amplified` or `bot-surfaced` from the briefing-context section's classification line (per `provenance-classification.md`). Telemetry only (does not change comment voice); used to populate audit counts in Step 5.
   - **Reply target** (when present): the briefing-context section may contain a `Reply target: comment <prior_comment_id> (<author> <date> on <path:line>)` line indicating pr-intel synthesis routed this finding to be threaded under a prior-round same-author comment. When present, MOVE this entry from the main inline-comments list to a separate `inline_replies` list (keyed by `prior_comment_id` and `body`). These do NOT go into the atomic review POST in Step 3; they are posted separately in Step 3.6. If a comment has both a `**Line N**` marker AND a `Reply target:` line, the `Reply target:` wins (the line marker is for briefing context only when the comment is a reply). See pr-intel `synthesis.md` Step 2 position-based same-author dedup rule for the upstream logic.
 - **Bot reactions** (when present): from the pr-intel `bot_reactions` list (rendered as a `### Bot Reactions (for /post-review)` section in the briefing output per pr-intel's bot-reactions.md). Each entry has `{comment_id, endpoint, reaction, bot_name, finding_summary}` where `endpoint` is `pulls` (inline review comment) or `issues` (issue-level conversation comment), and `reaction` is `+1` (bot finding was correct) or `-1` (bot finding was a false positive). If absent, skip Step 3.5.
 
@@ -95,10 +95,12 @@ For each inline comment, run these two checks per file, in parallel:
 git show <headRefOid>:<file_path> | awk 'NR==<line> {print NR": "$0}'
 
 # Hunk check: extract the +NNN,+M ranges from the PR diff hunks for this file.
-# THREE-DOT (merge-base) diff is mandatory: GitHub's PR view and its 422
-# line-resolution are merge-base-relative; a two-dot diff diverges whenever
-# main has advanced past the merge-base (the common case in this monorepo).
-git fetch origin main --quiet && git diff origin/main...<headRefOid> -- <file_path> | grep "^@@"
+# THREE-DOT (merge-base) diff against the PR's BASE branch is mandatory: GitHub's
+# PR view and its 422 line-resolution are merge-base-relative. Use <baseRefName>
+# from the PR metadata, NOT a hardcoded main: a stacked PR (Graphite) bases on a
+# downstack branch, and diffing against main pulls the downstack PR's lines into
+# the hunk ranges. For a non-stacked PR, baseRefName is main, so this is a no-op.
+git fetch origin <baseRefName> --quiet && git diff origin/<baseRefName>...<headRefOid> -- <file_path> | grep "^@@"
 # Authoritative fallback when local objects are missing:
 #   gh api /repos/{owner}/{repo}/pulls/{n}/files --jq '.[] | select(.filename=="<file_path>") | .patch' | grep "^@@"
 ```
@@ -135,7 +137,7 @@ as a file:line bullet, or drop it.
 **Skip for --quick mode** (no inline comments). Runs in default mode before the preview.
 
 Every inline comment pr-intel emits is tool-discovered: it passed through a specialist
-agent or an orchestrator pattern check, not Michael's unaided reading. Per a reviewer's
+agent or an orchestrator pattern check, not Michael's unaided reading. Per the engineering lead's
 2026-05-26 ask (review-voice.md T5 / reviewer-discipline.md T5), each posted inline
 comment MUST open with an explicit attribution lede, never in Michael's first-person
 voice, and the attribution is the lede, not parenthetical. The review SUMMARY body is
@@ -226,8 +228,10 @@ the destructive-commands false positive (a review body mentioning `rm` + `*`),
 and the personal-tier-vocab scan (a `/pr-intel`-style path argument to
 `--input`). The em-dash guard also fires on `gh pr comment` / `gh pr review` /
 `gh api -X POST/PATCH`. Two defaults sidestep all of them: (1) write the JSON
-payload to a FLAT scratch path `/home/vscode/.claude/scratch/<pr>-review.json`
-(no subdirectory named after a slash command) via the Write tool, then post
+payload to a FLAT scratch path `/home/vscode/.claude/scratch/<pr>-review-<YYYY-MM-DD>.json`
+(no subdirectory named after a slash command; the date suffix matches the Step 5
+memory-key scheme so a re-review does not collide with a prior round's stale file
+and trip the Write tool's read-before-write guard) via the Write tool, then post
 with `gh api --input <that-file>` in a SEPARATE command (the attribution
 PreToolUse hook reads the file before the Bash command runs, so build-then-post
 in one command validates stale content). (2) GitHub Markdown mangles
@@ -245,7 +249,9 @@ TWO-STEP sequence (never a stdin heredoc; heredocs trip the destructive-command
 and vocab scans and bypass the attribution hook's payload validation):
 
 1. Write the payload with the Write tool to
-   `/home/vscode/.claude/scratch/<pr_number>-review.json`:
+   `/home/vscode/.claude/scratch/<pr_number>-review-<YYYY-MM-DD>.json` (on a
+   same-day second round the file collides again; the Write read-before-write
+   guard is the safety net there, Read then overwrite):
 ```json
 {
   "body": "<review summary>",
@@ -255,9 +261,11 @@ and vocab scans and bypass the attribution hook's payload validation):
   ]
 }
 ```
-2. Post it referencing the file in a separate command:
+2. Post it referencing the file in a separate command (capture the response so
+   Steps 4-6 need no refetch; `submitted_at` is Step 6's DynamoDB range key):
 ```bash
-gh api -X POST /repos/{owner}/{repo}/pulls/{pull_number}/reviews --input /home/vscode/.claude/scratch/<pr_number>-review.json
+gh api -X POST /repos/{owner}/{repo}/pulls/{pull_number}/reviews --input /home/vscode/.claude/scratch/<pr_number>-review-<YYYY-MM-DD>.json \
+  --jq '{id, state, html_url, submitted_at}'
 ```
 
 When there are no inline comments (e.g., --quick mode), omit the `comments`
@@ -282,7 +290,7 @@ identical.
 
 After the main review post succeeds, apply `+1`/`-1` reactions to the bot
 comments pr-intel classified in its Bot Reactions phase (the upgraded form of
-a reviewer's 2026-05-20 "thumbs-up instead of repeat" feedback). The `bot_reactions`
+the engineering lead's 2026-05-20 "thumbs-up instead of repeat" feedback). The `bot_reactions`
 list (extracted in Step 1) carries `{comment_id, endpoint, reaction, bot_name,
 finding_summary}`; POST each to the `pulls/comments/{id}/reactions` (inline) or
 `issues/comments/{id}/reactions` (issue-level) endpoint. Skip silently if empty.
@@ -322,7 +330,7 @@ Gather these facts (most come from the pr-intel output and the successful post r
 - `<pr_number>` - from the pr-intel output
 - `<date>` - today in `YYYY-MM-DD` form (for the key suffix and the body)
 - `<event>` - APPROVE / COMMENT / REQUEST_CHANGES (the actual event posted, not the
-  recommendation; these can diverge if the user overrode with `change`)
+  recommendation; these can diverge if the user confirmed a different event verb than the recommendation)
 - `<head_sha_short>` - first 12 chars of `headRefOid` (fetched earlier during line
   verification; in --quick mode that step is skipped, so fetch it here:
   `gh pr view <number> --json headRefOid --jq '.headRefOid'`); represents the
@@ -339,10 +347,11 @@ Gather these facts (most come from the pr-intel output and the successful post r
 - `<body_fold_count>` - number of findings that were folded into the body because they
   couldn't be posted inline (NOT_IN_HUNK / path-not-resolved / user-dropped)
 - `<bot_surfaced_count>` - number of posted inline comments classified as bot-surfaced
-  per synthesis.md step 5d (comments that opened with an attribution prefix)
+  per `provenance-classification.md` (verification needed live-state, multi-file, or document-synthesis work)
 - `<speed_amplified_count>` - number of posted inline comments classified as
-  speed-amplified per synthesis.md step 5d (comments written in Michael's voice
-  without attribution)
+  speed-amplified per `provenance-classification.md` (the reviewer could have caught it from
+  careful single-file reading). Classification is telemetry only; ALL posted comments carry an
+  attribution prefix regardless of class.
 - `<bot_reaction_count>` - total number of reactions applied to bot comments in
   Step 3.5 (sum of thumbs-up and thumbs-down)
 - `<bot_thumbs_up_count>` - number of `+1` reactions (bot finding agreed-with;

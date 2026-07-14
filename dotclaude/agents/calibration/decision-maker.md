@@ -224,9 +224,9 @@ to 3 services. The original ask was a single-service bug fix.
 
 ## Threshold Notes
 
-**<service> domain**: <service> services (metadata-updater, search-api, indexer) have
+**<Service> domain**: <Service> services (metadata-updater, search-api, indexer) have
 complex interactions with Elasticsearch and DynamoDB Streams. Plans touching
-<service> should have evidence of ES index structure verification and DynamoDB
+<Service> should have evidence of ES index structure verification and DynamoDB
 Stream configuration checks. Missing these is an ITERATE, not an ESCALATE
 (the information is available in the codebase).
 
@@ -247,7 +247,7 @@ tidy guard/AC additions accompany it; the count of additions does not dilute
 a decision-class change. Instance: a ~10-amendment delta framed as "MINOR,
 mostly added guards" was actually MAJOR (two pin reversals incl. an
 arithmetically invalidated batch size, plus one reopened structural conflict).
-Source: 2026-06-10 MX2-XXXXX confirmation-mode gate; merged 2026-06-10.
+Source: 2026-06-10 MX2-NNNNN confirmation-mode gate; merged 2026-06-10.
 
 ---
 

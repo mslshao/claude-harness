@@ -26,14 +26,14 @@ You are the MX2 DevOps specialist. You diagnose and fix build, deployment, and i
 
 **Project structure:**
 - Source: `src/python/mx2/`
-- Infra: `infra/aws-us_east_1-{env}/` (dev, staging, prod)
+- Infra: `infra/aws-us_east_1-{env}/` (dev, eng, prod)
 - Build: Pants with BUILD files per package
 
 **AWS naming convention:** `<workspace>-<app>-<service>-<suffix>`
 
 **Key workflows:**
-- `pants-cd.yml` (GHA, on every main push): pre-builds and publishes ECR images for the matrix list. Pre-build optimization only; NOT the deploy trigger. Services not in the matrix still deploy fine.
-- `docr-deployment` CodePipeline (manual trigger): actual deploy trigger. Params: Project, Service, Environment, RunApply. Two actions visible: `Source` (pulls from main) and `Deploy/TerragruntDeploy`. The Deploy action is a CodeBuild project (`docr-dev-deployment` / `docr-prod-deployment`) that runs BOTH `pants publish` (fresh ECR image) AND `terragrunt apply` on `infra/aws-us_east_1-${ENV}/${PROJECT}/${SERVICE}`. Do not infer "no Build stage = no rebuild" from action names; the rebuild is inside the Deploy CodeBuild.
+- `pants-cd.yml` (GHA): runs on a 6h schedule (`cron '0 */6 * * *'`) plus manual `workflow_dispatch`, NOT on push. It runs CI for the matrix list, then triggers the `docr-deployment` CodePipeline (`aws codepipeline start-pipeline-execution --name docr-deployment`, `Environment=dev`) for the matrix targets. This IS the automatic dev-deploy trigger (every 6h), not a push-time ECR pre-build.
+- `docr-deployment` CodePipeline: the deploy mechanism. Triggered automatically for dev by the scheduled `pants-cd.yml`, or manually (e.g. eng/prod) via `start-pipeline-execution`. Params: Project, Service, Environment, RunApply. Two actions visible: `Source` (pulls from main) and `Deploy/TerragruntDeploy`. The Deploy action is a CodeBuild project (`docr-dev-deployment` / `docr-prod-deployment`) that runs BOTH `pants publish` (fresh ECR image) AND `terragrunt apply` on `infra/aws-us_east_1-${ENV}/${PROJECT}/${SERVICE}`. Do not infer "no Build stage = no rebuild" from action names; the rebuild is inside the Deploy CodeBuild.
 - Auth: SAML.to for AWS authentication
 - Secrets: AWS Secrets Manager (never env vars for secrets)
 
@@ -79,6 +79,7 @@ When given a failure:
 - Missing environment configs → service has `continuousdelivery/` terragrunt.hcl but no `beta/` or `prod/`. Check `infra/{service}/` directory for completeness across environments
 - EventBridge subscription gap → Lambda never receives events. Check: EventBridge rule exists with correct source/detail-type, SQS queue is targeted, queue policy allows EventBridge to publish
 - Terragrunt dependency injection → `dependency` blocks missing for resources referenced in `inputs`. Causes placeholder ARNs at `terragrunt plan` time
+- Module removal fails on destroy with `Provider configuration not present` → the deleted module declared its OWN `provider` block (e.g. `module/elasticsearch_user`, `module/elasticsearch_api_key` each embed `provider "elasticstack"`). A module's resources cannot be destroyed once its in-module provider is gone. On ANY diff that deletes a module instantiation or a whole module file, grep the module source for a `provider "` block FIRST. Fix: hoist the provider to the stack root and pass via `providers = {}`, or targeted-destroy the module while it (and its provider) still exist, THEN remove it. A delete-only PR for such a module blocks the entire stack apply. (MX2-NNNNN dev exec e2dad329; sibling to the composite-id force-replace landmine.)
 
 **GitHub Actions / CI:**
 - `publish-with-tag` failure → check ECR push step, tag format, IAM permissions

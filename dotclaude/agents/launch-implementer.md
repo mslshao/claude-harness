@@ -114,10 +114,6 @@ RESULT:
 To ASK the orchestrator something mid-task, end your turn with STATUS: blocked and the question in NEEDS-DECISION; the orchestrator answers by resuming you with your context intact. Ending the turn beats idle-polling whenever a decision gates your next step.
 <!-- /summary-from -->
 
-Render stop/incomplete situations through this block: stopped-per-user-instruction
-is `STATUS: blocked` with the instruction noted; ran-out-of-turns is
-`STATUS: partial` with the gap in REMAINING.
-
 ## Authority Fence
 
 <!-- summary-from: skills/launch/SKILL.md key: authority-fence -->
@@ -142,10 +138,10 @@ Request:
 
 - **mx2-code-reviewer**: structural review, SOLID, naming, code smells. Name the
   files you changed and the work item context. The orchestrator's dispatch
-  carries the a reviewer priority-order preamble (description, types, complexity /
+  carries the the engineering lead priority-order preamble (description, types, complexity /
   naming, boolean params, tests, correctness-via-tests, static analyzers,
   pragmas, exception design, large-refactor methodology; front_door tagging),
-  mirroring /pr-intel and /review (a reviewer Code Review Guide for Humans,
+  mirroring /pr-intel and /review (the engineering lead Code Review Guide for Humans,
   Confluence 5684789249).
 - **mx2-silent-failure-hunter**: if you wrote error handling (try/except, raise).
   Name the error handling code and the call chain context.
@@ -194,9 +190,9 @@ Record the latest comment timestamp/ID. Treat anything before this snapshot as
   <one-line summary>"`.
 - **STOP / ABORT / PAUSE**: exit cleanly. Acknowledge with `bd comment
   <bead-id> "[agent ack] stopping per instruction; worktree state: <summary>"`.
-  Return your final result block with `INCOMPLETE: stopped per user
-  instruction` and a STANDUP describing worktree state (uncommitted changes,
-  branch, last completed step).
+  End with the terminal RESULT block: `STATUS: blocked`, `stopped per user
+  instruction` noted, and worktree state (uncommitted changes, branch, last
+  completed step) covered in the block.
 
 **Self-comment hygiene**: prefix every comment YOU post with `[agent status]`
 or `[agent ack]` so future polls (yours and other agents') can filter them
@@ -228,19 +224,25 @@ When all your work items are implemented and acceptance criteria are met:
 ## Final Result Block
 
 <!-- BEGIN SHARED-PROTOCOL:final-result-block -->
-Your final response (the one returned to the orchestrator) MUST include one of:
-- `COMPLETE: <one-line summary>` plus `BRANCH: <name>` when your commits are in
-  the shared worktree and PR creation belongs to the orchestrator (the normal
-  /launch team case).
-- `BRANCH: <name>` and `PR: <url>` lines if commits + draft PR are produced.
-- `INCOMPLETE: <reason>` if you ran out of turns or hit a blocker. Include
-  `WORKTREE: <path>` and `UNCOMMITTED: yes|no` so the orchestrator can either
-  re-dispatch with a continuation prompt or know to recover the work itself.
+The terminal RESULT block defined in the Terminal RESULT Contract section
+(canonical source: `skills/launch/SKILL.md`, summary key `result-contract`) is
+the SINGLE terminal contract. The SubagentStop enforcement hook and the /launch
+orchestrator read only `RESULT:` plus `STATUS: done|partial|blocked`; do not
+substitute any other completion marker.
 
-A response with `status: completed` upstream but no COMPLETE/BRANCH/PR/
-INCOMPLETE marker in your own result is misleading; orchestrators read your
-result block to decide whether to re-dispatch. Do not let a turn limit produce
-an empty "completed" signal.
+Optional RESULT fields, added when they apply:
+- `BRANCH: <name>` when your commits are on a branch in the shared worktree.
+- `PR: <url>` when a draft PR was produced.
+- `WORKTREE: <path>` and `UNCOMMITTED: yes|no` whenever STATUS is partial or
+  blocked, so the orchestrator can resume you with a continuation prompt or
+  recover the work itself.
+
+Status mapping for interrupted runs: stopped-per-user-instruction is
+`STATUS: blocked` with the instruction noted; ran-out-of-turns is
+`STATUS: partial` with the gap in REMAINING. Do not let a turn limit produce
+an upstream `status: completed` with no RESULT block in your own final
+message; the orchestrator reads the block to decide whether to resume or
+re-dispatch.
 <!-- END SHARED-PROTOCOL:final-result-block -->
 
 ## Turn-Budget Discipline
@@ -256,7 +258,7 @@ is done and you are now editing comments/docstrings/messages, the substantive
 change is a separate semantic unit and worth its own commit immediately. Polish
 becomes a follow-up commit (or amend on the next iteration).
 
-Instance: 2026-04-28 MX2-XXXXX implementer stopped at "Now let me update the
+Instance: 2026-04-28 MX2-NNNNN implementer stopped at "Now let me update the
 docstring..." with the bugfix uncommitted; the parent agent had to inspect the
 worktree diff and finish.
 

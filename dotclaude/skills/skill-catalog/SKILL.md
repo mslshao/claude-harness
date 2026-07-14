@@ -47,7 +47,7 @@ End-to-end planning pipeline that chains refine, forge, challenge, consult, and 
 ## /launch
 Execution launcher: takes a Jira ticket or bead, enriches context, converges on a plan, then dispatches an agent team in a shared worktree to BUILD it; produces real commits and a draft PR. Distinct from /converge: launch writes code; converge writes a plan.
 **Recommend when**: Ticket is well-scoped and you want hands-off implementation. Multiple invocations run in parallel via worktrees.
-**Not for**: Ambiguous scope (use /converge first). Single-file mechanical changes (use mx2-executor agent directly).
+**Not for**: Ambiguous scope (use /converge first). Single-file mechanical changes (direct edit per routing rule 7 carve-out; mx2-executor only for a fully-specified few-file change outside a PR iteration).
 
 ## /autopilot
 Autonomous pipeline: converge on a plan or build a feature without human approval gates. Uses mx2-decision-maker as quality gate at each checkpoint. Modes: plan (converge only, output = beads) or build (converge + launch, output = draft PR).
@@ -55,7 +55,7 @@ Autonomous pipeline: converge on a plan or build a feature without human approva
 **Not for**: High-stakes architectural decisions (use /converge with explicit signoff).
 
 ## /pr-intel
-PR intelligence briefing for human reviewers. Gathers full PR context and produces a structured briefing with summary, scope, risk analysis, test coverage, open threads, and a readiness verdict. Two modes: reviewing others (default) and self-review (`--mine`).
+PR intelligence briefing for human reviewers. Gathers full PR context and produces a structured briefing with summary, scope, risk analysis, test coverage, open threads, and a readiness verdict. Three modes: reviewing others' PRs (default), self-review (`--mine`), and quick triage (`--quick`: one-shot, no specialist dispatch).
 **Recommend when**: About to review a PR and want context + analysis to inform critical opinion. Also for self-review before publishing.
 **Not for**: Automated code review that posts to GitHub. Author-facing specialist review swarm (use `pr-review-toolkit:review-pr`).
 
@@ -68,6 +68,11 @@ Takes /pr-intel output from conversation context and posts it as an atomic GitHu
 Autonomous polling loop for an open draft PR. Classifies incoming review comments (bot vs human, mechanical vs substantive), auto-remediates mechanical bot suggestions via a pre-staged worktree with force-push, replies inline, and escalates human reviewer feedback. State persists in a tracking bead so the loop survives compaction.
 **Recommend when**: Operator opens a draft PR, expects bot feedback (Copilot, PR Metrics, Vercel, Lighthouse, SonarQube, etc.), and wants to step away while bot noise gets handled hands-off.
 **Not for**: Foreign-authored PRs (skill amends; requires authorship). Published (non-draft) PRs without `--allow-published` (auto-merge mid-loop risk). Operators who want every finding adjudicated (use /pr-intel on a cadence instead).
+
+## /overwatch
+Standing work-queue watcher: a self-paced ScheduleWakeup loop that watches the user's beads, GitHub PRs, and Jira on a backing-off cadence (15 -> 30 -> 60 min) and surfaces only time-sensitive DELTAS (a bead newly unblocked, a new review request, an in-progress item going stale). Read-only and surfacing-only; quiet on a healthy no-op cycle. State persists in a tracking bead's notes so it survives compaction. Chat-only output for v1.
+**Recommend when**: The user is heads-down and wants to be told when something newly needs their attention across beads/PRs/Jira without polling by hand ("watch my work queue", "what should I pick up next" as a standing request).
+**Not for**: Watching one specific PR and acting on it (use /babysit-pr, which mutates); a backward-looking one-shot summary of past work (use /standup-prep); a single current-state check (use `bd ready` / `gh search prs` directly).
 
 ## /enrich
 Context loader for Jira tickets, beads, PRs, or topics. Gathers ticket details, related beads, codebase references, and domain knowledge into a structured briefing.
@@ -96,7 +101,7 @@ Audit and clean up stale agent/autopilot worktree branches in `/workspaces/main`
 
 ## /calibrate
 Review and merge calibration drift entries that subagents have emitted via beads memory. Reads `bd memories calibration:<agent>:*`, presents each entry alongside the current calibration file state, lets the user keep/merge/reject per entry, and writes accepted merges to the agent's calibration file.
-**Recommend when**: SessionStart hook nudges about unmerged entries; an /autopilot run surfaces a Calibration Drift block; periodic review of accumulated drift.
+**Recommend when**: SessionStart hook nudges about unmerged entries; periodic review of accumulated drift.
 **Not for**: Authoring calibration files from scratch (write directly). Tuning agent behavior in-session (edit the agent file).
 
 ## /snapshot-system-prompt
@@ -115,7 +120,7 @@ Divergent approach generation: produces 3-5 ranked candidate approaches with a m
 **Not for**: One obvious approach (go straight to /converge); stress-testing a single existing plan (/challenge).
 
 ## /review
-Local self-review fan-out for uncommitted or branch-relative changes: dispatches up to twelve review agents in parallel, deduplicates, and presents a grouped severity report. Read-only, local-only, no GitHub posting.
+Local self-review fan-out for uncommitted or branch-relative changes: dispatches up to thirteen review agents in parallel, deduplicates, and presents a grouped severity report. Read-only, local-only, no GitHub posting.
 **Recommend when**: Before opening or pushing a PR; "review my changes / this branch / self-review".
 **Not for**: Reviewing someone else's PR (use /pr-intel); posting comments to GitHub (use /post-review).
 
@@ -126,13 +131,18 @@ Improvement loop: scans a just-completed work unit for friction signals and buil
 
 ## /recall
 BFS-first cross-corpus search over beads, memories, and topic files for information another session produced.
-**Recommend when**: The user references past work without a current-session referent ("what we discussed about X", "remind me about Y", vague pronouns after a session gap).
+**Recommend when**: The user references past work without a current-session referent ("what we discussed about X", "remind me about Y", vague pronouns after a session gap); a SESSION HANDOFF prompt is pasted at cold start (run with its seed line, or derive seeds from its CONTEXT section).
 **Not for**: Information already in the current conversation; live external-system lookups.
 
 ## /capture-transcript
 Ingest a pasted meeting/standup/1:1 transcript and route it: a scannable action breakdown for a standup, or a durable memory file + recall bead + index row for a sync/1:1.
 **Recommend when**: The user pastes a transcript with capture intent ("capture this standup", "capture this 1:1", "here is the transcript").
-**Not for**: Generating an outbound standup from your own activity (use /standup); a cold-start prompt (use /handoff).
+**Not for**: Generating an outbound standup from your own activity (use /standup-prep); a cold-start prompt (use /handoff).
+
+## /standup-prep
+Generate your OWN spoken-standup talk-track from your engineering activity (git, PRs authored + reviewed, PR/issue comments, Jira, Confluence, beads, plus a Slack sweep for unanswered asks), binned by your local timezone. Outbound status generation, not transcript capture.
+**Recommend when**: "prep my standup", "verbal standup", "what did I do yesterday/Friday", "what did I ship"; a bare "help me with standup" when recent context is code/PR/Jira work.
+**Not for**: Capturing a pasted transcript of a meeting that already happened (use /capture-transcript); a Slack-only message built from just your Slack activity (use the slack plugin /standup).
 
 ---
 

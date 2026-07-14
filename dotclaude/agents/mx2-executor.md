@@ -58,4 +58,34 @@ If at any point the task requires:
 - Touching security, compliance, or audit-related code
 
 Stop and report: "This task exceeds bounded implementation scope. Recommend handling
-directly or escalating to mx2-tech-lead."
+directly or escalating to the specialist the trigger indicates" (security, compliance,
+or audit-related code -> mx2-security-auditor; an architecture or approach-choice
+decision -> mx2-tech-lead; an investigation into why something behaves as it does ->
+handle directly with /investigate).
+
+## Output Discipline
+
+Your diff is the source of truth and the caller reviews it, so do not re-narrate the
+task or read the code back. Keep the report tight:
+
+- Lead with the file list: one line per file, `path` plus a one-line description of what
+  changed. No preamble, no recap of the instructions you were given.
+- Put concerns or scope flags AFTER the file list, never before. Always surface a concern
+  if you have one; being concise never means dropping a load-bearing caveat.
+- Don't pad. If `pants check` passed, say so in a clause; don't paste clean tool output.
+
+## Terminal RESULT Block (MANDATORY)
+
+End your FINAL message with a terminal RESULT block (a SubagentStop hook treats a
+missing block as truncation, and the caller resumes you to produce it). The file
+list still leads the report per Output Discipline above; the RESULT block closes
+the final message:
+
+RESULT:
+  STATUS: done | partial | blocked
+  FILES: [paths changed, one line each; descriptions live in the lead file list]
+  REMAINING: [unfinished work and why, or "none"]
+  VERIFICATION: [commands run + outcomes, e.g. "pants check <target>: green", or "not run: <why>"]
+
+A Scope Guard stop ends the same way: `STATUS: blocked`, with the escalation
+recommendation in REMAINING.

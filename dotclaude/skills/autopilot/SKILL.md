@@ -6,7 +6,7 @@ description: >
   Modes: plan (converge only, output = beads) or build (converge + launch,
   output = draft PR). Use when you want to kick off work and walk away.
 argument-hint: "<task | MX2-XXXXX | docr-XXXX> [--mode plan|build] [--max-iterations N]"
-allowed-tools: ["Bash", "Glob", "Grep", "Read", "Agent", "Write", "Edit", "WebFetch", "ScheduleWakeup", "CronCreate", "Skill"]
+allowed-tools: ["Bash", "Glob", "Grep", "Read", "Agent", "Write", "Edit", "WebFetch", "ScheduleWakeup", "CronCreate", "Skill", "SendMessage"]
 ---
 
 # Autopilot
@@ -222,8 +222,8 @@ skill, so do not hardcode a count here.
 `/review` findings DO carry weight in `mx2-decision-maker`'s evaluation (it can
 return ITERATE on a `/review` CRITICAL). `bot-review` is one of `/review`'s
 conditional fan-out agents (runs when public surface changes, hard-capped at
-COMMENT/NOTE/SUGGESTION), so its cross-file blast-radius findings already arrive
-in the `## /review Evidence` as advisory (never forcing ITERATE). There is no
+COMMENT/NOTE/SUGGESTION), so its cross-file blast-radius findings arrive within
+the `## /review Evidence` as advisory-only (never forcing ITERATE); there is no
 separate bot-review dispatch.
 
 Invocation: from the worktree directory so `git diff origin/main..HEAD` is
@@ -235,17 +235,6 @@ Skill(skill="review")
 
 Append the report to the Evidence Trail under a `## /review Evidence` header
 (see Phase 9 format below).
-
-### Phase 8.5: bot-review (folded into /review)
-
-`bot-review` is now one of `/review`'s conditional fan-out agents (Phase 8.4),
-dispatched only when `changes_public_surface` is true and hard-capped at
-COMMENT/NOTE/SUGGESTION. Its cross-file blast-radius findings therefore arrive in
-the `## /review Evidence` as advisory (never forcing ITERATE). No separate
-bot-review dispatch: the standalone pass was retired when `/review` absorbed
-`bot-review` as a fan-out agent. The `## Bot-Review Evidence` block in Phase 9
-remains valid, sourced from `/review`'s bot-review output (or "skipped (no public
-surface change)" when the conditional did not fire).
 
 ### Phase 9: Decision Gate 2 (Implementation Approval)
 
@@ -277,14 +266,6 @@ Agent(
   - Agents that ran: enumerate the agents `/review` actually dispatched (its roster is conditional and evolves with the skill; do not hardcode it)
     (note which conditional agents were skipped and why)
 
-  ## Bot-Review Evidence
-  - Findings: N (NOTE: M, SUGGESTION: K, COMMENT: J)
-  - Highest-severity findings (if any):
-    - [changed_symbol_file:line] [NOTE] [invariant articulation]
-    - ...
-  - Cross-file impact summary: <one-line>
-  (If bot-review was skipped, replace this block with: "Bot-Review: skipped (no public surface change)")
-
   ## Iteration History
   [All prior decisions including Gate 1]
   """
@@ -294,9 +275,8 @@ Agent(
 The decision-maker treats `## /review Evidence` as weight-bearing: a CRITICAL
 finding can force ITERATE on its own, and clustered WARNINGs in the same
 domain (e.g., multiple test-quality issues) are a signal to consider ITERATE.
-The decision-maker treats `## Bot-Review Evidence` as informational. Because the
-agent cannot emit BLOCKING/CRITICAL, no bot-review finding alone forces ITERATE;
-the decision-maker weighs them alongside pants tlc result and standup history.
+Because `bot-review` cannot emit BLOCKING/CRITICAL, its findings arrive inside
+`## /review Evidence` as advisory-only and never force ITERATE on their own.
 
 **Handle the decision:**
 
@@ -455,8 +435,8 @@ Agent(
   Run your self-reflection protocol. If a new rule or example would
   have prevented this miss, emit calibration drift via bd remember per
   your Self-Reflection Protocol. Never attempt to edit the calibration
-  file directly; subagent writes to ~/.claude are sandboxed and the
-  /calibrate skill is the only merge path.
+  file directly; calibration changes pass through the /calibrate human
+  review gate by design, so the bd-remember channel is the only merge path.
   """
 )
 ```

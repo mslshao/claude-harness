@@ -29,26 +29,27 @@ positives. The depth scales with PR size:
    could not actually test from their tool surface. This is the load-bearing case
    the falsifiable-claims rule in CLAUDE.md is written for.
 
-   **Escalate inconclusive falsifiable claims to the `@claude` bot.** When the local
-   check is inconclusive (behavior depends on framework version or wiring, the
-   installed source is ambiguous, or the claim asserts repo-wide consistency such as
-   "all callers migrated" or "field X is unused" that a worktree grep cannot fully
-   settle), do NOT ship the claim in reviewer voice and do NOT silently drop it.
-   Convert the finding to the bot-invoked `@claude` form (synthesis.md "Bot-Invoked
-   Comment Form"): the GitHub bot validates against repo HEAD with fresh context and
-   is empirically more reliable on framework-internal and repo-wide-state assertions
-   than a code-only specialist pass, which can carry a confident-but-wrong claim onto
-   the PR. The bot's answer lands on the record in bot voice, so the reviewer never
-   stakes their name on a claim they could not verify. Canonical instance (2026-05-29,
-   PR 9451): a confident specialist claim that "Starlette's default TestClient is a
-   loopback client" drove a false "healthcheck any-client test gap"; the default host
-   is the non-IP string "testclient", and the `@claude` bot caught it from repo-HEAD
-   reading where the local pass had shipped the gap. This verification pass is
-   size-gated off for XS/S PRs; on those the same escalation fires at synthesis time
-   (synthesis.md "Bot-Invoked Comment Form" second trigger). 9451 was S-sized, so
-   verification was skipped, which is exactly why the wrong claim would have shipped.
-   Bot-routing is `default` mode only; in `--mine`, surface the unverified claim as a
-   pre-submission item to check rather than routing it to the bot.
+   **Resolve inconclusive falsifiable claims locally; do not ship them as a confident
+   verdict.** When the local check is inconclusive (behavior depends on framework version
+   or wiring, the installed source is ambiguous, or the claim asserts repo-wide
+   consistency such as "all callers migrated" or "field X is unused" that a worktree grep
+   cannot fully settle), do NOT ship the claim in reviewer voice and do NOT silently drop
+   it. For the cross-system column/field class, run the named Cross-System Investigation
+   recipe (synthesis.md "Unverified-Assertion Containment + Cross-System Investigation"):
+   resolve the expected mirror column via `simplify_sf_name` and grep a sibling query in
+   an UNCHANGED file; the result drives the verdict. For the general class with no named
+   recipe, surface an explicit UNVERIFIED-ASSERTION finding (honest uncertainty, verdict
+   capped per mode) and attach the manual `@claude review once` (managed Code Review)
+   escalation note. Canonical instance (2026-05-29, PR 9451): a confident specialist claim
+   that "Starlette's default TestClient is a loopback client" drove a false "healthcheck
+   any-client test gap"; the default host is the non-IP string "testclient". This is the
+   general-class case (no named recipe), so it surfaces as an UNVERIFIED-ASSERTION rather
+   than a confident gap. This verification pass is size-gated off for XS/S PRs; on those
+   the same containment fires at synthesis time (synthesis.md rule 10 + the Cross-System
+   Investigation trip-wire). 9451 was S-sized, so verification was skipped, which is
+   exactly why the wrong claim would have shipped a confident verdict. The behavior is
+   uniform across modes now (no bot-routing in any mode): surface the unverified claim as
+   an UNVERIFIED-ASSERTION finding (or, in `--mine`, a pre-submission item to check).
 
 3. **Adjudicate.** For each assumption:
    - **CONFIRMED**: Code evidence supports the claim. Keep the finding.

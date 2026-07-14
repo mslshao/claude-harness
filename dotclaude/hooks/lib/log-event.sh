@@ -6,7 +6,10 @@
 #   hook_instrument "$(basename "$0")"
 #
 # Appends one JSONL line per invocation to ~/.claude/logs/hooks.jsonl with:
-#   ts, hook, outcome (allow|block|error), exit, duration_ms
+#   ts, hook, outcome (allow|block|error), exit, duration_ms, session_id
+# session_id comes from the CLAUDE_CODE_SESSION_ID env var the harness exports
+# to hook processes (empty string when absent, e.g. manual runs); it enables
+# per-session block-rate analysis (bd docr-bkiji ADAPTIVE v2 dependency).
 #
 # Exit conventions (per Claude Code hook protocol):
 #   0  -> allow
@@ -37,8 +40,9 @@ _log_hook_end() {
     *) outcome="error" ;;
   esac
   mkdir -p "$(dirname "$_HOOK_LOG_FILE")" 2>/dev/null || true
-  printf '{"ts":"%s","hook":"%s","outcome":"%s","exit":%d,"duration_ms":%d}\n' \
+  printf '{"ts":"%s","hook":"%s","outcome":"%s","exit":%d,"duration_ms":%d,"session_id":"%s"}\n' \
     "$(_hook_now_iso)" "$_HOOK_NAME" "$outcome" "$exit_code" "$duration_ms" \
+    "${CLAUDE_CODE_SESSION_ID:-}" \
     >> "$_HOOK_LOG_FILE" 2>/dev/null || true
 }
 

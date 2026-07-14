@@ -82,8 +82,19 @@ keywords related to the correction. Record the result:
 
 ### 6. Apply
 
-- **y**: Apply the edit using the Edit tool. Update the correction memory with the
-  resolution: `bd remember --key="<same key>" "<date>: Resolved - added to <file>"`
+**Landing path by tier (decide BEFORE applying).** Personal-tier targets
+(`~/.claude/CLAUDE.md`, `~/.claude/skills/`, `~/.claude/agents/`, memory files) apply
+directly with Edit and ship immediately. Project-tier targets (`.claude/rules/`, the
+project `CLAUDE.md`, project `.claude/skills`/`.claude/agents`) are committed team
+files: per CLAUDE.md "Implement in a worktree, never branch in the main checkout" and
+the lab-to-production rule, they land via a worktree + PR, never a direct Edit on
+`main`. Most Route-table domains (testing, code-style, architecture, security,
+debugging) are project-tier, so worktree + PR is the default; surface that in the
+proposal rather than implying a direct edit.
+
+- **y**: Apply per the target's tier above (direct Edit for personal-tier; worktree +
+  PR for project-tier). Update the correction memory with the resolution:
+  `bd remember --key="<same key>" "<date>: Resolved - added to <file>"`
 - **edit**: Accept the user's modifications, apply the revised edit, update memory.
 - **n**: Discard. Do NOT save a date-stamped recurrence memory if an umbrella memory (`correction:<domain>:<topic>`) plus structural enforcement (hook, linter, gate, formatter) are both already in place; recurrence tallies entrench adversarial framing without changing default behavior (CLAUDE.md Reflection Trigger step 5). If the same correction recurs after /reflect concludes "no edit", surface it back to the user as a mechanical question (which different enforcement layer would catch this?), not as another dated memory. The exception: save a recurrence memory only if the prior memory is missing context that would meaningfully sharpen future matching (a new structural variant, a new context category), and the surplus is genuinely additive rather than performative.
 

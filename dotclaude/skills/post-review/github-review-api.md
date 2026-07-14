@@ -4,8 +4,11 @@ Empirically verified 2026-04-03. See `memory/github-api.md` for full context.
 
 ## Posting a Review with Inline Comments
 
-```bash
-gh api -X POST /repos/lawfirm/main/pulls/{pull_number}/reviews --input - <<'JSON'
+Write the payload to a file with the Write tool, then pass it with `--input <file>`. Do NOT use a stdin heredoc: heredocs are fragile with special characters in comment bodies and trip the em-dash Bash hook.
+
+Payload shape (write this to e.g. `/tmp/pr-review-<number>.json`):
+
+```json
 {
   "body": "review summary",
   "event": "COMMENT",
@@ -17,7 +20,12 @@ gh api -X POST /repos/lawfirm/main/pulls/{pull_number}/reviews --input - <<'JSON
     }
   ]
 }
-JSON
+```
+
+Then post it:
+
+```bash
+gh api -X POST /repos/lawfirm/main/pulls/{pull_number}/reviews --input /tmp/pr-review-<number>.json
 ```
 
 Returns: `{"id": <review_id>, "html_url": "...#pullrequestreview-<id>", "state": "COMMENTED"}`

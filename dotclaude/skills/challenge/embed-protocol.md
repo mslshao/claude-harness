@@ -27,7 +27,7 @@ or something I'm assuming?" Extract assumptions using these triggers:
 
 For each assumption, record: the statement, which category it falls into
 (codebase / domain / technical / scope / dependency / precedent / reasoning /
-completeness), and where in your plan it appears.
+completeness / pipeline bypass), and where in your plan it appears.
 
 **Relevance gate**: For each extracted assumption, ask: "If this is wrong, does
 the plan change in a way that matters?" Drop assumptions where the answer is no.

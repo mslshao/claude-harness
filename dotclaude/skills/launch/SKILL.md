@@ -15,7 +15,7 @@ description: >
   generation before a plan exists, use /ideate. For planning only with no
   code, use /converge. For root cause investigation, use /investigate.
 argument-hint: "[MX2-XXXXX | docr-XXXX | description] [--skip-checks]"
-allowed-tools: ["Bash", "Glob", "Grep", "Read", "Agent", "Write", "Edit", "WebFetch", "Skill", "AskUserQuestion"]
+allowed-tools: ["Bash", "Glob", "Grep", "Read", "Agent", "Write", "Edit", "WebFetch", "Skill", "AskUserQuestion", "SendMessage"]
 ---
 
 # Launch
@@ -133,6 +133,17 @@ files, then dispatch `prompt-refiner` in headless mode. Output is a 200-400 word
 All tool calls in this phase run in parallel where possible. Do not show
 intermediate output to the user.
 
+**Target-tier check.** Before any worktree/PR planning, classify where the work lands.
+If the bead's file targets are personal-tier (`~/.claude/` skills, agents, hooks,
+commands, memory) or otherwise outside a git repository, the Phase 5 worktree and Phase 6
+PR machinery DO NOT APPLY: there is no repo to branch, no diff to PR, and editing live
+`~/.claude/` files breaks worktree isolation. Fire ESCALATE-ROUTE at the Phase 3.6 gate
+with SUGGESTED_NEXT_SKILL = direct in-place implementation (edit the files directly, no
+worktree, no commit, no PR; verify via the bead's own verification path, e.g. a
+grep-sweep). Detection: work-item file targets resolve under `/home/vscode/.claude/`, or
+`git -C <dir> rev-parse --is-inside-work-tree` is false. Recurrence: 2026-06-16 docr-6j3d,
+a personal-tier pr-intel skill edit where /launch would have produced an empty PR.
+
 ## Phases 2-3.6: Plan Pipeline (Internal)
 
 Run the converge-style plan pipeline against the implementation brief: refine
@@ -169,7 +180,7 @@ The bypass exists because re-running challenge + consult + skeptic +
 decision-maker on a plan that was already through that pipeline in a prior
 session produces redundant token cost without new signal. The recurring case
 is a `/launch` invocation that immediately follows a `/converge` whose plan
-was forged into beads. Recurrence context: 2026-05-28 MX2-XXXXX / docr-xii5,
+was forged into beads. Recurrence context: 2026-05-28 MX2-NNNNN / docr-xii5,
 where the prompt told /launch the convergence was complete and the protocol
 forced a re-run anyway; the orchestrator had to manually skip 1-3.6.
 
@@ -397,6 +408,10 @@ em-dash guard, the report template) lives in [finalization.md](finalization.md):
 - **Standup protocol is mandatory.** Every agent checks in after every logical unit.
 - **Specialists are ephemeral.** Spawn them for review at checkpoints, don't persist them.
 - **Draft PR always.** Never create a ready-for-review PR.
+- **Detect personal-tier / non-repo targets up front.** Phase 1's Target-tier check
+  fires ESCALATE-ROUTE when the work targets `~/.claude/` files or anything outside a git
+  repo; /launch's worktree+PR execution model does not apply there, and direct in-place
+  implementation is the route (docr-6j3d, 2026-06-16).
 - **Detect INPUT_MODE up front.** Phase 1 classifies the input as
   `problem-framed` or `mechanism-prescribed`. Jira tickets routinely
   prescribe mechanisms; the implementation pipeline must NOT

@@ -47,6 +47,33 @@ Break the refined scope into work items with these fields:
 - **Context is annotation only.** It changes how the user reads other
   fields (legacy + small Effort is impressive; greenfield + small
   Effort is expected). Do not score on Context.
+- **Control-verb items require a State-transitions table.** Any item
+  whose Title/Description contains an operator control verb
+  (stop/start/pause/resume/restart/cancel) applied to a recurring,
+  scheduled, or background mechanism must enumerate every {prior-state}
+  x {action} combination in Design notes (e.g. ACTIVE+stop, ACTIVE+
+  resume, STOPPED+resume, STOPPED+stop), naming the concrete tool-level
+  primitive that guarantees each one. Missing this table is treated the
+  same as a missing Verification path: it triggers ITERATE. Added
+  2026-07-10 after a "resume path" item shipped without this table and
+  the ambiguity it hid (which of two different meanings of "resume" was
+  meant) surfaced only when the tool's actual queuing semantics let a
+  stopped mechanism silently un-stop itself.
+- **Gather/diff/merge items require an explicit uniqueness key.** Any
+  item whose Design notes describe gathering, diffing, or merging items
+  across 2+ sources must name the uniqueness key explicitly, and state
+  whether the raw identifier is unique only within its source namespace.
+  Added 2026-07-10 after a cross-repo PR-search item shipped with no
+  stated key; a bare PR number would have silently collided across repos.
+- **Multi-case items require a per-case algorithm-shape tag.** Any item
+  naming 2+ cases/categories/triggers as producing one outcome via one
+  described mechanism must tag each case's actual detection shape
+  (membership-diff / threshold-crossing / rate-of-change / other) in
+  Design notes. A case whose tag differs from its siblings needs its own
+  sub-item or an explicit note on why one mechanism still covers it.
+  Added 2026-07-10 after an "aged in-progress item" category was named
+  alongside two membership-diff categories with no distinction, when it
+  actually needed its own state machine.
 
 ## Category Assignment
 

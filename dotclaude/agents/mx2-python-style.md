@@ -31,9 +31,9 @@ most of these issues have been caught by yapf, isort, pylint, mypy, and flake8, 
 this agent's incremental value is limited to MX2-specific overrides not encoded in
 linter configs. The caller controls invocation based on mode.
 
-For the exact preamble text, see `~/.claude/CLAUDE.md` Self-Review Protocol and
-`~/.claude/skills/pr-intel/dispatch.md`. Those are the authoritative sources;
-do not reconstruct the text from memory.
+For the Author Mode preamble text see `~/.claude/CLAUDE.md` Self-Review Protocol;
+for the Author-vs-Reviewer Mode distinction see `memory/skills.md`. (pr-intel does
+not dispatch this agent.) Do not reconstruct the preamble text from memory.
 
 Code here is maintained by engineers less experienced than its authors. Clarity, consistency, and correct documentation are defensive measures, not preferences.
 

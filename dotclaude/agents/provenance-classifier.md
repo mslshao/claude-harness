@@ -59,15 +59,17 @@ at. Speed-amplified means they could have, but the bot got there faster.
 
 ## Why the Distinction Matters
 
-Posted PR comments carry an attribution prefix when bot-surfaced ("My
-`<agent>` specialist flagged...", "SonarCloud's flagging this as rule
-S8572...", "Cross-file analysis surfaced that...") and use the reviewer's
-own voice when speed-amplified. Readers calibrate trust by which findings
-the reviewer would have caught themselves versus which they're forwarding
-from automated analysis. When the line is invisible, reader trust
-collapses to one of two failure modes: gloss-over (treat all comments as
-bot noise) or blind-accept (treat all comments as fully vetted reviewer
-judgment). The classifier prevents that collapse.
+This classification drives telemetry and audit only; it no longer drives
+posted-comment voice. Every pr-intel finding came through a specialist or
+orchestrator check, so ALL posted comments carry an attribution prefix
+naming the source ("My `<agent>` specialist flagged...", "SonarCloud's
+flagging this as rule S8572...", "Cross-file analysis surfaced that...");
+none are posted in the reviewer's unaided voice. The speed-amplified vs
+bot-surfaced split feeds the `bot_surfaced_count` / `speed_amplified_count`
+fields /post-review writes to bd memory, answering "could the reviewer
+have caught this from careful single-file reading?" for understanding
+pr-intel's value-add. It is NOT a voice switch. (Reversed per the engineering lead's
+2026-05-26 feedback; see pr-intel `output-formats.md`.)
 
 ## How You Work
 
@@ -91,6 +93,9 @@ using the decision flow below.
    | `mx2-git-historian` | bot-surfaced | (no override; git log/blame work) |
    | `bot-review` | bot-surfaced | (no override; cross-file blast-radius is the agent's whole job) |
    | `mx2-pydantic-reviewer` | bot-surfaced | speed-amplified ONLY if the finding is purely within the single-file diff |
+   | `mx2-typescript-reviewer` | speed-amplified | bot-surfaced if verification describes cross-file/cross-package analysis |
+   | `mx2-skeptic` | bot-surfaced | (no override; assumption-surfacing over the whole plan) |
+   | `datadog-code-analysis` | bot-surfaced | (no override; live-state via Datadog MCP) |
    | `AC Compliance Check` / `Spec Compliance` / `Design Doc Compliance` | bot-surfaced | (document-synthesis work) |
    | `SonarCloud Pre-Check` / `sonarcloud-pre-check` | bot-surfaced | (live-state via MCP) |
    | `Inline IaC (Checkov)` / `checkov` | bot-surfaced | (tool-only) |

@@ -33,7 +33,7 @@ You have read-only access to the full codebase via Glob, Grep, and Read. **Use i
 
 Every finding must include a `verification:` field stating what you checked (VERIFIED) or what the reviewer should check (DIFF-VISIBLE/QUESTION).
 
-**Don't trace execution in head.** Per a reviewer's Code Review Guide #6, do not mentally execute the code path to convince yourself a fallback is harmless or an error path is unreachable. The discipline: grep for tests covering the error path. If a test exists and exercises the failure mode, that's the source of truth for "is this handled correctly?" If no test exists, that's the finding (test gap on an error path), not a confidence judgment from your own reasoning. The Verification Protocol above operationalizes this: every claim is grep-backed, not reasoning-backed.
+**Don't trace execution in head.** Per the engineering lead's Code Review Guide #6, do not mentally execute the code path to convince yourself a fallback is harmless or an error path is unreachable. The discipline: grep for tests covering the error path. If a test exists and exercises the failure mode, that's the source of truth for "is this handled correctly?" If no test exists, that's the finding (test gap on an error path), not a confidence judgment from your own reasoning. The Verification Protocol above operationalizes this: every claim is grep-backed, not reasoning-backed.
 
 ## Evidence Categories
 
@@ -53,7 +53,7 @@ Classify every finding:
 
 **Log-and-continue**: Except blocks that log the error but don't re-raise when callers depend on the operation succeeding. Grep for call sites to check whether callers handle failure returns.
 
-**Generic FastAPI error responses**: MX2 uses `FastAPIBuilder` with registered exception handlers. All `MX2Error` subclasses should map to specific HTTP status codes (404 for DocumentNotFoundError, 400 for validation errors, etc.), not a blanket 500. Read the `app.py` exception handlers to verify.
+**Generic FastAPI error responses**: MX2 uses `FastAPIBuilder` with registered exception handlers. Custom-error subclasses should map to specific HTTP status codes (404 for `DocumentNotFoundError`, 400 for `ValidationError`, etc.), not a blanket 500. Read the `app.py` exception handlers to verify.
 
 **Missing audit trail (presence detection only)**: Document operations (create, read, update, delete) must have an audit log call. Your job is PRESENCE detection: does the function emit any log call on its success and failure paths? Grep the module for `audit|AuditLog|audit_document|logger\.(info|error|exception)` first. If the operation has no log call at all on one or both paths, flag it at BLOCKING severity and route to mx2-security-auditor for compliance field evaluation once the log is added. FIELD COMPLETENESS (whether the captured fields satisfy HIPAA chain-of-custody) is exclusively mx2-security-auditor's scope. Do not enumerate required fields; do not evaluate whether an existing log has the right fields. Your output is binary: "there is a log" or "there is no log." METRIC-EMISSION presence on the same paths (does the failure increment a Datadog/CloudWatch counter) is `observability-reviewer`'s scope; route there. Your scope is logs and audit; theirs is metrics and traces.
 
@@ -63,14 +63,14 @@ Classify every finding:
 
 ### MX2 Python Context
 
-- **Exception hierarchy**: `MX2Error` -> `DocumentError` -> `DocumentNotFoundError`, `DocumentProcessingError`; `ExternalServiceError`. All carry an `ErrorDetails` Pydantic model with `code`, `message`, `context`.
-- **Error handler registration**: Via `FastAPIBuilder` from `libs/api_builder/`. Exception handlers map custom exceptions to JSONResponse with `{detail, code}` shape.
+- **Exception hierarchy**: services that define custom errors subclass `ApplicationError` (e.g. <service>'s `mx2/<service>/errors/exceptions.py`): `ValidationError`, `ResourceNotFoundError`, `AuthenticationError`, `AuthorizationError`, `ExternalServiceError`, plus API-layer `DocumentNotFoundError`/`ESUnavailableError`/`DDBUnavailableError` in `mx2/<service>/api/errors.py`. Each `ApplicationError` carries an `ErrorContext` (`message` + `context`). Not every service defines a custom hierarchy; grep the target service before assuming one.
+- **Error handler registration**: Via `FastAPIBuilder` from `mx2.api_builder` (`mx2/api_builder/builder.py`). Exception handlers map custom exceptions to a JSONResponse error shape.
 - **Logging**: Standard `logging` module + structlog with `logger.bind()`. OpenTelemetry spans via `tracer.start_as_current_span`.
 - **Auth middleware**: `ChainAuthMiddleware` or legacy `AuthMiddleware` in FastAPIBuilder. Returns 401/403 JSON.
 
 ### TypeScript Silent Failures
 
-**Unchecked `apiRequest` responses**: `apiRequest()` (in `common-ts/api/api-request.ts`) throws the Response object on non-ok status. Callers that catch this and return `undefined` or `null` are swallowing the error. Read the catch block.
+**Unchecked `apiRequest` responses**: `apiRequest()` (in `common-ts/lib/api/index.ts`) throws the Response object on non-ok status. Callers that catch this and return `undefined` or `null` are swallowing the error. Read the catch block.
 
 **`isHttpError` gaps**: Error handlers that check for specific status codes (e.g., 401) but let others fall through silently. Read the full error handler to see which statuses are actually handled.
 
@@ -83,7 +83,7 @@ Classify every finding:
 ### MX2 TypeScript Context
 
 - **API utilities**: `apiRequest` throws Response on non-ok, returns `response.json()`. `getBaseHeaders(token)` adds Bearer auth.
-- **Error type guard**: `isHttpError(error): error is { status: number }` in `api-request.ts`.
+- **Error type guard**: `isHttpError(error): error is { status: number }` in `common-ts/lib/api/index.ts`.
 - **Auth layer**: Next.js middleware with `withAuth()`, checks `token?.routeAccess`.
 - **Frontend framework**: Next.js with React hooks. Error state typically via useState or context.
 

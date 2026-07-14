@@ -54,6 +54,10 @@ Draft:
 - **Issue type**: default Task; Bug if clearly a fix; Story for new service or feature
 - **Project**: MX2
 - **Assignee**: current user by default
+- **Component (owning scrum team)**: REQUIRED for board visibility. Infer the owning team from the work's domain and the current conversation; default to the user's team (Jesup) when unclear. The MX2 Sprint board filters on Components, so a ticket with none does not appear on the board.
+- **Label (domain)**: the domain label (e.g. `<service>`), also board-filtered. Infer from the work's domain; ask only if genuinely ambiguous.
+
+See the "Board visibility" section of `memory/jira.md` for the rule and the verified component ids per team.
 
 **Attribution**: every drafted description ends with the paragraph `Generated using the Claude Code /jira skill.`
 
@@ -82,6 +86,8 @@ Use `mcp__atlassian__createJiraIssue` with the cloudId. ADF format for `descript
 
 Set `assignee_account_id` to current user's account ID.
 
+**Label + Components (board visibility, required).** `createJiraIssue` drops `labels` on essentially every create and never sets `components` from the draft. Do NOT rely on passing `labels` in the create payload (it will not stick); ALWAYS issue a follow-up `editJiraIssue {"labels": [<domain label>], "components": [{"id": "<team component id>"}], "customfield_11220": <empty ADF>}` as a mandatory second step (component ids per the "Board visibility" section of `memory/jira.md`; Jesup=11049). Treat this as unconditional, not verify-then-maybe-reapply. Skipping it leaves the ticket off the Sprint board.
+
 ### 5. Output
 
 Print the created ticket ID. If created from current branch, suggest renaming to include the ticket ID for `/pr` pickup.
@@ -93,7 +99,7 @@ Print the created ticket ID. If created from current branch, suggest renaming to
 The draft is a YAML file at `<draft-path>` with the following shape:
 
 ```yaml
-parent: MX2-XXXXX              # optional: shared parent epic for all tickets
+parent: MX2-NNNNN              # optional: shared parent epic for all tickets
 tickets:
   - summary: "Phase 1: Foo"
     description: |
@@ -101,6 +107,8 @@ tickets:
     issue_type: Task            # optional; default Task
     parent: MX2-XXXXX           # optional per-ticket override
     priority: Medium            # optional; default Medium
+    component: Jesup            # owning scrum team (board visibility); default Jesup if omitted
+    label: <service>               # domain label (board visibility)
     links:                      # optional outgoing Blocks links to other tickets
       blocks:
         - phase_2_id            # symbolic reference resolved after creation
@@ -133,6 +141,8 @@ Show the full list (summary + first line of description per ticket) plus the lin
 Issue all `createJiraIssue` calls in ONE message with multiple tool blocks. Capture the returned MX2-NNNNN keys, mapping each symbolic `id_ref` to its real key.
 
 **Per-ticket fields preserved** (see `memory/jira.md` "Editing tickets" section): assignee, parent, customfield_11220 (empty ADF for non-SF types or mirrored for SF types), priority.
+
+**Board-visibility fields (batch).** After the parallel creates, set each ticket's domain Label and owning-team Component (from the draft's `label` / `component`, defaulting Component to Jesup) via follow-up `editJiraIssue` calls in one parallel message, since `createJiraIssue` drops labels and does not set components. Verify on read-back. Per the "Board visibility" section of `memory/jira.md`.
 
 ### 6. File issue links in parallel
 

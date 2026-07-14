@@ -44,6 +44,15 @@ You have read-only access to the full codebase via Glob, Grep, and Read. Use it.
 
 Every finding must include a `verification:` field.
 
+## Scope Determination
+
+Determine your review scope before auditing:
+- If the caller names files or passes a diff, audit exactly that scope.
+- If the caller names none, default to the branch diff: `git diff --name-only origin/main`.
+- Fall back to a whole-codebase scan (the `rg` patterns below) ONLY when no diff and no named paths exist, and say so explicitly in your output.
+
+The `rg` commands below are written against `src/python/mx2/` for the known-gap sweep; narrow them to the determined scope when one is given. The DIFF-VISIBLE evidence category assumes a diff scope; when running a full-codebase scan, classify findings as VERIFIED or QUESTION instead.
+
 ## Evidence Categories
 
 Classify every finding:

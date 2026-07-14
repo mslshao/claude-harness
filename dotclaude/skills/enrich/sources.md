@@ -19,7 +19,7 @@ Shared reference for context-gathering tools and bounds. Referenced by
 
 ```
 mcp__atlassian__getJiraIssue
-  cloudId: <atlassian-cloud-id>
+  cloudId: <your-atlassian-cloud-id>
   issueIdOrKey: MX2-XXXXX
   fields: ["summary", "status", "assignee", "priority", "description", "customfield_11220", "comment", "issuelinks"]
   responseContentFormat: markdown
@@ -29,11 +29,22 @@ mcp__atlassian__getJiraIssue
 last 5 comments. Read BOTH `customfield_11220` and `description`; both render
 in the Jira UI as of ~2026-04-30. Per project convention (see
 [/workspaces/main/.claude/commands/jira.md](/workspaces/main/.claude/commands/jira.md),
-MX2-XXXXX): non-Salesforce issue types put canonical content in `description`
+MX2-NNNNN): non-Salesforce issue types put canonical content in `description`
 with `customfield_11220` blanked to empty ADF; Salesforce-specific issue types
 mirror the same content in both fields. Use whichever field has content; if
 both are populated, prefer `description` for non-SF types and either for SF
 types (they should match).
+
+**Linked-issue sweep (when `issuelinks` is non-empty):** for each linked issue
+(relates to / blocks / is blocked by), fetch status plus the most recent 2-3
+comments (same `getJiraIssue` call, fields `["summary", "status", "comment"]`).
+If a linked issue's findings contradict or supersede the target ticket's latest
+framing, surface a flagged **CONTRADICTION** line at the top of the briefing,
+citing both sources (ticket + comment date each). Rationale: MX2-NNNNN sat
+blocked ~6 weeks re-asserting a hypothesis its "relates to" sibling MX2-NNNNN
+had falsified in comments on 2026-05-19; the falsification was invisible from
+the target ticket alone. **Bounds:** max 3 linked issues, most recently updated
+first; note the count if more exist.
 
 **ADF parsing for `customfield_11220`:** This field always returns ADF JSON
 regardless of `responseContentFormat`. Extract plain text using the recursive

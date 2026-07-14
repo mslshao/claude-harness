@@ -60,7 +60,7 @@ walk, then remaining matches. The walker stops at `--limit`.
 ## Cold-start orientation
 
 If just spawned and you have no context: this is a personal
-knowledge-graph walker over ~1800 beads memories + ~110 topic files in
+knowledge-graph walker over ~1000 beads memories + ~145 topic files in
 `~/.claude/projects/-workspaces-main/memory/`. Phase 1 shipped
 2026-05-22. Output is informational, not directive: a surfaced
 neighbor does not mean the user wants action taken on it.

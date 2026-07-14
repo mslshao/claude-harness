@@ -9,10 +9,8 @@ to evaluate design decisions in context.
 2. **Service Context**: CLAUDE.md / README orientation for the service the PR
    touches; gives external reviewers enough background.
 3. **Migration State**: load operational state for in-flight migrations before
-   forming review concerns. **Provisional, added 2026-04-27.** Revisit usage
-   signal at 2026-05-27; if no /pr-intel run hit this branch in the interim,
-   consider removing or relocating to `~/.claude/skills/_shared/migration-state.md`
-   for cross-skill reuse.
+   forming review concerns. Permanent as of 2026-07-02 (2026-07-01 audit:
+   revisit never ran, check in active use).
 
 ## PR Series Context
 
@@ -85,7 +83,7 @@ For PRs spanning multiple services, include context for each.
 
 ## Migration State (when PR touches an in-flight migration)
 
-> **Provisional section**, added 2026-04-27. Revisit usage signal at 2026-05-27.
+> Permanent as of 2026-07-02 (2026-07-01 audit: revisit never ran, check in active use).
 
 If the PR's title, body, or linked Jira epic chain references an active
 migration (signals: tokens like "migration", "cutover", "v3", "matters",

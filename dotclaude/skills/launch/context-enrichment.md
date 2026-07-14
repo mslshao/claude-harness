@@ -44,7 +44,7 @@ Run as many of these in parallel as possible.
 **Jira ticket:**
 ```
 mcp__atlassian__getJiraIssue
-  cloudId: <atlassian-cloud-id>
+  cloudId: <your-atlassian-cloud-id>
   issueIdOrKey: MX2-XXXXX
   fields: ["summary", "status", "assignee", "priority", "description", "customfield_11220", "comment", "issuelinks"]
   responseContentFormat: markdown
@@ -53,7 +53,7 @@ Extract: summary, linked tickets (`issuelinks`), assignee, status, comments
 (last 5). Read BOTH `customfield_11220` and `description`; both render in the
 Jira UI as of ~2026-04-30. Per project convention
 ([/workspaces/main/.claude/commands/jira.md](/workspaces/main/.claude/commands/jira.md),
-MX2-XXXXX): non-SF tickets carry content in `description` with
+MX2-NNNNN): non-SF tickets carry content in `description` with
 `customfield_11220` blanked to empty ADF; SF-specific tickets mirror content
 in both fields. Use whichever has content. `customfield_11220` returns ADF
 JSON; extract plain text by recursively collecting `text` fields from `content`
@@ -109,7 +109,7 @@ After gathering all inputs, classify the request as one of:
 
 - **`problem-framed`**: the input describes a problem to solve without
   committing to a mechanism. Example: "users are hitting X", "we need a
-  better way to handle Y", "MX2-XXXXX says we should figure out Z". The
+  better way to handle Y", "MX2-NNNNN says we should figure out Z". The
   implementation space is wide open.
 - **`mechanism-prescribed`**: the input commits to a specific mechanism
   to build. Example: "add a Redshift query for X", "create a Fulfillment
