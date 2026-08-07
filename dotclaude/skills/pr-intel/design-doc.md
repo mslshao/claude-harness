@@ -14,17 +14,17 @@ page ID and fetch the page content AND comments **in parallel** with Jira hydrat
 
 ```
 mcp__atlassian__getConfluencePage
-  cloudId: <your-atlassian-cloud-id>
+  cloudId: <atlassian-cloud-id>
   pageId: <extracted page ID>
   contentFormat: markdown
 
 mcp__atlassian__getConfluencePageInlineComments
-  cloudId: <your-atlassian-cloud-id>
+  cloudId: <atlassian-cloud-id>
   pageId: <extracted page ID>
   contentFormat: markdown
 
 mcp__atlassian__getConfluencePageFooterComments
-  cloudId: <your-atlassian-cloud-id>
+  cloudId: <atlassian-cloud-id>
   pageId: <extracted page ID>
   contentFormat: markdown
 ```

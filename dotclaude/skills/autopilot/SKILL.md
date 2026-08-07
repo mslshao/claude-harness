@@ -14,6 +14,16 @@ allowed-tools: ["Bash", "Glob", "Grep", "Read", "Agent", "Write", "Edit", "WebFe
 Run the converge/launch pipeline autonomously. The mx2-decision-maker agent
 replaces human approval at every gate. You (the main session) orchestrate.
 
+> **Retirement trigger (armed 2026-07-20, docr-go00s; decision lineage
+> docr-9bp1b/docr-1vqfg).** `build` mode is slated for retirement to a stub
+> pointing at `/campaign` + `/launch --gate=agent`. The trigger is falsifiable:
+> it fires when the FIRST real (non-throwaway) epic completes a `/campaign` run
+> to cursor `state=COMPLETE` with 2+ nodes and a run report on the epic bead.
+> When that happens: record the firing on docr-9bp1b, then replace this skill's
+> build path with the stub (plan mode's fate is decided at the same review).
+> Do NOT stub before the trigger fires; drill runs (campaign-drill label) do
+> not count.
+
 ## Input
 
 Parse `/autopilot $ARGUMENTS`:
@@ -123,6 +133,14 @@ above are autopilot-internal scaffolding, not load-bearing for the
 decision-maker, which references "Evidence trail" generically).
 
 Output: converged plan + evidence trail.
+
+**Boundary: the embedded converge protocol ends here, at Phase 4 synthesis.**
+Do NOT run converge Phases 4.5 (skeptic) or 4.6 (convergence gate) inside
+autopilot: Gate 1 (Phase 6 below) replaces the convergence gate, and skeptic
+expansion to autopilot is calibration-gated (CLAUDE.md Agent Dispatch routing
+rule 3). Their "mandatory" language in converge/SKILL.md applies to /converge
+runs, not to this embedding; likewise the /converge present-template
+enforcement (stop-validate-plan-present.sh) does not arm for /autopilot.
 
 ### Phase 6: Decision Gate 1 (Plan Approval)
 

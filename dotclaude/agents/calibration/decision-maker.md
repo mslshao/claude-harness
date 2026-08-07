@@ -138,6 +138,43 @@ an external call without naming the concrete classes. Source: 2026-05-19
 `elasticsearch.ApiError` is a sibling (not subclass) of `TransportError`,
 so 401/403/400 escaped the catch and inverted the fail-closed intent.
 
+### Ideation gate: a high-signal ITERATE names a specific missed alternative
+
+At ideation/converge gates, an ITERATE that names a CONCRETE missed alternative
+from a known-good source (a memory file, a ratified prior decision) is
+high-signal and warrants a real evaluation spike, even late in a pass; vague
+dissatisfaction is not. The correct response is not always to adopt the named
+alternative: evaluate-and-document-the-decline satisfies the ITERATE when the
+alternative trades a documented limitation for an unverified one plus new risk.
+Source: 2026-07-09 /converge overwatch-skill gate; merged 2026-07-21.
+
+### Ideation-gate rubric gaps: grade quality, declare tier, enumerate zero-code
+
+At /ideate and /converge gates, ITERATE when the scoring exhibits any of these
+(3x-confirmed across the overwatch and autopilot ideations): (a) Verifiability
+grades that the MECHANISM executes rather than that the DECISION or RANKING is
+correct (a headline capability every candidate rests on was never run or
+killed-and-resumed, yet scored high); (b) a candidate leaves its tier/target
+path undeclared when tier is an open user question, and Fit=match papers over
+the disagreement; (c) Diverge produced only in-process variants with no
+zero-code / existing-artifact candidate for a recurring-watch-shaped problem,
+despite a durable alternative already documented. Extends "Strategy enumeration:
+include zero-code paths" above with the ideation-phase specifics. Source:
+2026-07-09 overwatch + 2026-07-17 autopilot ideation gates; merged 2026-07-21.
+The structural /ideate-rubric fix (goal-fit column, capability-proving
+Verifiability, mandatory zero-code enumeration) landed in the /ideate
+scoring-matrix and Phase 2 Diverge on 2026-07-21.
+
+### Fit weakness rooted in a missing user constraint: ESCALATE-QUESTIONS, not re-ITERATE
+
+When weak-dimension=fit at an ideation gate traces to an UNDECLARED user
+requirement (a required autonomy floor, an expected epic frequency) rather than
+a missing candidate, ESCALATE-QUESTIONS on the constraint instead of a second
+ITERATE-re-diverge. Re-scoring cannot manufacture a constraint the user never
+stated, a second fit ITERATE nears the stuck-loop condition, and precedent shows
+re-diverge repairs the candidate pool but re-flags the same fit gap unresolved.
+Source: 2026-07-17 autopilot ideation gate round-2; merged 2026-07-21.
+
 ---
 
 ## Example Decisions
@@ -224,9 +261,9 @@ to 3 services. The original ask was a single-service bug fix.
 
 ## Threshold Notes
 
-**<Service> domain**: <Service> services (metadata-updater, search-api, indexer) have
+**<service> domain**: <service> services (metadata-updater, search-api, indexer) have
 complex interactions with Elasticsearch and DynamoDB Streams. Plans touching
-<Service> should have evidence of ES index structure verification and DynamoDB
+<service> should have evidence of ES index structure verification and DynamoDB
 Stream configuration checks. Missing these is an ITERATE, not an ESCALATE
 (the information is available in the codebase).
 

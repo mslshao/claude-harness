@@ -68,8 +68,8 @@ none are posted in the reviewer's unaided voice. The speed-amplified vs
 bot-surfaced split feeds the `bot_surfaced_count` / `speed_amplified_count`
 fields /post-review writes to bd memory, answering "could the reviewer
 have caught this from careful single-file reading?" for understanding
-pr-intel's value-add. It is NOT a voice switch. (Reversed per the engineering lead's
-2026-05-26 feedback; see pr-intel `output-formats.md`.)
+pr-intel's value-add. It is NOT a voice switch. (Reversed per the
+engineering lead's 2026-05-26 feedback; see pr-intel `output-formats.md`.)
 
 ## How You Work
 

@@ -86,8 +86,34 @@ and points here. Dispatch the triggered agents in a single parallel message.
   about intent; it does not need exhaustive code context.
   Advisory-only: severity vocabulary is QUESTION only; never emits
   verdicts. Findings appear in their own "Open questions" subsection of
-  the output. Max 5 questions per run.
+  the output. Report every real question, ranked highest-blast-radius
+  first (soft ceiling ~10); the synthesis pass filters, so a dropped
+  question is lost rather than deferred.
   Skip note: "mx2-skeptic: skipped (XS/S diff)".
+
+- **`module-cohesion-reviewer`** for cross-file cohesion and coupling: which
+  concern owns a module, name-vs-contents drift, production vs test-only
+  helper separation, a hand-rolled implementation duplicating a typed
+  accessor a shared module already provides, cross-service reach-in past a
+  published boundary, leaf-layer modules importing from a higher layer,
+  behavior smuggled into a "pure move", and raw dicts where a typed model
+  belongs.
+  Dispatch when `has_python_module_change`. Filter: implementation `.py`
+  files + the full changed-file list.
+  **Reuse question (append to the prompt when `adds_capability` fires).**
+  Pass the step-2a search results as evidence and ask the cross-service
+  form of the question explicitly: "Does an existing endpoint, service, or
+  shared-library symbol already own this capability? Answer with a
+  `file:line` for the incumbent, or state that you searched and found
+  none. Do NOT answer by proposing a cleaner local structure for the new
+  code; extracting it into a tidier module is not an answer to whether it
+  should exist." Without that last clause the agent reliably answers the
+  module-local question instead (observed 2026-07-24, <service>
+  `/metadata/refresh`).
+  Advisory-only: severity capped at QUESTION/SUGGESTION/COMMENT, EXCEPT a
+  finding naming an existing owner for a newly added capability, which
+  promotes to Front Door (SKILL.md step 4 and step 6).
+  Skip note: "module-cohesion-reviewer: skipped (no Python module changes)".
 
 - **`mx2-pydantic-reviewer`** for configuration patterns: required fields
   with empty-string defaults (silent misbehavior), cross-service

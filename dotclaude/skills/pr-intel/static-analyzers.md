@@ -13,7 +13,7 @@ Per-tool default-mode behavior:
 | Datadog code analysis | `mcp__datadog__search_pr_insights` (verified via `datadog/unblock-pr` skill) | Vulnerabilities: BLOCKING; Quality: DISCUSSION | No |
 | Sentry | N/A (no live bot on MX2 PRs as of 2026-05-28) | (see Sentry sub-section) | No |
 
-Static-analyzer findings are inline-iterate, not Front Door class. the engineering lead's
+Static-analyzer findings are inline-iterate, not Front Door class. The engineering lead's
 "send back quickly" framing applies to description and types specifically
 (synthesis.md step 7b). A static-analyzer finding can still be BLOCKING in
 its own severity bucket; that just routes through the regular Recommendation
@@ -137,7 +137,7 @@ resolution step.
 
 **Direct-access rule.** Datadog MCP exposes per-PR code-quality and
 code-security counts via `mcp__datadog__search_pr_insights`. Do not parse
-the `datadog-lawfirm` bot comment text; query the MCP directly. The
+the `datadog-morgan-morgan` bot comment text; query the MCP directly. The
 bot comment links to dashboards but does not include the finding details
 inline; the MCP returns the structured counts. The relevant Datadog skill
 guide is `datadog/unblock-pr` (Step 1.5 PR Health subsection); load it on
@@ -145,13 +145,13 @@ demand if more context is needed.
 
 **Process:**
 
-1. **Resolve the repo URL.** `repo_url: https://github.com/lawfirm/main`
+1. **Resolve the repo URL.** `repo_url: https://github.com/<company>/docr`
    (prepend `https://` to the `@git.repository.id_v2` form).
 
 2. **Call the MCP.**
    ```
    Tool: mcp__datadog__search_pr_insights
-   repo_url: https://github.com/lawfirm/main
+   repo_url: https://github.com/<company>/docr
    pr_number: <N>
    ```
    Extract `code_quality` and `code_security` entries from

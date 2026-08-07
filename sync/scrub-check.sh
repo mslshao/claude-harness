@@ -62,10 +62,10 @@ TIER2_PATTERNS=(
   'Anthropic.*[Rr]ejection'
   'Anthropic.*technical enablement'
   'rejected.*from Anthropic'
-  '<company>'
+  'Morgan-and-Morgan'
   '\bM&M\b'
-  '/workspaces/main\b'
-  '-workspaces-main\b'
+  '/workspaces/docr\b'
+  '-workspaces-docr\b'
 )
 
 # Tier 3: internal tracking IDs.
@@ -76,15 +76,15 @@ TIER2_PATTERNS=(
 # - AWS resource names beginning with the workspace prefix (docr-deployment,
 #   docr-dev-deployment) are Tier 4 infrastructure detail; allowed.
 TIER3_PATTERNS=(
-  '<confluence-space-id>'               # confluence space ID
-  '<atlassian-cloud-id>'                 # atlassian cloud ID
+  '712020e7620f9a43fa4ea69b7a38bc2ee47ff5'               # confluence space ID
+  'f6ec428e-c64c-40d8-983b-9ac03ead43f5'                 # atlassian cloud ID
   '\bMX2-[0-9]+\b'                                       # specific Jira ticket numbers (placeholder forms MX2-XXXXX/NNNNN do not match)
 )
 
 # Tier 4: infrastructure detail patterns (cautious; many of these will be
 # legitimate examples in unscrubbed contexts; this list is starter-shaped).
 TIER4_PATTERNS=(
-  'dyn-<service>-.*-dlq'                                    # specific queue names
+  'dyn-quaero-.*-dlq'                                    # specific queue names
   'arn:aws:.*:.*:.*'                                     # AWS ARNs identify
   '\bQuaero\b'                                           # internal service name (capital, prose contexts)
   '\bquaero\b'                                           # internal service name (lowercase, identifier contexts)

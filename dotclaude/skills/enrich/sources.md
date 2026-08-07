@@ -19,7 +19,7 @@ Shared reference for context-gathering tools and bounds. Referenced by
 
 ```
 mcp__atlassian__getJiraIssue
-  cloudId: <your-atlassian-cloud-id>
+  cloudId: <atlassian-cloud-id>
   issueIdOrKey: MX2-XXXXX
   fields: ["summary", "status", "assignee", "priority", "description", "customfield_11220", "comment", "issuelinks"]
   responseContentFormat: markdown
@@ -212,7 +212,7 @@ gh pr view <N> --json title,body,changedFiles,url,state,author,baseRefName
 
 **For inline review comments** (when the briefing needs reviewer context):
 ```bash
-gh api /repos/lawfirm/main/pulls/<N>/comments \
+gh api /repos/<company>/docr/pulls/<N>/comments \
   --jq '[.[] | {user: .user.login, path: .path, line: .line, body: .body}]'
 ```
 Adds inline thread context (Copilot/Sentry comments live here). Also fetch
@@ -225,6 +225,19 @@ context, not review analysis. For review analysis, use `/pr-intel`.
 ## 7. Codebase
 
 Grep and Read based on references found in the primary source.
+
+**PR branch not checked out (read via `git show`, not the working tree):** When the
+primary source is a GitHub PR, its changed files live on the PR's head branch, NOT the
+local working tree (which holds the base branch). Reading `src/.../foo.py` directly
+returns "No such file or directory" for any file the PR adds or that diverged. Fetch
+the head ref once, then read through it:
+```bash
+gh pr view <N> --json headRefName --jq '.headRefName'   # e.g. cfried/mx2-ruleseng
+git fetch origin <headRefName>
+git show origin/<headRefName>:<path>                     # read any changed file
+```
+Do NOT stand up a worktree for enrichment (that is `/pr-intel`'s job); `git show`
+against the fetched ref is enough for the read-only characterization enrich does.
 
 **File paths:** Extract `src/python/mx2/...` or similar path patterns from
 ticket descriptions, bead design notes, or PR changed files. Read those files.

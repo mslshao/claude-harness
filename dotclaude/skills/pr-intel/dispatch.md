@@ -28,6 +28,7 @@ When pre-loaded context is available, triggers are pre-evaluated in
 | `has_security_patterns: true` OR `security_files` non-empty | Security & compliance |
 | `has_test_files: true` | Test quality |
 | `has_terraform: true` | Infrastructure review |
+| `has_ci_workflow_change: true` | CI/CD workflow security review |
 | `has_typescript_files: true` | TypeScript review |
 | `structural_risk_size: true` AND `has_file_history: true` | Git history regression |
 | `structural_risk_size: true` AND `has_pattern_precedent: true` | Prior PR precedent |
@@ -35,9 +36,89 @@ When pre-loaded context is available, triggers are pre-evaluated in
 | `changes_public_surface: true` OR `has_pattern_precedent: true` | Cross-file blast-radius |
 | `structural_risk_size: true` | Adversarial dissent |
 | `has_pydantic_settings_signal: true` | Pydantic Settings review |
+| `adds_capability: true` | Active Reuse-Search (orchestrator step, ALL sizes; section below, not a specialist) |
 
 The descriptions below document what each trigger checks (for reference and
 fallback mode). When dispatch-signals are available, use the booleans above.
+
+## Active Reuse-Search (orchestrator-owned, runs BEFORE the fan-out)
+
+Fires when `adds_capability` (SKILL.md Dispatch Signals). Runs at ALL sizes,
+including XS/S renders that dispatch no specialists; it is an orchestrator
+step, not a specialist. The question is not "is the new code correct?" but
+"should this code exist at all, or does something in the monorepo already
+own this capability?" That is `architecture.md` Reuse Across Boundaries,
+specifically its "If no boundary exists, build one; don't duplicate" bullet.
+Cross-author review is where this matters most: there is no bead or design
+context to fall back on, so if the orchestrator does not run the search,
+nobody does (PR #10807, 2026-07-24: both reuse gaps surfaced only on a
+second pass, after the author was asked the why-not-how question).
+
+**Run the search yourself; do NOT delegate it to the specialists.** The
+per-agent self-enrichment instruction already tells every agent to grep for
+related code paths, and on the <service> `/metadata/refresh` duplication
+(2026-07-24, docr-5obvn) it did not fire even with
+`module-cohesion-reviewer` dispatched. An instruction that has been tried
+and missed is not a mechanism; the search has to be deterministic and owned
+here.
+
+Derive 2-4 search terms per introduced capability from the CAPABILITY, not
+from the new code's naming (the author's names are precisely what will not
+match the incumbent's):
+- the external endpoint, host, or binary being reached
+  (`api.anthropic.com`, `superset`, `soffice`)
+- the shared-library symbol that would wrap it (`init_llm`,
+  `RedshiftCalls`, `DocumentStore`)
+- the domain verb plus object (`publish refresh`, `convert docx`)
+
+Use BARE symbols as terms, never `class X` or `def X` anchors: the
+incumbent is often re-exported from a package `__init__.py` or declared in
+a differently-named submodule (`mx2.redshift_calls.RedshiftCalls` lives in
+`calls.py`), so a declaration-anchored term misses the call sites that
+prove the capability is already owned.
+
+From the PR worktree root, run BOTH passes, source first (documentation
+hits otherwise crowd out the declaration):
+
+```
+# pass 1, source: what already implements this
+git grep -n -i -E "<term1>|<term2>" -- 'src/python/mx2/**/*.py' \
+  'src/typescript/mx2/**/*.ts' 'libs/**/*.py' \
+  ':(exclude)**/*_test.py' ':(exclude)**/test_*.py' \
+  ':(exclude)**/conftest.py' | head -25
+
+# pass 2, docs: which service CLAIMS to own it (often the clearest statement)
+git grep -n -i -E "<term1>|<term2>" -- '**/*.md' | head -15
+```
+
+Test files are excluded by git pathspec, NOT by piping through `grep -v`:
+`git grep` emits `path:line:content`, so a content-matching filter drops
+real source lines whose code happens to contain the filter text
+(`grep -vE 'test_'` discards `litify_docs__Latest_Version__c`, exactly the
+identifier shape a capability search targets).
+
+Record ONE of two outcomes per capability; both are mandatory output, and
+silence is not an allowed third state (the outcome renders on the header
+`reuse-search:` line, output-formats.md):
+
+- **Candidate owner found**: name it as `file:line`, state what it already
+  does, and carry it into synthesis step 7b as a capability-duplication
+  Front Door finding. Pass the incumbent into the `mx2-code-reviewer` and
+  `module-cohesion-reviewer` prompts as evidence, appending: "Does an
+  existing endpoint, service, or shared-library symbol already own this
+  capability? Answer with a `file:line` for the incumbent, or state that
+  you searched and found none. Do NOT answer by proposing a cleaner local
+  structure for the new code; extracting it into a tidier module is not an
+  answer to whether it should exist."
+- **No owner found**: record the literal terms tried, rendered as
+  `reuse-search: searched <terms>, no existing owner found`. A search
+  whose terms are not stated is indistinguishable from a search that never
+  ran.
+
+Do not resolve the finding. Whether to delete the new code, call the
+incumbent, or add a boundary to the incumbent is the author's call; this
+step exists to make sure the question is asked BEFORE the diff gets
+refined into a better version of the wrong thing.
 
 **Structural risks** → `mx2-code-reviewer` + `mx2-silent-failure-hunter`
 Trigger: diff > 200 lines OR > 5 files changed OR diff contains `try`/`except`/`raise`
@@ -52,6 +133,9 @@ Trigger: PR includes files matching `*_test.py|test_*|conftest.py`
 
 **Infrastructure review** → `mx2-devops-build-deploy`
 Trigger: changed files match `*.tf|*.hcl|terragrunt.hcl` OR paths contain `infra/|module/`
+
+**CI/CD workflow security review** → `mx2-devops-build-deploy`
+Trigger: `has_ci_workflow_change: true` (changed files match `.github/workflows/*.ya?ml`). Use the CI-workflow prompt variant (see the `mx2-devops-build-deploy` prompt below), NOT the Terraform prompt.
 
 **TypeScript review** → `mx2-typescript-reviewer`
 Trigger: `has_typescript_files: true` (changed files include `*.ts|*.tsx|*.mts|*.cts` outside `src/gen-typescript/`)
@@ -92,7 +176,7 @@ Trigger: `structural_risk_size: true` (M+ PR: > 200 lines OR > 5 files). Surface
 Different from `bot-review` (cross-file consumer-invariant articulation; both are advisory but skeptic asks "what did you not consider" while bot-review asks "what does X consumer assume that breaks"). Different from `mx2-code-reviewer` (structural verdicts) and `mx2-silent-failure-hunter` (error-propagation verdicts) which produce judgments rather than questions.
 
 **Module cohesion & coupling** → `module-cohesion-reviewer`
-Trigger: `has_python_module_change: true` (subject to the standard M+ specialist size gate; not dispatched on XS/S). Cross-file cohesion and coupling lens: which concern a module owns, name-vs-contents, production vs test-only helper separation, a hand-rolled query duplicating a typed accessor a shared module already exposes, cross-service reach-in past a published boundary, and dependency-direction violations. Resolves to the personal-tier variant (shadows the project agent), whose seam defers to the other specialists in this roster by name. Advisory only; every finding is an author-facing question, severity vocabulary limited to QUESTION/SUGGESTION/COMMENT (never BLOCKING/CRITICAL). Different from `mx2-code-reviewer` (within-file SRP), `bot-review` (consumer-invariant blast-radius across call sites), and `mx2-pydantic-reviewer` (Settings patterns): this agent owns the module-and-import-graph layer those do not. If skipped, note "module-cohesion-reviewer: skipped (no Python module changes)" in the output header.
+Trigger: `has_python_module_change: true` (subject to the standard M+ specialist size gate; not dispatched on XS/S). Cross-file cohesion and coupling lens: which concern a module owns, name-vs-contents, production vs test-only helper separation, a hand-rolled query duplicating a typed accessor a shared module already exposes, cross-service reach-in past a published boundary, and dependency-direction violations. Resolves to the personal-tier variant (shadows the project agent), whose seam defers to the other specialists in this roster by name. Advisory only; every finding is an author-facing question, severity vocabulary limited to QUESTION/SUGGESTION/COMMENT (never BLOCKING/CRITICAL). Different from `mx2-code-reviewer` (within-file SRP), `bot-review` (consumer-invariant blast-radius across call sites), and `mx2-pydantic-reviewer` (Settings patterns): this agent owns the module-and-import-graph layer those do not. If skipped, note "module-cohesion-reviewer: skipped (no Python module changes)" in the output header. When `adds_capability` fired, append the Active Reuse-Search results and its cross-service reuse question (section above) to this agent's prompt AND to `mx2-code-reviewer`'s.
 
 **Inline IaC analysis** → `checkov` (tool call, not subagent)
 Trigger: `has_terraform: true` AND (at least one net-new `*.tf` file exists OR `has_new_tf_resource`: a modified `.tf` added a `resource`/`module`/`data` block). The range-overlap filter (checkov.md) scopes modified-file findings to the added block, so pre-existing resources are not re-flagged.
@@ -105,6 +189,10 @@ Skip on rebase-artifact PRs (all tf files are stale per Merge Base Freshness).
 
 **NOT to dispatch** (specialist agents above, NOT checkov): XS/S PRs, test-only PRs, generated-code-only PRs, and rebase-artifact PRs (where Merge Base Freshness shows the diff is entirely stale content).
 
+**Non-code diffs still get a review, just a different lens.** For a docs-only, rules-file, markdown, or config-only diff the code-focused specialist fan-out has no surface, so "no dispatch" does NOT mean "no review." The review reduces to three checks the fan-out cannot do: (1) **claim accuracy**: verify every cited example, file path, dependency, and command in the added text actually exists AND demonstrates the stated pattern (read the referenced file, grep the dep, run the command); a doc that names a canonical example is only correct if that example uses the pattern the doc prescribes. (2) **placement and consistency**: the addition sits under the right heading and does not contradict or silently duplicate a nearby line. (3) **AC vs ticket**. This IS the review for such a PR; do not substitute a padded code fan-out and do not skip. (PR #10669, 2026-07-17: a 1-line `python-testing.md` bullet whose review was entirely (1), verifying `sf_sync_client_test.py` used the `responses` fixture param and asserted on `responses.calls`.)
+
+**Attributing off-roster findings in a non-code review.** These reviews often lean on an agent outside the specialist roster, most often `claude-code-guide` for Claude Code skill/hook/memory/frontmatter semantics. Attribute its findings like any tool: open the inline lede with `My `claude-code-guide` consult flagged ...` or `Flagged by `claude-code-guide`: ...` (both pass `check_review_attribution.py`; a natural-language lede such as "Checked the docs:" does not, and gets rewritten at /post-review time). Set the provenance-classifier `source` to the agent actually consulted, never a specialist that never ran. Findings from cross-artifact synthesis (comparing the diff against sibling files) use the `Cross-file analysis surfaced ...` lede. (PR #10970, 2026-07-24: three claude-code-guide / synthesis ledes drafted in natural language had to be rewritten at the /post-review attribution check.)
+
 ## Context Optimization
 
 Do NOT send the full diff to every specialist. Filter by relevance:
@@ -113,7 +201,7 @@ Do NOT send the full diff to every specialist. Filter by relevance:
 - **Test reviewer**: only test files + the source files they test
 - **mx2-code-reviewer**: only implementation files (non-test, non-config)
 - **mx2-silent-failure-hunter**: only files containing try/except/raise patterns
-- **mx2-devops-build-deploy**: only Terraform/HCL/terragrunt files + infra directory changes
+- **mx2-devops-build-deploy**: only Terraform/HCL/terragrunt files, infra directory changes, or `.github/workflows/*.ya?ml`
 - **mx2-git-historian**: line ranges of changed files only (the agent runs git log/blame for context)
 - **mx2-pr-precedent**: file path list only (the agent queries gh API server-side; no diff content needed)
 - **observability-reviewer**: only files matching the observability sub-rules above (exception-class diffs, metric-emission hunks, observability `*.tf` files, enum/Literal additions) PLUS any sibling `*.tf` in the same service directory PLUS the PR description (for alert references)
@@ -136,9 +224,11 @@ any state-modifying command.
 SCOPE: The diff below shows what changed in PR #<number>. Use it to identify what to review.
 
 STATIC ANALYSIS CONTEXT: This repo runs CI checks (pylint, mypy, flake8, bandit, yapf,
-isort, autoflake, SonarCloud, Datadog SAST/SCA/Secrets, GitHub Copilot). Focus on
-design judgment that automated tools cannot catch. Do not flag style, formatting, or
-type issues unless they indicate a deeper design problem or CI has not yet passed.
+isort, autoflake, SonarCloud, Datadog SAST/SCA/Secrets, GitHub Copilot). Weight your
+attention toward design judgment those tools cannot catch, but report every real finding
+you have. If one is style, formatting, or type-level, tag it `CI-catchable: <tool>` and
+report it anyway; the synthesis pass drops the ones CI is genuinely covering on these
+lines and keeps the rest. Do not withhold a finding because a tool might catch it.
 
 VERIFICATION: You have read access to the full codebase at the PR's HEAD commit via
 Grep, Glob, and Read tools. Use <WORKTREE_DIR> as the path root (not /workspaces/main).
@@ -157,6 +247,11 @@ TONE: Frame findings as observations, not verdicts. Use "this appears to" or "th
 for DIFF-VISIBLE findings. Use "confirmed that" only for VERIFIED findings where you
 read the code. QUESTION findings are already interrogative. Do not use absolute language
 ("this is wrong", "this will break") unless you have VERIFIED evidence of a concrete bug.
+
+READ-ONLY: You are a reviewer. Report findings; never modify the working tree, the
+branch, or the PR, even to demonstrate a fix. Fixes go through a separate fix pass the
+orchestrator verifies. (Covers resumed/re-purposed sessions where tool-roster
+enforcement can lapse; a 2026-07 pilot had a resumed reviewer apply its own findings.)
 ```
 
 When Jira ticket context is available, append this to the preamble:
@@ -304,10 +399,21 @@ Test files (diff):
 ```
 <scope preamble>
 
+When the changed files are `.github/workflows/*.ya?ml` (`has_ci_workflow_change`), review for WORKFLOW SECURITY, not Terraform: untrusted-trigger / secret-exposure surface (which events run with secrets; is untrusted PR-head checkout possible on them), `author_association`/actor gating, `GITHUB_TOKEN` permission scope and `id-token` usage, `concurrency` semantics, unpinned `uses:` SHAs on secret-bearing steps, and operational foot-guns (missing `timeout-minutes`). Skip the Terraform/HCL checks that follow.
+
 Review infrastructure changes in PR #<number> for Terraform/HCL correctness.
 Check for: missing variable pass-through to child modules, duplicate HCL keys
 (silently keeps last value), missing environment configs (CD but no beta/prod),
 EventBridge subscription completeness, and terragrunt dependency injection gaps.
+Resolve every hardcoded external reference in the diff (endpoint/DNS URL, ARN,
+account ID, secret ARN, API gateway ID) to the account/env it actually targets:
+grep infra for per-env existence (infra/{service}/{env}) and the account IDs in
+the env terragrunt files, and use Datadog span aws_account/env tags where reachable.
+Confirm it matches the env being deployed. A non-prod env pointing at a prod
+endpoint, or a per-env module inheriting a shared-account default it cannot reach
+cross-account, is BLOCKING. Sweep sibling fields of the same kind (every
+*_dns_name, every *_secret_arn) before concluding, not just the one that caught
+your eye.
 Return structured FINDING format with evidence categories. Use Read to examine
 child module variables.tf when checking pass-through. Use Glob to verify
 environment config completeness across infra/{service}/ directories.
@@ -343,6 +449,13 @@ Files changed (line ranges):
 For each modified file in PR #<number>, query gh for the 3 most recent merged PRs
 that touched the file (last 180 days). For each, fetch inline review comments and
 apply the survival filter from your agent definition:
+
+Retrieve everything via `gh api` / `gh pr list` / `gh pr view` (server-side); you have
+no worktree and need no local checkout. Do NOT run `gh pr checkout`, `git checkout`, or
+`git branch` (create or delete): a local branch op violates the read-only mandate and
+trips the destructive-command guard (observed PR #10714, 2026-07-20: the agent
+`gh pr checkout`'d then `git branch -D`'d the PR branch and triggered a security warning).
+
 - Drop self-precedent (same author as current PR)
 - Drop comments < 50 chars (LGTM, emojis, nits)
 - Drop if shared filename only (require shared symbol references)
@@ -473,6 +586,13 @@ of eyes would ask that the author or other reviewers might have skipped past
 because they were too close to the problem.
 
 Examples of question shapes you should produce (not exhaustive):
+- "Does the runtime, platform, framework, or an existing service already provide this,
+  so the mechanism this PR builds should not exist at all?" (necessity / goal-fit; e.g.
+  a hand-rolled client that duplicates a Lambda extension, sidecar, managed feature, or
+  published boundary). This is the HIGHEST-VALUE question you can ask: interrogate
+  whether a net-new mechanism needs to exist BEFORE anyone reviews how it is built, and
+  anchor on the PR's stated goal to ask whether the diff is the simplest path to it.
+  When it applies, prioritize it above the shapes below.
 - "Did anyone confirm that X is actually true?" (assumption surfacing)
 - "What happens if Y occurs and we're not handling it here?" (edge case)
 - "Why is this in this PR rather than a follow-up?" (scope)
@@ -482,8 +602,12 @@ Examples of question shapes you should produce (not exhaustive):
 Constraints:
 - Severity vocabulary is QUESTION only. Do NOT emit BLOCKING, CRITICAL,
   DISCUSSION, MINOR, NOTE, COMMENT, SUGGESTION, or any verdict tag.
-- Maximum 5 questions. If you have more, prioritize the ones most likely to
-  expose a real risk.
+- Report every real question you have, ordered highest-blast-radius first. Do
+  NOT drop a genuine question to hit a count: synthesis filters and ranks in a
+  separate pass downstream, and a suppressed question is lost, not deferred.
+  Soft ceiling ~10; past that, keep ranking rather than truncating. This is a
+  recall instruction, not license to pad: the "do not manufacture concerns"
+  rule below still binds.
 - Frame as a question, not a statement. "Has anyone checked X?" not "X is
   broken."
 - Each question cites at least one file:line or PR description excerpt so the

@@ -39,12 +39,25 @@ source was authoritative for the framing.
 
 Run as many of these in parallel as possible.
 
+### 0. Freshness gate (before any code reads; not parallelizable with step 3)
+
+Run `git fetch origin main -q`, then compare `git log -1 --format=%ci HEAD` vs
+`git log -1 --format=%ci origin/main` in the main checkout. If local main is
+more than a day behind origin, read every code surface in step 3 via
+`git show origin/main:<path>` (never the working tree) and state the staleness
+in every Phase 3 subagent prompt so they do the same. The Phase 5 worktree
+bases on origin/main; enrichment that reads a stale working tree plans against
+code that no longer exists. Recurrence: the docr-t9o69 launch (2026-08-06)
+enriched against a 13-day-stale main that hid the already-shipped producer
+contract the launch consumed; the orchestrator and two stress-test agents each
+independently re-discovered the staleness mid-flight.
+
 ### 1. Fetch primary source
 
 **Jira ticket:**
 ```
 mcp__atlassian__getJiraIssue
-  cloudId: <your-atlassian-cloud-id>
+  cloudId: <atlassian-cloud-id>
   issueIdOrKey: MX2-XXXXX
   fields: ["summary", "status", "assignee", "priority", "description", "customfield_11220", "comment", "issuelinks"]
   responseContentFormat: markdown

@@ -31,6 +31,22 @@ The `pr_review_state` module imports `boto3` and `pydantic>=2`; use `uv run --wi
 so the heredoc runs in an ephemeral env. boto3 reads `AWS_DEFAULT_REGION`, not
 `AWS_REGION`.
 
+**Use the existing script; do not hand-write the record.**
+`~/.claude/scratch/scripts/pr_review_ddb_writeback.py` already implements this step.
+Write the briefing to a file, write a params JSON, and call it:
+
+```bash
+AWS_PROFILE=dev AWS_DEFAULT_REGION=us-east-1 uv run --with boto3 --with 'pydantic>=2' \
+  python3 ~/.claude/scratch/scripts/pr_review_ddb_writeback.py <params.json>
+```
+
+`params.json`: `{"repo", "pr", "timestamp", "head_sha", "title", "author", "size",
+"briefing_path", "comments": [{"id", "path", "line", "body"}]}`, where each `id` is the
+GitHub comment id returned by the Step 3 post and `comments` is omitted for a body-only
+review. Reach for the inline form below only when a field the script does not expose is
+needed; hand-writing the whole record per review is ~100 lines of throwaway Python and
+was done five times in one session before this note existed (2026-08-06).
+
 ```bash
 AWS_PROFILE=dev AWS_DEFAULT_REGION=us-east-1 uv run --with boto3 --with 'pydantic>=2' python3 - <<'PY'
 import sys
@@ -38,7 +54,7 @@ sys.path.insert(0, '/home/vscode/.claude/tooling/pr-review-bot/pkg')
 from pr_review_state import Review, ProposedComment, write_review
 
 review = Review(
-    repo="lawfirm/main",
+    repo="<company>/docr",
     pr=<PR_NUMBER>,
     timestamp=<UTC_ISO_TIMESTAMP>,
     head_sha=<HEAD_SHA>,
@@ -79,11 +95,15 @@ Populate the placeholders from the review you just posted:
   each `posted_comment_id` from `/pulls/{n}/comments` filtered by that review id:
 
   ```bash
-  gh api /repos/{owner}/{repo}/pulls/{n}/comments \
+  gh api --paginate /repos/{owner}/{repo}/pulls/{n}/comments \
     --jq '.[] | select(.pull_request_review_id==<STEP_3_REVIEW_ID>) | {id, path, line}'
   ```
 
-  Filter by `pull_request_review_id`, NOT by author+path. A concurrent same-author
+  `--paginate` is required: the endpoint returns only ~30 comments per page, so on a
+  PR with many review comments the `pull_request_review_id` filter silently returns
+  empty (the just-posted comments sit on a later page). Observed on PR #9725 (42
+  review comments): the non-paginated fetch returned zero; the `--paginate` re-run
+  found all three. Filter by `pull_request_review_id`, NOT by author+path. A concurrent same-author
   review on the same PR (Michael runs multiple windows) contaminates an author+path
   filter: observed on PR #9838, where a parallel-window review posted a comment on
   the same file ~5s before this one and an author+path fetch returned both.

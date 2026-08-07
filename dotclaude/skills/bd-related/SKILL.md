@@ -71,11 +71,13 @@ If `~/.claude/scratch/graph/namespace_index.json` or `bridges.jsonl`
 look stale (over 24h old or the corpus has changed substantially):
 
 ```bash
-python3 ~/.claude/scratch/scripts/memory-graph/build_namespace_index.py
-python3 ~/.claude/scratch/scripts/memory-graph/extract_bridges.py
+python3 ~/.claude/scratch/scripts/memory-graph/regen_graph.py --force
 ```
 
-Each script runs in under 2 seconds on the current corpus.
+One script builds both outputs from a single `bd memories` fetch,
+fingerprint-skips when the corpus is unchanged (drop `--force` to allow
+the skip), and writes atomically. The SessionStart hook runs it detached
+in the background, so a manual run is rarely needed.
 
 ## Related
 

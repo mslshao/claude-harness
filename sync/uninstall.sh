@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # uninstall.sh: remove symlinks created by install.sh.
 #
-# Walks ~/.claude/{agents,skills,hooks} and ~/.claude/CLAUDE.md, removes
+# Walks ~/.claude/{agents,skills,hooks,commands} and ~/.claude/CLAUDE.md, removes
 # any symlink pointing into this repo's dotclaude/. Does NOT touch memory/,
 # scratch/, or any non-symlink file.
 #
@@ -63,7 +63,7 @@ remove_link() {
   esac
 }
 
-for top in agents skills hooks; do
+for top in agents skills hooks commands; do
   if [ -d "$CLAUDE_DEST/$top" ]; then
     for item in "$CLAUDE_DEST/$top"/*; do
       remove_link "$item"

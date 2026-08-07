@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Checks for PR review comment posts (the engineering lead 2026-05-26 + Michael 2026-06-02).
+"""Checks for PR review comment posts (engineering lead 2026-05-26 + Michael 2026-06-02).
 
 Reads a `gh api` command string from stdin. If the command posts a PR review
 (POST .../pulls/N/reviews) or creates/edits an inline review comment
@@ -210,7 +210,7 @@ def evaluate(data: dict, kind: str) -> list[str]:
             out.append("")
         out.extend([
             "BLOCKED: unattributed PR review comment(s) (review-voice.md T5; "
-            "the engineering lead 2026-05-26 uniform-attribution rule).",
+            "engineering lead's 2026-05-26 uniform-attribution rule).",
             "Every INLINE comment must OPEN with explicit tooling attribution as "
             "the lede, not Michael's unaided voice. Accepted openers, e.g.:",
             "  'My automated <specialist> pass flagged ...'",

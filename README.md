@@ -4,7 +4,11 @@ A personalized Claude Code harness, published as a portfolio artifact.
 
 Agents, skills, hooks, dispatch heuristics, and memory scaffolding accumulated through months of daily use, with AI-authored commentary explaining why each component exists and what failure mode it prevents.
 
-> **Status: V2.** Per-component AI-authored commentary (`WORLDMAP.md` in each directory) is complete. `project-tier/` mirrors 7 promoted artifacts (3 agents, 3 skills, 1 rule); `evidence/` now has 7 entries (one third-party, six own-loop); the `dotclaude/` mirror was refreshed to current personal-tier state; one agent was renamed (`mx2-tenth-man` -> `mx2-skeptic`, recorded in `graveyard/`); `learnings/` has 11 of 12 pages lifted from the original Confluence corpus with editorial scrubbing applied. `graveyard/` may grow as more historical context is reconstructed.
+> **Status: V3.** The `dotclaude/` mirror is caught up to personal-tier state as of 2026-08-07: 22 agents, 32 skills (`campaign` and `cold-review` are new this pass), and a `commands/` directory (`jira`, `confluence`) that `install.sh` and `uninstall.sh` now symlink alongside agents, skills, and hooks. The hooks catalog stands at 30 documented entries with 8 portable runnable examples. `project-tier/` mirrors 7 promoted artifacts (3 agents, 3 skills, 1 rule); `evidence/` has 7 entries (one third-party, six own-loop); `learnings/` has 11 of 12 pages lifted from the original Confluence corpus with editorial scrubbing applied.
+>
+> This pass also closed a privacy gap. The Tier 1 real-name pattern list (`sync/scrub-names.local`) is gitignored by design, and it was missing, so `scrub-check.sh` had been running with the real-name scan disabled and reporting a qualified pass while teammate names sat in the published mirror. The list is restored, the names are scrubbed, and the mirror now scans clean on all four tiers. `sync/SCRUB-SPEC.md` documents the failure mode and the fresh-clone recovery steps, and its Tier 3 section was corrected to match what the detector actually enforces (bead IDs stay; they were never scrubbed).
+>
+> Not done: WORLDMAP commentary does not yet cover `commands/` or the two new skills; the 12th `learnings/` page (PM workflows) is still deferred; the Perplexity Spaces port described below is still planned, not run. `graveyard/` may grow as more historical context is reconstructed.
 
 ## Thesis
 
@@ -17,7 +21,7 @@ The claim this repo carries is not "I use AI well." It is "I built scaffolding f
 | `patterns/` | Tool-agnostic philosophy. The parts that survive the boundary between Claude Code and any other AI tool. | 12 docs + WORLDMAP commentary |
 | `dispatch/` | Routing logic: which specialist runs when, model selection rules, PR review routing. | 4 docs + WORLDMAP commentary |
 | `scaffolding/` | Memory architecture: two-tier doctrine, key namespace, dating conventions. | 7 docs + WORLDMAP commentary |
-| `dotclaude/` | Scrubbed mirror of `~/.claude/`. Drop-in install via `sync/install.sh`. | 21 agents, 27 skills, hooks catalog, all with WORLDMAP commentary |
+| `dotclaude/` | Scrubbed mirror of `~/.claude/`. Drop-in install via `sync/install.sh`. | 22 agents, 32 skills, 2 commands, 30-entry hooks catalog with 8 portable examples; WORLDMAP commentary covers agents, skills, and hooks (commands and the two newest skills are not written up yet) |
 | `learnings/` | AI Learning Track corpus. Originally authored as an internal Confluence series, migrated here with editorial scrubbing. | 11 of 12 pages lifted; 12th (PM workflows) deferred |
 | `evidence/` | Empirical anecdata: before-after entries demonstrating compression of human-only work. | 7 entries: Salesforce-dedup (third-party) + 6 own-loop (PR-review observability calibration, cross-session handoff, enforcement ladder, agent-tier eval, guardrail self-protection, rules-as-executable-specs); more accumulate as instances surface |
 | `project-tier/` | Promoted artifacts. Demonstrates the lab-to-production pattern (personal-tier sandbox to team-reviewed PR). | 3 agents + 3 skills + 1 rule mirrored from team-reviewed PR promotions, with internal identifiers genericized |

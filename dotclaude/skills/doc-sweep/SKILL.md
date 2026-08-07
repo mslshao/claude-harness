@@ -44,7 +44,7 @@ Collect candidate items from every lane that has historically produced drift:
 
 Dispatch via the Workflow tool: one agent per page + one agent per external claim.
 
-- Page agent inputs: pageId, cloudId `<your-atlassian-cloud-id>`, the page's
+- Page agent inputs: pageId, cloudId `<atlassian-cloud-id>`, the page's
   candidate items, and the conventions block (below). Output schema per finding:
   `{section, stillApplies, recommend: apply|skip|needs-owner|needs-verification,
   evidence, find, replace}` plus current page `version`.

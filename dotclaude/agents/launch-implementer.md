@@ -98,22 +98,6 @@ Emit the STANDUP block in your output stream (you have no messaging tool; the
 orchestrator reads your output). Do not skip standups - the orchestrator
 uses them to coordinate phasing, dispatch specialists, and unblock you.
 
-## Terminal RESULT Contract (MANDATORY)
-
-<!-- summary-from: skills/launch/SKILL.md key: result-contract -->
-End your FINAL message with a terminal RESULT block (a SubagentStop hook treats a missing block as truncation, and the orchestrator resumes you to produce it):
-
-RESULT:
-  STATUS: done | partial | blocked
-  DONE: [completed work items / acceptance criteria, one line each]
-  REMAINING: [unfinished work and why, or "none"]
-  DISCOVERED: [unforeseen work found en route, one line each, classified as either "blocking-AC: <what> | proposed-fix: <one line> | files: <paths>" or "non-blocking: <what>" (non-blocking goes to a linked ticket; do NOT fix it inline)]
-  NEEDS-DECISION: [questions only the orchestrator or user can answer, or "none"]
-  VERIFICATION: [commands run + outcomes, e.g. "pants tlc <target>: green", or "not run: <why>"]
-
-To ASK the orchestrator something mid-task, end your turn with STATUS: blocked and the question in NEEDS-DECISION; the orchestrator answers by resuming you with your context intact. Ending the turn beats idle-polling whenever a decision gates your next step.
-<!-- /summary-from -->
-
 ## Authority Fence
 
 <!-- summary-from: skills/launch/SKILL.md key: authority-fence -->
@@ -138,11 +122,11 @@ Request:
 
 - **mx2-code-reviewer**: structural review, SOLID, naming, code smells. Name the
   files you changed and the work item context. The orchestrator's dispatch
-  carries the the engineering lead priority-order preamble (description, types, complexity /
-  naming, boolean params, tests, correctness-via-tests, static analyzers,
-  pragmas, exception design, large-refactor methodology; front_door tagging),
-  mirroring /pr-intel and /review (the engineering lead Code Review Guide for Humans,
-  Confluence 5684789249).
+  carries the engineering lead's priority-order preamble (description, types,
+  complexity / naming, boolean params, tests, correctness-via-tests, static
+  analyzers, pragmas, exception design, large-refactor methodology; front_door
+  tagging), mirroring /pr-intel and /review (the engineering lead's Code Review
+  Guide for Humans, Confluence 5684789249).
 - **mx2-silent-failure-hunter**: if you wrote error handling (try/except, raise).
   Name the error handling code and the call chain context.
 
@@ -218,8 +202,40 @@ non-optional even if you polled at the post-commit step.
 
 When all your work items are implemented and acceptance criteria are met:
 1. Run `pants check` on all your changed files
-2. Send a final standup with DONE summarizing everything you built
+2. Close with the terminal RESULT block (see Terminal RESULT Contract, the last
+   section of this file), with DONE summarizing everything you built. Do NOT
+   close with a standup: STANDUP blocks are mid-task check-ins only; the RESULT
+   block is the terminal output.
 3. Your output is available for the next phase's agents
+
+## Turn-Budget Discipline
+
+If you're approaching your turn limit while in a polish phase (docstring updates,
+comment cleanup, name refactors, log-message tweaks), commit what you have FIRST
+via `gt create --all -m "..."` or `git add && git commit`. An agent that runs out
+of turns mid-edit leaves no record of substantive work without a commit. Polish
+follow-up commits are cheap; lost work is expensive.
+
+Heuristic: if the substantive code change (new function, bug fix, schema update)
+is done and you are now editing comments/docstrings/messages, the substantive
+change is a separate semantic unit and worth its own commit immediately. Polish
+becomes a follow-up commit (or amend on the next iteration).
+
+Instance: 2026-04-28 MX2-NNNNN implementer stopped at "Now let me update the
+docstring..." with the bugfix uncommitted; the parent agent had to inspect the
+worktree diff and finish.
+
+## Retry Context Handling
+
+If your startup prompt includes a `## RETRY CONTEXT` block, you are on a retry
+iteration. Your prior work is already committed to the branch.
+
+1. Run `git -C $WORKTREE log $BASE_REF..HEAD --oneline` to see what you already built (BASE_REF is supplied in your prompt; when absent, use `origin/HEAD`; on a stacked launch the base is the parent node's branch, and `origin/HEAD` would wrongly show the whole parent stack as yours).
+2. Read the files listed under "Prior commits" before touching anything.
+3. Focus ONLY on the "Specific gap to fix" described in the block.
+4. Do NOT modify files listed under "What is already correct."
+5. Do NOT create a new branch. Commit to the existing branch named in the block.
+6. Do NOT amend prior commits. Add new commits only.
 
 ## Final Result Block
 
@@ -245,31 +261,16 @@ message; the orchestrator reads the block to decide whether to resume or
 re-dispatch.
 <!-- END SHARED-PROTOCOL:final-result-block -->
 
-## Turn-Budget Discipline
+## Terminal RESULT Contract (MANDATORY)
 
-If you're approaching your turn limit while in a polish phase (docstring updates,
-comment cleanup, name refactors, log-message tweaks), commit what you have FIRST
-via `gt create --all -m "..."` or `git add && git commit`. An agent that runs out
-of turns mid-edit leaves no record of substantive work without a commit. Polish
-follow-up commits are cheap; lost work is expensive.
+<!-- summary-from: skills/launch/SKILL.md key: result-contract -->
+Any turn you end with no pending tool call MUST close with a terminal RESULT block (a SubagentStop hook treats a missing block as truncation, and the orchestrator resumes you to produce it). The rule is unconditional: use STATUS: done when all your work items are complete; use STATUS: partial or STATUS: blocked when ending a turn mid-task. To ASK the orchestrator something mid-task, end the turn with STATUS: blocked and the question in NEEDS-DECISION; the orchestrator answers by resuming you with your context intact. Ending the turn beats idle-polling whenever a decision gates your next step.
 
-Heuristic: if the substantive code change (new function, bug fix, schema update)
-is done and you are now editing comments/docstrings/messages, the substantive
-change is a separate semantic unit and worth its own commit immediately. Polish
-becomes a follow-up commit (or amend on the next iteration).
-
-Instance: 2026-04-28 MX2-NNNNN implementer stopped at "Now let me update the
-docstring..." with the bugfix uncommitted; the parent agent had to inspect the
-worktree diff and finish.
-
-## Retry Context Handling
-
-If your startup prompt includes a `## RETRY CONTEXT` block, you are on a retry
-iteration. Your prior work is already committed to the branch.
-
-1. Run `git -C $WORKTREE log origin/HEAD..HEAD --oneline` to see what you already built.
-2. Read the files listed under "Prior commits" before touching anything.
-3. Focus ONLY on the "Specific gap to fix" described in the block.
-4. Do NOT modify files listed under "What is already correct."
-5. Do NOT create a new branch. Commit to the existing branch named in the block.
-6. Do NOT amend prior commits. Add new commits only.
+RESULT:
+  STATUS: done | partial | blocked
+  DONE: [completed work items / acceptance criteria, one line each]
+  REMAINING: [unfinished work and why, or "none"]
+  DISCOVERED: [unforeseen work found en route, one line each, classified as either "blocking-AC: <what> | proposed-fix: <one line> | files: <paths>" or "non-blocking: <what>" (non-blocking goes to a linked ticket; do NOT fix it inline)]
+  NEEDS-DECISION: [questions only the orchestrator or user can answer, or "none"]
+  VERIFICATION: [commands run + outcomes, e.g. "pants tlc <target>: green", or "not run: <why>"]
+<!-- /summary-from -->

@@ -13,7 +13,7 @@ description: >
   (multi-specialist on SAME code), /challenge (assumption-test of an
   EXISTING plan), /pr-intel (PR review), /investigate (root cause).
 argument-hint: "[problem statement, bead ID, Jira ticket, Slack URL, Confluence URL, or transcript]"
-allowed-tools: ["Bash", "Glob", "Grep", "Read", "Agent", "AskUserQuestion"]
+allowed-tools: ["Bash", "Glob", "Grep", "Read", "Agent", "AskUserQuestion", "mcp__atlassian__getJiraIssue", "mcp__atlassian__getConfluencePage"]
 ---
 
 # Ideate
@@ -98,6 +98,10 @@ Load all inputs, strip bias, clarify the problem.
      extract `<PAGE_ID>`, then `getConfluencePage`.
    - Pasted text (Slack excerpt, transcript, page body, free-text): use
      as-is.
+   - If an MCP fetch tool is unavailable or the call fails, ask the user
+     to paste the content (the same fallback the Slack path uses); do not
+     proceed on an unloaded input. Ideating from an input you failed to
+     read produces approaches aimed at an imagined problem.
 
 2. **Detect terseness.** If consolidated input is under ~30 words or
    lacks explicit constraints, invoke the `prompt-refiner` subagent:
@@ -123,6 +127,15 @@ Load all inputs, strip bias, clarify the problem.
    problem names a known service or path under `src/python/mx2/`, read
    the service-level `CLAUDE.md` when one exists. Matcher misfires
    must NOT block ideation; skip and continue.
+
+   **Underlying-defect precondition.** When the problem is review-quality,
+   process-quality, or "how do we catch X sooner", check whether the defect
+   that motivated it is still unfixed. If it is, say so BEFORE diverging and
+   offer to fix it first. A planning pass on how to have caught a bug faster,
+   run while the bug is live, inverts the priority for the whole pipeline.
+   Observed 2026-08-06: two `/ideate` rounds and two `/converge` rounds on a
+   review-lens gap while the prod monitor that motivated them stayed broken
+   for 13 days, with its one-line fix already filed on day one.
 
 4. **Bias-stripping (mandatory).** Build TWO context blocks:
    - `Loaded context (problem only)`: problem framing, constraints,
@@ -165,6 +178,17 @@ Key invariants:
   without a simple anchor on the table the ranking cannot pick simple
   even when simple is correct. It is the reference point for the Phase 3
   right-sizing flag. See [specialists.md](specialists.md) for sourcing.
+- **Zero-code / existing-artifact candidate is mandatory when one plausibly
+  exists.** For any recurring-watch-shaped, automation, or process problem, the
+  candidate pool MUST include a zero-code / point-to-existing-artifact /
+  durable-native-alternative candidate (a platform toggle, a documented recipe,
+  an existing tool), explicitly labeled, when such a path plausibly exists.
+  Steelman-biased specialists skew toward building; without this anchor the pool
+  is all in-code variants even when a documented durable alternative already
+  exists (observed 2x: the overwatch and autopilot ideations each produced only
+  in-process polling variants despite a durable mechanism already in memory). If
+  no zero-code path plausibly exists, say so explicitly rather than omitting the
+  check.
 - Each specialist returns 1-2 approaches with Shape, Context, Steelman,
   Tradeoff, Codebase touch points, Verifiability, Verification path,
   and Consequence per approach (the format Phase 3 consumes).
@@ -174,8 +198,8 @@ Key invariants:
 Rank approaches on the multi-criteria scoring matrix, then run mandatory
 skeptic on the top-3.
 
-For the full scoring matrix (8 columns: Context, Effort, Risk,
-Reversibility, Fit, Rules-alignment, Verifiability, Consequence), the
+For the full scoring matrix (9 columns: Context, Effort, Risk,
+Reversibility, Fit, Goal-fit, Rules-alignment, Verifiability, Consequence), the
 composite Score formula, the override rules, AND the Phase 3c
 skeptic dispatch prompt with edge-case + failure handling, see
 [scoring-matrix.md](scoring-matrix.md).
@@ -187,6 +211,13 @@ Key invariants:
   to last place regardless of Score.
 - Consequence=high AND Verifiability=low is also forced to last place
   (trust-asymmetry override).
+- Goal fit = `weak`/`partial` on the top-Score approach MUST be surfaced in
+  Phase 5 (symmetric to the right-sizing flag): a candidate cannot win on low
+  Effort while under-delivering the stated want. When the weak goal fit traces
+  to an undeclared user constraint, the Phase 4 gate ESCALATE-QUESTIONs on it
+  rather than re-diverging.
+- Verifiability rates whether the OUTCOME can be proven before committing, not
+  whether the mechanism merely runs; a "it executes" check is `low`, not `high`.
 - Skeptic (`mx2-skeptic`) runs on the top-3 by Score. Mandatory,
   not opt-in. Findings fold into Phase 5 as a `Skeptic Lens` block.
   When fewer than 3 approaches survive Phase 2, run on whatever
@@ -231,13 +262,14 @@ the gate ran. List each round with verdict + action taken.>
 
 ### Approaches
 
-| # | Approach | Context | Effort | Risk | Rev | Fit | Rules | Verif | Conseq | Score |
-|---|----------|---------|--------|------|-----|-----|-------|-------|--------|-------|
-| 1 | <title> | legacy | M | low | easy | match | aligned | high | low | 19 |
+| # | Approach | Context | Effort | Risk | Rev | Fit | GFit | Rules | Verif | Conseq | Score |
+|---|----------|---------|--------|------|-----|-----|------|-------|-------|--------|-------|
+| 1 | <title> | legacy | M | low | easy | match | full | aligned | high | low | 22 |
 | ... |
 
-(Column key: Rev = Reversibility, Verif = Verifiability, Conseq =
-Consequence of wrong. Context is annotation, not numerically scored.)
+(Column key: Rev = Reversibility, Fit = codebase-pattern fit, GFit = Goal fit
+(delivers the stated want), Verif = Verifiability, Conseq = Consequence of
+wrong. Context is annotation, not numerically scored.)
 
 Per-approach narrative (in Score order):
 

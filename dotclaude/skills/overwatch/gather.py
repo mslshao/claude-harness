@@ -150,6 +150,23 @@ def _review_request_rows(stdout: str) -> list[dict[str, Any]]:
     ]
 
 
+def _reviewing_rows(stdout: str) -> list[dict[str, Any]]:
+    """Rows for prs_reviewing: identity fields plus updated_at (from gh's
+    camelCase updatedAt), the watermark cycle.py diffs on to detect author
+    activity (a new push, a reply) on a PR the user already reviewed."""
+    data = json.loads(stdout)
+    return [
+        {
+            "number": row["number"],
+            "title": row.get("title", ""),
+            "url": row.get("url", ""),
+            "repository": (row.get("repository") or {}).get("nameWithOwner", ""),
+            "updated_at": row.get("updatedAt", ""),
+        }
+        for row in data
+    ]
+
+
 # name -> (argv, parse). Bash-pollable sources only; Jira is handled agent-side.
 SOURCES: dict[str, tuple[list[str], Callable[[str], list[Any]]]] = {
     "beads_ready": (
@@ -178,6 +195,19 @@ SOURCES: dict[str, tuple[list[str], Callable[[str], list[Any]]]] = {
             "--json", "number,title,url,repository",
         ],
         _review_request_rows,
+    ),
+    # Same `gh search prs` shape as prs_authored (cross-repo, no cwd git-repo
+    # dependency, so the loop can re-enter outside a checkout). Open only, and
+    # approved-but-still-open PRs are deliberately INCLUDED: a push after the
+    # user's approval is exactly the author activity worth surfacing. updatedAt
+    # rides along as the watermark cycle.py diffs on; membership alone cannot
+    # see new pushes or replies on an already-known PR.
+    "prs_reviewing": (
+        [
+            "gh", "search", "prs", "--reviewed-by=@me", "--state=open",
+            "--json", "number,title,url,repository,updatedAt",
+        ],
+        _reviewing_rows,
     ),
 }
 

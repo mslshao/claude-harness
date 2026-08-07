@@ -94,6 +94,22 @@ def main() -> int:
     )
     check("review_request_parse.repo", rr[0]["repository"] == "o/r", rr)
 
+    # parse coverage: reviewing rows flatten the repository object and carry
+    # updated_at (from gh's camelCase updatedAt), the watermark cycle.py diffs on
+    rv = gather._reviewing_rows(
+        '[{"number": 7, "title": "V", "url": "u7",'
+        ' "repository": {"nameWithOwner": "o/r"}, "updatedAt": "2026-07-16T00:00:00Z"}]'
+    )
+    check("reviewing_parse.repo", rv[0]["repository"] == "o/r", rv)
+    check("reviewing_parse.updated_at", rv[0]["updated_at"] == "2026-07-16T00:00:00Z", rv)
+
+    # SOURCES membership: prs_reviewing is wired to the reviewing parser and
+    # queries reviewed-by (open only; approved-open PRs deliberately included)
+    check("sources.prs_reviewing_present", "prs_reviewing" in gather.SOURCES, list(gather.SOURCES))
+    argv, parse = gather.SOURCES["prs_reviewing"]
+    check("sources.prs_reviewing_parser", parse is gather._reviewing_rows, parse)
+    check("sources.prs_reviewing_reviewed_by", "--reviewed-by=@me" in argv, argv)
+
     # contract invariant across every record shape: ok XOR error, keys disjoint
     for label, rec in [
         ("ok", gather.classify(0, "[]", "", gather._bead_rows)),
@@ -109,6 +125,13 @@ def main() -> int:
         return 1
     print("FIXTURE TIER PASSED")
     return 0
+
+
+def test_fixture_tier() -> None:
+    """Pytest bridge: main() is the suite; pytest collects nothing from the
+    script-style check() calls on its own (no test_* functions), and a bare
+    `pytest -q` on this file would exit 5 "no tests ran" while looking green."""
+    assert main() == 0
 
 
 if __name__ == "__main__":

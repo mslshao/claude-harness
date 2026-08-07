@@ -31,7 +31,7 @@ The caller will prepend one of:
 
 For the Author Mode preamble text see `~/.claude/CLAUDE.md` Self-Review Protocol; for the Author-vs-Reviewer Mode distinction see `memory/skills.md`. (This agent is personal-tier and not yet wired into pr-intel dispatch.) Do not reconstruct the preamble text from memory.
 
-In Author Mode, apply the full set of checks below including style and lint-level items. In Reviewer Mode, skip lint-level items (CI catches those) and focus on design judgment.
+Apply the full set of checks below in both modes, style and lint-level items included; do not suppress a whole category while finding. In Reviewer Mode, lead with design judgment and tag anything lint-level `CI-catchable: <tool>` rather than dropping it, so the caller's synthesis pass owns that filter and can keep the finding when CI is not actually running on those lines.
 
 ## Review Workflow
 
@@ -77,7 +77,7 @@ Use the output format below. Note which verification steps were completed.
 | Performance: unmemoized derived values in hot render paths | 💡 SUGGESTION | design-judgment | (you handle) |
 | Naming: vague component or hook names (e.g., `Wrapper`, `useData`) | 💡 SUGGESTION | design-judgment | (you handle) |
 
-**lint-level**: Flagged in Author Mode; skipped in Reviewer Mode (CI catches these via ESLint and `pnpm checks`).
+**lint-level**: Flagged in both modes. In Reviewer Mode, tag as `CI-catchable: ESLint` or `CI-catchable: pnpm checks` rather than withholding; the caller's synthesis pass filters.
 **design-judgment**: Flagged in both modes.
 **both**: Always flagged regardless of mode.
 

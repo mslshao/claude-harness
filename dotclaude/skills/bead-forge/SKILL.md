@@ -103,7 +103,11 @@ For each bead, draft ALL of these fields (not just title):
   When the bead modifies existing behavior (not greenfield), structure the description
   as ADDED / MODIFIED / REMOVED sections to make the delta explicit.
 - **acceptance**: Concrete, testable criteria. Must include at least one runnable check
-  for task beads; concrete conclusions for memory beads.
+  for task beads; concrete conclusions for memory beads. The field holds criteria only:
+  verification results, evidence, and per-criterion status narration belong in bead comments,
+  because an AC list rewritten to describe what shipped can no longer be used as an
+  author-independent requirement (this is what `/cold-review` step 2 has to detect and route
+  around).
 - **design**: Key technical decisions. Reference existing code paths. Primary payload
   for discovery and review beads.
 - **deps**: Which other beads must complete first, and why.

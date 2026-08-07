@@ -6,7 +6,7 @@ Installation tooling and CI guardrails for the personalized Claude Code harness.
 
 | File | What it does |
 |---|---|
-| `install.sh` | Symlink `dotclaude/{agents,skills,hooks}/*` and `dotclaude/CLAUDE.md` into `~/.claude/`. Skips `memory/` and `scratch/`. Backs up existing target files before symlinking. |
+| `install.sh` | Symlink `dotclaude/{agents,skills,hooks,commands}/*` and `dotclaude/CLAUDE.md` into `~/.claude/`. Skips `memory/` and `scratch/`. Backs up existing target files before symlinking. |
 | `uninstall.sh` | Remove symlinks created by install.sh. Leaves any non-symlink file alone. |
 | `scrub-check.sh` | CI guardrail that scans repo content for proprietary patterns (real teammate names, internal IDs, atlassian cloud/space IDs). Exits 1 on any finding. |
 | `SCRUB-SPEC.md` | Documentation of what gets scrubbed and why (the 4-tier scrub doctrine). |

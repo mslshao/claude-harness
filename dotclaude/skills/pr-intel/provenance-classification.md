@@ -46,6 +46,7 @@ Each entry has:
   - `AC Compliance Check`, `Spec Compliance Check`, `Design Doc Compliance`
   - `sonarcloud-pre-check`, `checkov`
   - `pre-synthesis-analysis-patterns`
+  - `claude-code-guide` (or another off-roster agent consulted during a non-code-diff review; see dispatch.md "Attributing off-roster findings in a non-code review")
   - `null` when the finding came from an inline pipeline step without a
     specialist dispatch and no source tag was set upstream
 - `evidence`: VERIFIED / DIFF-VISIBLE / QUESTION (per grounding.md)
@@ -152,6 +153,24 @@ back to text-heuristic alone. The canonical sources to set:
 When the orchestrator constructs the findings list for this phase, set the
 source field at construction time. Don't rely on the agent's text-heuristic
 fallback (it works but is brittle on borderline phrasings).
+
+## Carried-forward findings on delta re-reviews
+
+A finding carried forward UNCHANGED from a prior round already has a classification on
+disk: `/post-review` Step 5 records the per-round `bot_surfaced_count` /
+`speed_amplified_count`, and the round's memory body names the finding. Reuse it instead
+of re-dispatching. The classifier's input is the verification path required to establish
+the claim, and that path does not change when the code does not change, so a second
+dispatch spends a full agent call to re-derive a stored answer (observed on PR #10818
+round 3: one carried-forward finding, ~52k subagent tokens, same `bot-surfaced` verdict
+as the round-2 memory).
+
+Dispatch only for findings NEW in this round. When every finding is carried forward, skip
+the phase and populate the `Provenance:` line from the prior round's memory, noting the
+reuse in the briefing context ("classification reused from <memory key>"). Re-classify a
+carried-forward finding only when its verification path actually shifted, for example the
+claim was narrowed or widened by intervening commits, or a prior round's classification
+was low-confidence.
 
 ## Recurrence Context
 

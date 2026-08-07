@@ -42,6 +42,15 @@ Apply to all findings:
    diff hunks. The `/post-review` skill catches this during verification, but pr-intel
    should not generate unpostable line numbers in the first place.
 
+   **Line-number source: the target file at HEAD, never a persisted-diff's line prefixes.**
+   The anchor is the line number in the changed file itself. On an M+ PR the `gh pr diff`
+   output spills to a persisted-output file, and reading it back shows `cat -n` prefixes that
+   are the DIFF TEXT's own line numbers, not the target file's. Do not copy those. Derive each
+   anchor from the file at HEAD (`git show <headRefOid>:<path>`, locate the symbol) or from the
+   hunk header's post-image range (`@@ -A,B +C,D @@` gives valid lines `[C, C+D-1]`). Observed
+   2026-07-24 on #10973: three anchors carried diff-text line numbers (361/378/56); the real
+   file lines were 124/135/32, caught only at `/post-review` verification.
+
    **Stacked / merged-base PRs (anchor outside the net diff).** A specialist reads the
    full file at the PR's HEAD, which on a stacked or recently-main-merged PR includes
    code already on main or from a downstack PR. A finding about that code is real but

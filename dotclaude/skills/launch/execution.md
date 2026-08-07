@@ -43,7 +43,22 @@ WORKTREE_BASE="/workspaces/main/.launch-worktrees"
 mkdir -p "$WORKTREE_BASE"
 WORKTREE_DIR="$WORKTREE_BASE/launch-$(date +%s)"
 BRANCH="launch-$(date +%s)"
-git worktree add "$WORKTREE_DIR" -b "$BRANCH" origin/HEAD 2>&1
+# Base ref (docr-ib6nd, 2026-07-17): --base-ref=origin/<branch> from the
+# invocation, default origin/HEAD. Stacked launches (e.g. /campaign node K+1
+# on node K's open branch) MUST pass the origin/<branch> form, never a bare
+# local branch, and the fetch below is mandatory: external writes to the base
+# (reviewer commit-suggestions, bot autofixes) reach this clone only via an
+# explicit fetch. Every base-relative diff downstream uses $LAUNCH_BASE_REF,
+# not origin/HEAD; on a stacked node origin/HEAD..HEAD would mis-attribute
+# the ENTIRE parent stack as this node's work.
+LAUNCH_BASE_REF="${LAUNCH_BASE_REF:-origin/HEAD}"
+if [[ "$LAUNCH_BASE_REF" != "origin/HEAD" ]]; then
+  case "$LAUNCH_BASE_REF" in
+    origin/*) git fetch origin "${LAUNCH_BASE_REF#origin/}" 2>&1 ;;
+    *) echo "FATAL: --base-ref must be origin/<branch> (got: $LAUNCH_BASE_REF)"; exit 1 ;;
+  esac
+fi
+git worktree add "$WORKTREE_DIR" -b "$BRANCH" "$LAUNCH_BASE_REF" 2>&1
 ```
 
 **Path constraint**: WORKTREE_BASE must be outside `.git/`. Claude Code treats
@@ -59,7 +74,12 @@ bd update "$LAUNCH_BEAD_ID" --append-notes \
   "[LAUNCH_EVENT type=WORKTREE_CREATED branch=$BRANCH ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)]"
 bd update "$LAUNCH_BEAD_ID" --set-metadata launch_branch="$BRANCH"
 bd update "$LAUNCH_BEAD_ID" --set-metadata launch_worktree="$WORKTREE_DIR"
+bd update "$LAUNCH_BEAD_ID" --set-metadata launch_base_ref="$LAUNCH_BASE_REF"
 ```
+
+Cold-start, retry-context, and artifact diffs all recover the base from the
+`launch_base_ref` metadata (falling back to `origin/HEAD` when absent, i.e.
+pre-2026-07-17 launches).
 
 All agents work in this single worktree. Do NOT use `isolation: "worktree"` on
 agent spawns - that creates per-agent worktrees with no coordination.
@@ -79,6 +99,13 @@ Key rules for agent spawn prompts:
   the agent's bead-comment polling channel engages; see "Mid-flight Updates
   from User" in `~/.claude/agents/launch-*.md`). Mention the bead ID
   prominently (e.g., "BEAD: docr-XXXX" or "Working on bead `docr-XXXX`").
+- **Keep the brief itself tight; link, don't inline.** Every token in the
+  spawn prompt is re-read as cache on EVERY tool call the agent makes: cost
+  scales as brief length x tool calls, and a 2026-07 pilot measured 703M+
+  subagent cache-read tokens from long implementer briefs alone, rivaling the
+  orchestrator's own context cost. Put in the brief only the work items, AC,
+  the explicit file list, and the protocol pointers; reference aux context by
+  path for the agent to read on demand instead of pasting documents in.
 - **Scope each agent's mandate to one file or one tightly-coupled concern.**
   A subagent accumulates context with every file it reads, tool it runs, and
   self-review it invokes. A mandate spanning several files or concerns risks the
@@ -139,6 +166,15 @@ While agents are running, you are actively:
      "[orchestrator guidance] From [specialist]: [findings]"`. Agents poll
      comments at checkpoints. (SendMessage only continues a COMPLETED agent;
      it cannot deliver mid-run guidance.)
+3b. **Reviewer questions are blockers, not notes** - when any dispatched
+   specialist's findings include an unanswered QUESTION about state ownership
+   or placement (which service/worker owns a new table/queue/lock/claim/flag;
+   where in the pipeline it is acquired; whether the proposed owner even has
+   the concepts the state is keyed on), do NOT let dependent work items
+   proceed past it. Resolve it yourself from the design/codebase, or escalate
+   to the user as a blocker. A 2026-07 pilot's costliest defect was flagged by
+   exactly such a reviewer question that was read past as advisory; the
+   implementer's guess then had to be unwound across the remaining stack.
 4. **SCOPE-CHECK adjudication** - when an implementer emits a SCOPE-CHECK
    standup (predicted >~250 lines added):
    - Apply the concern-split test: does the work map to multiple ratified

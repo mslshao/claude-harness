@@ -14,7 +14,7 @@ description: >
   invocations run in parallel via worktrees. For divergent approach
   generation before a plan exists, use /ideate. For planning only with no
   code, use /converge. For root cause investigation, use /investigate.
-argument-hint: "[MX2-XXXXX | docr-XXXX | description] [--skip-checks]"
+argument-hint: "[MX2-XXXXX | docr-XXXX | description] [--skip-checks] [--gate=human|agent] [--base-ref=origin/<branch>]"
 allowed-tools: ["Bash", "Glob", "Grep", "Read", "Agent", "Write", "Edit", "WebFetch", "Skill", "AskUserQuestion", "SendMessage"]
 ---
 
@@ -158,7 +158,8 @@ the user yet.
 Skip Phases 2-3.6 entirely and go straight to Phase 4 (approval gate) when
 either of the following is true:
 
-1. The user's prompt explicitly states "do NOT re-converge" or "skip
+1. The user's prompt OR an orchestrating skill's invocation (e.g. /campaign's
+   per-node Skill args) explicitly states "do NOT re-converge" or "skip
    convergence" or "convergence already done", AND the input bead's
    description contains all four elements of a converged plan: (a) work-item
    scope with file targets, (b) acceptance criteria, (c) verification path,
@@ -239,9 +240,29 @@ Strategy, Open Assumptions, and the ESCALATE-ROUTE-only "No Agent Team
 Dispatched" variant. Populate every applicable section in order; do not
 free-form narrate the plan.
 
-**This is a hard stop.** Do not proceed to Phase 5 without explicit human approval.
+**This is a hard stop.** Do not proceed to Phase 5 without explicit approval.
 If the user provides feedback, revise and re-present. Max 2 revision rounds - if
 more changes are needed, suggest the user provide consolidated feedback.
+
+**Gate parameter (`--gate=human|agent`, default `human`).** With `--gate=agent`
+(docr-he4j9; decision record docr-1vqfg), the approval at this call site is
+performed by `mx2-decision-maker` instead of the human, using the "Phase 4
+Agent Approval Gate" dispatch in [gate-prompts.md](gate-prompts.md)
+(`MODE: LAUNCH GATE, POSITION: approval`; calibration namespace
+`calibration:mx2-decision-maker:launch-approval:*`). Rules:
+
+- **Default unchanged.** Without the flag, this section behaves exactly as
+  written above; the human approves.
+- **Unattended verdict contract**: PROCEED proceeds to Phase 5. ANY other
+  verdict (ITERATE / ESCALATE-QUESTIONS / ESCALATE-ROUTE) is a NODE FAILURE:
+  halt loudly per the unattended decision-point policy (durable-state.md
+  "Unattended decision-point policy"): never loop back into phases the
+  pre-converged bypass skipped, never wait on a question no one will answer.
+- **3.6/4 double-run guard**: when Phase 3.6 already ran the decision-maker
+  this run (non-bypass `--gate=agent`), Phase 4 auto-passes ONLY on durable
+  evidence: a `GATE_PASSED phase=3.6` event in the launch bead's log from this
+  run. A resumed/rolled-over session that lands at Phase 4 without that event
+  re-runs the gate; it never auto-passes from memory of a verdict.
 
 When the gate fired ESCALATE-ROUTE, "approval" is not the operative action;
 the user is being told /launch is the wrong skill for this ticket. The
@@ -260,6 +281,19 @@ team. The bash, exact bead-event writes, and recurrence calibration live in
 - **5.0 Durable State Initialization**: acquire/create the tracking bead, claim
   it, write `SESSION_STARTED`; if a prior `LAUNCH_EVENT` exists on the bead, run
   the Cold-Start Protocol (`durable-state.md`) instead of proceeding to 5.1.
+- **5.0b Prior-Art Delta Mining (pre-dispatch guards)**: before spawning any
+  agent, mine the plan-vs-execution deltas of the session's (or domain's)
+  recent PRs: what did review or execution catch that the plan missed? Group
+  into mistake classes and wire ONE concrete guard per class into the
+  dispatch prompts. Recurring guards that have paid off: hand agents
+  pre-validated external-config strings (Datadog queries, IAM ARNs, API
+  bodies) as FIXED SPEC they may flag but not alter; hostile fixtures for any
+  sanitization behavior; a 2am-test acceptance bar on operator-facing text;
+  a day-one live-state check for config that activates on deploy; a
+  dependent-artifact sweep after any orchestrator hand-fix to agent output.
+  Never dispatch with a previously-observed mistake class unguarded; at
+  worst, make new mistakes. Canonical classes + worked instance:
+  `bd recall feedback:workflow:plan-vs-execution-delta-mining`.
 - **5.1 Create Shared Worktree**: one worktree under `.launch-worktrees/`
   (outside `.git/`, which Claude Code blocks writes to); all agents share it.
   Do NOT use `isolation: "worktree"` on agent spawns.
@@ -291,10 +325,13 @@ STANDUP:
 
 Two canonical blocks every launch-phase agent template carries verbatim (the
 agent defs mirror them via `summary-from` marked pairs; `lint-skill-summary-sync.sh`
-keeps the copies in sync). Added 2026-06-09, bd docr-pnx9.
+keeps the copies in sync). Added 2026-06-09, bd docr-pnx9. The result-contract
+block is the LAST section of each launch agent file (recency placement: the
+contract is the final instruction the agent reads; bd docr-ag1xa). Keep it last
+when adding agent sections.
 
 <!-- summary key: result-contract -->
-End your FINAL message with a terminal RESULT block (a SubagentStop hook treats a missing block as truncation, and the orchestrator resumes you to produce it):
+Any turn you end with no pending tool call MUST close with a terminal RESULT block (a SubagentStop hook treats a missing block as truncation, and the orchestrator resumes you to produce it). The rule is unconditional: use STATUS: done when all your work items are complete; use STATUS: partial or STATUS: blocked when ending a turn mid-task. To ASK the orchestrator something mid-task, end the turn with STATUS: blocked and the question in NEEDS-DECISION; the orchestrator answers by resuming you with your context intact. Ending the turn beats idle-polling whenever a decision gates your next step.
 
 RESULT:
   STATUS: done | partial | blocked
@@ -303,8 +340,6 @@ RESULT:
   DISCOVERED: [unforeseen work found en route, one line each, classified as either "blocking-AC: <what> | proposed-fix: <one line> | files: <paths>" or "non-blocking: <what>" (non-blocking goes to a linked ticket; do NOT fix it inline)]
   NEEDS-DECISION: [questions only the orchestrator or user can answer, or "none"]
   VERIFICATION: [commands run + outcomes, e.g. "pants tlc <target>: green", or "not run: <why>"]
-
-To ASK the orchestrator something mid-task, end your turn with STATUS: blocked and the question in NEEDS-DECISION; the orchestrator answers by resuming you with your context intact. Ending the turn beats idle-polling whenever a decision gates your next step.
 <!-- /summary -->
 
 <!-- summary key: authority-fence -->
@@ -380,6 +415,12 @@ em-dash guard, the report template) lives in [finalization.md](finalization.md):
   amend before reporting. May be delegated when the user explicitly assigns the
   review to another session or reviewer; record the delegation on the tracking
   bead and skip the local run (running both duplicates the roster).
+- **6.3.6 Jira Back-Link**: once the draft PR exists, post a short comment on
+  the driving Jira ticket with the PR URL and one line of state ("draft PR
+  up: <url>, review pending"). The ticket is where teammates look first; a
+  PR that exists only on GitHub is invisible from the ticket (2026-07-15:
+  the user had to request the links retroactively for two tickets). Skip
+  when the launch input carried no Jira ticket.
 - **6.4 Cleanup**: `git worktree remove --force` (fallback `rm -rf` +
   `git worktree prune`).
 - **6.5 Report**: present the Launch Complete report (PR URL, Graphite link,
@@ -397,12 +438,25 @@ em-dash guard, the report template) lives in [finalization.md](finalization.md):
 | Non-blocking discovery (RESULT.DISCOVERED) | Linked ticket (/jira or bd create), continue with current plan; never fixed inline |
 | Blocking-AC discovery (RESULT.DISCOVERED) | ONE bounded detour agent per work item: minimum scope to unblock the AC, diff counts against the same scope budget, 3-attempt breaker applies. A second detour on the same work item, or a fix touching files outside the plan surface, escalates instead (to the user here; through the decision-maker gate first in autopilot) |
 
+**Unattended runs (`--gate=agent`, docr-mpgav)**: every "ask user" action in
+this table becomes a loud halt per durable-state.md "Unattended decision-point
+policy" (event + bead comment + PushNotification + stop). There is no one to
+ask; waiting is a silent hang and guessing compounds across a stacked chain.
+
 ## Rules
 
 - **No intermediate output during phases 1-3.6.** Phase 4 is the first
   synthesis-level user-facing output. Exception: the narrowing questions
   in a Phase 3.6 ESCALATE-QUESTIONS verdict are explicitly user-facing.
-- **Hard stop at phase 4.** No execution without explicit human approval.
+- **Hard stop at phase 4.** No execution without explicit approval. The approver
+  is the HUMAN by default; `--gate=agent` (docr-he4j9, decision record docr-1vqfg,
+  2026-07-17) substitutes `mx2-decision-maker` at this same call site so an
+  orchestrating skill (e.g. /campaign) can run pre-converged nodes unattended.
+  The substitution changes WHO approves, never WHETHER approval happens, and the
+  default human path is unchanged. Unattended verdict contract: PROCEED proceeds;
+  ANY other verdict is a node failure that halts loudly (see gate-prompts.md
+  "Phase 4 Agent Approval Gate"): never loop back into bypass-skipped phases,
+  never wait on ESCALATE-QUESTIONS.
 - **You are the orchestrator.** Don't spawn an orchestrator agent. Stay active, steer, unblock.
 - **Shared worktree.** One worktree for all agents. No per-agent isolation.
 - **Standup protocol is mandatory.** Every agent checks in after every logical unit.

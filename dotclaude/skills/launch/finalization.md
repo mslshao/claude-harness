@@ -82,15 +82,21 @@ non-main parent branch; stacked launch on top of an unmerged parent PR).
 > the same constraint applies. Sanitize the PR body file before invoking
 > either path.
 
-**Step 1: Determine the base branch.** Read the worktree's branch parent:
+**Step 1: Determine the base branch.** The AUTHORITATIVE source (docr-ib6nd,
+2026-07-17) is the `launch_base_ref` bead metadata written at Phase 5.1:
 ```bash
-BASE_BRANCH=$(git -C "$WORKTREE_DIR" rev-parse --abbrev-ref --symbolic-full-name @{upstream} 2>/dev/null | sed 's|^origin/||' \
+BASE_BRANCH=$(bd show "$LAUNCH_BEAD_ID" --json | jq -r '.metadata.launch_base_ref // empty' | sed 's|^origin/||')
+```
+When the metadata is absent (pre-2026-07-17 launches), fall back to branch
+decoration:
+```bash
+[[ -z "$BASE_BRANCH" ]] && BASE_BRANCH=$(git -C "$WORKTREE_DIR" rev-parse --abbrev-ref --symbolic-full-name @{upstream} 2>/dev/null | sed 's|^origin/||' \
   || git -C "$WORKTREE_DIR" log --pretty=%D origin/HEAD..HEAD --decorate=full 2>/dev/null | grep -oE 'origin/[^,)]+' | head -1 | sed 's|^origin/||' \
   || echo "main")
 ```
 For a standard non-stacked launch (worktree created from `origin/HEAD` in Phase 5.1)
-this resolves to `main`. For stacked launches (worktree created from another branch)
-it resolves to that parent. Defaults to `main` if detection fails.
+this resolves to `main`. For stacked launches (worktree created from another branch
+via `--base-ref=`) it resolves to that parent. Defaults to `main` if detection fails.
 
 **Step 2: Build the PR body file.** Build `/tmp/pr-body-<branch>.md` BEFORE
 invoking either submit path. Read the repo's PR template FIRST
@@ -124,9 +130,15 @@ operate on it. Recurrence context: 2026-05-08 PR #8971 silent-failure-hunter
 launch shipped via Path A and required retroactive `gt track` cleanup.
 ```bash
 cd "$WORKTREE_DIR"
-gt track --parent "$BASE_BRANCH"
-gt submit --stack --no-interactive --draft \
-  --body-file /tmp/pr-body-<branch>.md
+gt track --parent "$BASE_BRANCH"   # fails if $BASE_BRANCH itself is untracked;
+                                   # gt track "$BASE_BRANCH" --parent main first
+gt submit --stack --no-interactive --draft
+# gt submit has NO --body-file flag (verified 2026-07-20, drill F2 docr-k8l6y).
+# It creates the PR with the commit message as title; set title/body after:
+PR_NUM=$(gh pr view --json number --jq .number)
+BODY=$(cat /tmp/pr-body-<branch>.md)
+gh api -X PATCH "repos/<company>/docr/pulls/$PR_NUM" \
+  -f title="<title>" -f body="$BODY"
 ```
 - `gt track` is forbidden in the main checkout (CLAUDE.md), allowed in worktrees
   under the worktree exception.
@@ -139,6 +151,29 @@ gt submit --stack --no-interactive --draft \
 **Step 4: Capture the PR URL** for the report in 6.5:
 ```bash
 PR_URL=$(gh pr view --json url --jq .url)
+```
+
+**Step 5: Make the bead reachable from the PR and the ticket.** Put the Jira key
+and PR number in the bead TITLE, not only in a NOTES line or a comment. `bd search`
+covers title and description; it does NOT cover comments, and `bd list --json`
+exposes no comments field. A bead whose PR number lives only in
+`[LAUNCH_EVENT type=PR_CREATED ...]` is unreachable from `gh pr list` or from the
+Jira key, which strands every cold-start session that starts at the PR instead of
+at the bead (2026-08-06, docr-t9o69 / PR #11392: `bd search 11392` and
+`bd search MX2-NNNNN` both missed the bead holding all the state).
+
+Separate Bash call from any `gh` command (CLAUDE.md: the personal-tier-vocab hook
+scans the whole command string, so a compounded `bd` + `gh` invocation gets the
+whole call blocked):
+
+```bash
+bd update <bead-id> --title "[<JIRA-KEY>] <existing title> (PR #$PR_NUM)"
+```
+
+Then a retrieval-tier pointer so the mapping survives a title rewrite:
+
+```bash
+bd remember --key="ref:pr-$PR_NUM" "PR #$PR_NUM = <JIRA-KEY> = bead <bead-id>. <one-line state>. Siblings: <ids>."
 ```
 
 ## 6.3.5: Self-Review Gate (`/pr-intel --mine`)
@@ -168,7 +203,24 @@ PR was sound, but the step belongs in the flow.
 
 ## 6.4: Cleanup
 
+Do NOT remove the worktree at finalization by default. A launch PR almost
+always iterates after creation (cold-review round, reviewer feedback,
+/babysit-pr), and removing the worktree at PR creation forces a re-create
+within the hour (2026-08-06, docr-3yi0u: removed at 6.4, re-created 30 minutes
+later for the cold-review fix round). Instead: record the worktree path in the
+PR_CREATED bead event, keep it while the PR is open, and remove it when the PR
+merges or closes (or let /audit-worktrees reap it; the orphan pressure that
+motivated eager cleanup is handled there, `gotcha:orphaned-worktrees-2026-05-07`).
+
+Remove immediately ONLY when no iteration is expected (the session is ending
+with the PR handed off, or the launch was abandoned). Run it from the main
+checkout, never from inside the worktree: a shell whose cwd is inside the
+worktree is left on a deleted directory by the removal (getcwd failures on
+every subsequent command until a manual cd; hit 2026-08-06 after pants runs
+had moved the shell into the worktree):
+
 ```bash
+cd /workspaces/main
 git worktree remove "$WORKTREE_DIR" --force 2>&1 || \
   (rm -rf "$WORKTREE_DIR" && git worktree prune)
 ```
@@ -180,7 +232,7 @@ Present to the user:
 ## Launch Complete: [topic]
 
 **PR**: [URL] (draft)
-**Graphite**: https://app.graphite.dev/github/pr/lawfirm/main/[number]
+**Graphite**: https://app.graphite.dev/github/pr/<company>/docr/[number]
 **Branch**: [branch-name]
 **Jira**: [MX2-XXXXX]
 

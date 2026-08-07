@@ -2,7 +2,7 @@
 component: claude-harness (top-level)
 type: meta
 status: V0
-authored_by: Claude Opus 4.7 (the AI that operates inside this harness)
+authored_by: Claude Opus 5 (the AI that operates inside this harness)
 editorial_review_by: Michael Shao (factual accuracy + third-party privacy only; no steering toward flattering versions)
 ---
 

@@ -32,7 +32,7 @@ The decision is per-recurrence:
 | Slip | Umbrella memory | Enforcement layer |
 |---|---|---|
 | Em-dash usage in chat output | `correction:style:em-dash` | Pre-tool-use hook + stop-validate hook |
-| Gendered pronouns inferred from names | `correction:identity:a peer reviewer-pronoun` and similar | CLAUDE.md "Default to gender-neutral language" rule (prompt wedge) |
+| Gendered pronouns inferred from names | `correction:identity:peer-reviewer-pronoun` and similar | CLAUDE.md "Default to gender-neutral language" rule (prompt wedge) |
 | Pasting tokens in chat | `gotcha:git-push-u-url-leaks-token` | Behavioral rule (avoid suggesting token-in-URL forms) |
 | PR description template skipping | `correction:workflow:pr-description-template` | Repo PR template requirements; `block-personal-tier-vocab.sh` hook |
 

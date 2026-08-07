@@ -79,7 +79,7 @@ The handoff is only as fresh as its inputs. Do not synthesize from conversation 
 
 ```bash
 # Beads: in-flight tasks, today's corrections
-bd list --status=in_progress --json | jq -r '.[] | "\(.id) \(.title)"'
+bd list --status=in_progress --json -n 0 | jq -r '.[] | "\(.id) \(.title)"'
 bd memories correction: 2>/dev/null | grep "$(date -u +%Y-%m-%d)"
 
 # GitHub: authored + review-requested + recent self-activity
@@ -187,6 +187,7 @@ Wrap the template in a fenced code block in the output so the user can copy-past
 - Emitting calibration shifts as memory keys without their body (the next session can't look them up if the key is wrong; include the rule itself).
 - Adding boilerplate like "remember to be helpful" or "follow the rules" to the handoff. The next session already has CLAUDE.md.
 - Synthesizing from conversation context only. Beads, Slack, Jira, and Confluence all hold in-flight state the conversation may not have surfaced. Skipping the cross-surface gather (Step 1) and cross-reference (Step 2) produces a handoff that LOOKS complete but silently drops adjacent work; the next session re-derives it the hard way.
+- Writing "Ask Michael whether X happened" into SUGGESTED FIRST ACTIONS or OPEN ASKS when X is externally checkable (a Slack message sent, a PR state, a ticket transition). Phrase it as the verification the next session runs itself ("verify via Slack search / gh / Jira that X"); ask-the-user is only for facts no tool can reach. (2026-07-22 instance: a handoff-prescribed "ask Michael if the messages were sent" drew the correction `correction:verification:slack-sent-check-before-asking`.)
 
 ## Output format
 

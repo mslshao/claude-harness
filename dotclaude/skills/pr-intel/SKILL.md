@@ -42,7 +42,7 @@ This SKILL.md is always read in full. Sub-files load per the table; skipping a "
 |---|---|---|
 | every run | [output-formats.md](output-formats.md) (the output contract; never skippable, any mode, any size) | |
 | `--quick` | nothing further | all other sub-files |
-| default / `--once` / `--mine`, XS-S | [prior-reviews.md](prior-reviews.md) (if prior rounds exist), [compliance-checks.md](compliance-checks.md) (if Jira ticket or CI failures), [provenance-classification.md](provenance-classification.md), [bot-reactions.md](bot-reactions.md) (default mode only) | [dispatch.md](dispatch.md) (no specialist dispatch at XS/S, EXCEPT `has_terraform` with a net-new `.tf` OR `has_new_tf_resource` (a modified `.tf` that adds a `resource`/`module`/`data` block): dispatch `mx2-devops-build-deploy` even at XS/S, since IaC blast radius is decoupled from line count AND from whether the file is net-new; mirrors the Checkov net-new-tf-or-new-resource trigger and the size-independent `changes_public_surface` rule), [synthesis.md](synthesis.md), [verification.md](verification.md), [diagrams.md](diagrams.md) |
+| default / `--once` / `--mine`, XS-S | [prior-reviews.md](prior-reviews.md) (if prior rounds exist), [compliance-checks.md](compliance-checks.md) (if Jira ticket or CI failures), [provenance-classification.md](provenance-classification.md), [bot-reactions.md](bot-reactions.md) (default mode only) | [dispatch.md](dispatch.md) (no specialist dispatch at XS/S, EXCEPT `has_terraform` with a net-new `.tf` OR `has_new_tf_resource` (a modified `.tf` that adds a `resource`/`module`/`data` block) OR `has_ci_workflow_change` (a changed `.github/workflows/*.ya?ml`): dispatch `mx2-devops-build-deploy` even at XS/S, since IaC/CI-workflow blast radius is decoupled from line count AND from whether the file is net-new; mirrors the Checkov net-new-tf-or-new-resource trigger and the size-independent `changes_public_surface` rule; and EXCEPT `adds_capability`: load dispatch.md for its orchestrator-owned Active Reuse-Search step, which runs even at XS/S with no specialist dispatch implied, since capability duplication is decoupled from line count and one motivating miss, PR #10944, was 21 lines), [synthesis.md](synthesis.md), [verification.md](verification.md), [diagrams.md](diagrams.md) |
 | default / `--once` / `--mine`, M+ | all of the above plus [dispatch.md](dispatch.md), [dispatch-mechanics.md](dispatch-mechanics.md), [synthesis.md](synthesis.md), [static-analyzers.md](static-analyzers.md) | [verification.md](verification.md) at M when no BLOCKING-class findings |
 | L+ | plus [verification.md](verification.md) | |
 | trigger-conditional, any size | [checkov.md](checkov.md) (`has_terraform` + net-new tf), [diagrams.md](diagrams.md) (M+ AND `multi_service`), [design-doc.md](design-doc.md) (Confluence link in body), [context.md](context.md) (migration/series triggers), [freshness.md](freshness.md) / [grounding.md](grounding.md) when those checks need their exact commands | |
@@ -63,11 +63,23 @@ toward investigating when in doubt; an XS prefix lowers neither the investigatio
 the verification bar. The dead @claude-bot question is retired; `@claude review once`
 (managed Code Review) is the manual out-of-band escalation for inconclusive cases.
 
+**Empirical execution beats precedent-citation on disputed test behavior.** When the
+author and the reviewer disagree about what a test DOES (an assertion "doesn't work",
+a mock "doesn't intercept", a fixture "breaks under xdist"), do not re-cite precedent
+a second time: dispatch a worktree agent to check out the PR tip, restore or write the
+disputed test, and RUN it (`pants test <target>`), iterating on the failure output up
+to 3 attempts. The author's observation is usually real even when their diagnosis is
+wrong, and only execution distinguishes the two; the deliverable is a verified patch
+plus the actual root cause, which ends the loop in one round (PR #9725, 2026-07-16:
+three assertion-deletion rounds ended by one empirical run that found a repo-global
+moto fixture shadowing `responses.calls`).
+
 ## Data Gathering
 
 **Pre-flight checklist.** Before Phase 0, confirm each of these was executed or explicitly deemed not applicable. Skipping a conditional step (e.g., Jira ticket hydration when no ticket is referenced) is fine; skipping a conditional step when the trigger IS present is the failure mode this checklist exists to prevent.
 
 - [ ] PR metadata fetched
+- [ ] Run self-registered in the inject log (Skill-tool invocations; see Self-register the run)
 - [ ] Diff fetched (skip for `--quick`)
 - [ ] PR head ref fetched locally (for worktree)
 - [ ] Merge Base Freshness checked
@@ -96,6 +108,30 @@ gh repo view --json nameWithOwner --jq '.nameWithOwner'
 # Pre-fetch PR head ref (ensures commit is locally reachable for worktree creation)
 # headRefName comes from the PR metadata above
 git fetch origin <headRefName>
+```
+
+**Sanitize the fetched title before any render.** Graphite/GitHub PR titles routinely
+carry U+2014 (PR #10818: `... rewrite [U+2014] summary/derived-artifact ...`), and the
+title is echoed verbatim into the `## PR #<N>: <title>` header, so the em-dash gate in
+output-formats.md cannot catch it by re-reading authored prose. Replace it at the source
+once, and every downstream render inherits the clean string:
+
+```bash
+gh pr view <number> --json title --jq '.title' | sed 's/\xe2\x80\x94/-/g'
+```
+
+The same applies to any upstream string quoted into the briefing (bot comment text,
+author reply text, Jira summary, commit messageHeadline): sanitize on echo, never
+paste through.
+
+**Self-register the run** (required, once per invocation, alongside the metadata fetch):
+append this run to the inject log so `nudge-handrolled-review.sh` knows /pr-intel ran for
+this PR in this session. The UserPromptSubmit hook only logs runs the user typed; a
+Skill-tool invocation must log itself or later posts to this PR get a false nudge
+(three occurrences, 2026-07-15):
+
+```bash
+echo "{\"ts\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"session_id\":\"${CLAUDE_CODE_SESSION_ID}\",\"pr\":\"<PR_NUMBER>\",\"prompt_preview\":\"skill-invoked /pr-intel <PR_NUMBER>\"}" >> ~/.claude/logs/pr-intel-contract-inject.jsonl
 ```
 
 ### Prior Reviews
@@ -248,12 +284,14 @@ Compute these booleans from the diff for specialist dispatch:
 - **has_test_files**: changed files matching `*_test.py|test_*|conftest.py`
 - **has_terraform**: changed files matching `*.tf` or `*.hcl`
 - **has_new_tf_resource**: `has_terraform` is true AND an added line declares a new top-level Terraform block: `^\+(resource|module|data)\s+"`. Set by a MODIFIED `.tf` that appends a block, not only a net-new file. IaC blast radius (a new secret, a new plan-time `data` read against a shared multi-env stack) is decoupled from line count AND from whether the file is new, so this drives `mx2-devops-build-deploy` dispatch at any size, exactly like a net-new `.tf`. (PR #10554: a +18 modified `salesforce.tf` adding one `module` block gated a shared dev+prod secrets stack; the net-new-file trigger alone would have skipped the dispatch.)
+- **has_ci_workflow_change**: changed files matching `.github/workflows/*.ya?ml`, added OR modified. CI/CD workflow blast radius (secret exposure via `${{ secrets.* }}`, untrusted-actor trigger gating, `permissions:`/`id-token` scope, supply-chain via unpinned `uses:`) is decoupled from line count, exactly like `has_terraform`, so this drives `mx2-devops-build-deploy` dispatch at any size. (PR #10836: an XS +58 net-new `claude.yml` gated `ANTHROPIC_API_KEY` behind an author-association trigger guard and a write-capable OIDC app token; the XS-no-dispatch default would have skipped the devops lens on a security-sensitive file.)
 - **has_typescript_files**: changed files matching `*.ts|*.tsx|*.mts|*.cts` AND outside `src/gen-typescript/` (generated TS is excluded; review the generator instead)
 - **structural_risk_size**: diff > 200 lines OR > 5 files changed
 - **has_python_module_change**: changed files include a `src/python/**/*.py` that is added, deleted, or renamed, OR whose added lines declare a net-new top-level `def `/`class ` (column-0 on a `+` line). Drives `module-cohesion-reviewer` dispatch (cross-file cohesion lens). A changeset whose only Python changes are test files (`*_test.py|test_*|conftest.py`) does not set it unless production/test-only mixing is the concern.
 - **has_file_history**: count of merged PRs in last 180 days touching ANY file in the changeset (computed via `gh pr list --state merged --search "<file>" --limit 5` per top-3 changed files, cap at 3 per file). Boolean = aggregate count >= 3.
 - **has_pattern_precedent**: at least one file in changeset has >= 2 prior merged PRs in last 180 days AND the diff adds new public symbols. Symbol detection: added lines matching `^\+\s*(export |def |class |interface |type )`. Reuses the same `gh pr list` calls as `has_file_history`.
 - **changes_public_surface**: added/removed/modified lines declare a public symbol. Detection: lines matching `^[+-]\s*(def |async def |class |interface |type |export )`, OR `^[+-]\s*[A-Z_]+\s*[:=]` (constants, enum values), OR `^[+-]\s*\w+:\s*\w+` inside files matching `*Settings*` or Pydantic model classes (schema/Settings field changes). Excludes private symbols (leading underscore in Python, non-exported in TS). Drives `bot-review` dispatch (cross-file blast-radius lens). Size is a poor proxy for blast radius; an XS PR that changes a public type signature has higher downstream impact than an M PR refactoring internals.
+- **adds_capability**: added lines introduce a NEW outbound capability rather than extending an existing one. Any of: an HTTP call (`requests.`, `httpx.`, `urllib.request`, `aiohttp`, `fetch(`); a subprocess invocation (`subprocess.`, `os.system`, `shell=True`); a queue or topic publish (`publish(`, `send_message(`, `put_events(`); a new route declaration (`@app.`, `@router.`, `APIRouter(`); a new CLI entry point (`argparse`, `click.`, a new `__main__` block); a system-package or image install (`apt-get install`, a Dockerfile `RUN` adding a binary); or a new raw SQL or warehouse query string. Test-only files alone do not set it. Compute at ALL sizes, XS included: it drives the orchestrator-owned Active Reuse-Search in [dispatch.md](dispatch.md), not a specialist dispatch, so the XS/S no-dispatch default does not apply (PR #10944, one of the motivating misses, was 21 lines). Pattern set is duplicated from the `adds_capability` row in `~/.claude/skills/review/SKILL.md` step 2, the canonical copy per docr-z3qw4; if the two drift, reconcile toward the /review copy.
 - **multi_service**: changed files (net-new only) span 2+ distinct top-level service directories. Service directory = first path segment after `src/python/mx2/`, `src/typescript/mx2/`, or `infra/`. Files outside these prefixes (root scripts, generated code) do not contribute. Drives the optional Sequence Diagram briefing section for M+ PRs. See [diagrams.md](diagrams.md).
 - **spot_check_eligible**: ALL of (a) size in {L, XL, 2XL, 3XL}, (b) net-new file count >= 10 AND median per-file diff lines <= 25 (mechanical-pattern proxy: many small uniform edits), (c) PR description contains a methodology statement detectable by regex (`script:|ran (the )?(command|script|tool)|applied (rule|codemod|transform)|using (yapf|ruff|isort|black|sed|jscodeshift|comby|grit)|migration script|codemod`). Drives the spot-check mode under Specialist Dispatch (the engineering lead's Code Review Guide #11: "focus your review on the methodology... spot-check a few instances"). Conservative-by-default: when any of (a)/(b)/(c) is uncertain, set to false (full-diff dispatch is the safe default; spot-check trades coverage for speed and that trade only makes sense when the mechanical pattern is unambiguous).
 - **has_observability_signal**, **has_pydantic_settings_signal**: defined in [dispatch.md](dispatch.md); compute them when dispatch.md loads (M+ PRs).
@@ -314,7 +352,7 @@ After Phase 0 description quality, run three pre-dispatch checks:
    scoped to the PR. Three sub-tools today: SonarCloud (MCP available),
    Datadog code analysis (MCP via `search_pr_insights`), Sentry (no live
    bot on MX2 PRs; static patterns ride in `mx2-code-reviewer` instead).
-   the engineering lead's Code Review Guide #7 explicitly says review these findings
+   The engineering lead's Code Review Guide #7 explicitly says review these findings
    and call out anything that should be blocking.
 
 **Without compliance-checks.md, CI failures are reported without distinguishing
@@ -367,6 +405,8 @@ one-step-more-conservative recommendation), and `--mine` Review-Cache Reuse
 
 Evaluate dispatch triggers using the computed signals. Launch all triggered
 specialists **in parallel** via the Agent tool. This is NOT optional for default mode.
+
+**Active reuse-search precedes the fan-out.** When `adds_capability` fired, run the orchestrator-owned Active Reuse-Search in [dispatch.md](dispatch.md) BEFORE building specialist prompts, so its candidate-owner results ride into the `mx2-code-reviewer` and `module-cohesion-reviewer` prompts as grounding evidence. It runs at every size (including XS/S renders that dispatch no specialists), and its outcome always renders on the header `reuse-search:` line per output-formats.md.
 
 **CRITICAL: All specialist agents MUST be foreground calls.** Do NOT use
 `run_in_background: true`. Send all Agent calls in a single message (parallel
@@ -474,6 +514,24 @@ A default-mode render must contain, in order: the `## PR #<N>: <title>` header b
 
 The template is the output contract. Do not narrate findings in free-form prose.
 
+**Anchor check before emitting (mandatory, every mode with inline comments).** Every
+drafted inline anchor must sit inside the PR's net three-dot diff hunks or GitHub 422s
+it, and `/post-review` catches it only after the briefing is rendered and previewed:
+
+```bash
+python3 ~/.claude/skills/pr-intel/verify-anchors.py --base <baseRefName> --head <headRefOid> <path:line> ...
+```
+
+On `NOT_IN_HUNK`, apply the grounding.md remedy in PREFERENCE ORDER: re-anchor to the
+nearest net-new line that names the behavior (the script prints it as `nearest:`) and
+make the comment text self-locating ("on line 222 just below this hunk"); only when no
+net-new line triggers the finding at all, move it to the Draft Review Summary. A
+body-folded finding has no resolvable thread, so it is materially likelier to be skipped:
+on #10818 the author actioned every inline in the same review and silently skipped the
+one body-folded item, costing an extra round. Do not emit an
+anchor the script rejected. This is the mechanical enforcement of grounding.md's
+anchor-grounding rule, which lives in a trigger-conditional sub-file that XS-S runs skip.
+
 ## Unverified-Assertion Containment (default mode)
 
 Default mode is a one-shot briefing; the multi-phase `@claude` verify loop is retired
@@ -501,9 +559,10 @@ even if clean: "Reviewed for: PII exposure, auth/authz, audit trails, encryption
 - **Actionable output.** Every finding should help the reviewer take a specific action.
 - **High signal, no noise.** Only flag things with evidence. False positives erode trust.
 - **Two audiences per finding.** Briefing text (reviewer) and draft comment (PR author).
+- **Review the why, not just the what.** A PR is a claim that a change achieves a goal; the review's first job is to test that claim, not only to check that the surface code is well-built. Anchor on the goal (the description's why, the ticket intent), then ask whether the implementation achieves it AND whether it is the simplest path given what the deployment platform, runtime, framework, and existing services already provide. A clean specialist fan-out that never asks "does this mechanism need to exist at all?" will approve code that should not exist. Operationalized by the Goal-Fit & Mechanism Necessity design-review surface (synthesis.md) and the `mx2-skeptic` necessity question (dispatch.md); do not let surface-level polish substitute for the goal-fit question.
 - **Depth by default, speed on request.** Specialist dispatch is default. `--quick` for triage.
 - **Don't duplicate existing tools.** No `pants` runs. Posting is delegated to `/post-review`, never reimplemented. The briefing itself is never auto-posted, and `/pr-intel` performs no posting of its own; all posting is `/post-review` after your explicit OK.
-- **the engineering lead priority order is the human-reviewer standard.** the engineering lead's
+- **The engineering lead's priority order is the human-reviewer standard.** The engineering lead's
   [Code Review Guide for Humans](https://<company>.atlassian.net/wiki/spaces/PPET/pages/5684789249)
   (Mar 2026) defines the priority order: description, then types, then
   complexity / naming, then boolean / behavior-switching params, then tests,

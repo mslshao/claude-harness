@@ -44,6 +44,14 @@ Break the refined scope into work items with these fields:
   and no concrete way to validate them pre-commit are
   workstream-killers. Phase 4.6 enforces this; Phase 4 synthesis can
   pre-empt by either adding a verification path or downgrading scope.
+- **New state names its owner.** Any item introducing persistent or
+  coordinating state (table, queue, lock, claim, flag, cache, index)
+  states WHICH service/worker owns it and WHICH component consumes it
+  first, at what pipeline point. The design's WHERE is as load-bearing
+  as its WHAT: an item that says only what the state is leaves the
+  owner to the implementer's guess, and that guess gets baked into
+  every dependent item (2026-07-17 pilot lesson; the /challenge
+  State-Ownership subtrigger scores unnamed ownership FRAGILE+HIGH).
 - **Context is annotation only.** It changes how the user reads other
   fields (legacy + small Effort is impressive; greenfield + small
   Effort is expected). Do not score on Context.

@@ -68,3 +68,29 @@ Format per entry:
 - **Action**: new-rule
 - **Summary**: Verify checkable data parameters with one tool call before rating verif/conseq.
 - **Rationale**: Same-day proven (35d-vs-90d retention check flipped PROCEED to ITERATE); cheap, falsifiable, generalizes.
+
+## 2026-07-21
+
+- **Source key**: `calibration:mx2-decision-maker:converge:overwatch-skill`
+- **Category**: converge (gate-context tag, routed to Rule Overrides)
+- **Action**: new-rule
+- **Summary**: A high-signal ITERATE names a concrete missed alternative from a known-good source; evaluate-and-document-decline can satisfy it.
+- **Rationale**: Well-grounded (2026-07-09 overwatch converge ITERATE caught a real missed bg-poll alternative); merged as a consolidated Rule Override.
+
+- **Source key**: `calibration:mx2-decision-maker:ideation:overwatch-skill`
+- **Category**: ideation (gate-context tag, routed to Rule Overrides)
+- **Action**: new-rule
+- **Summary**: Ideation-gate rubric gaps: grade decision/ranking quality (not mechanism-executes), declare tier when tier is open, Diverge must enumerate a zero-code candidate.
+- **Rationale**: 2x-confirmed at merge; folded with the autopilot 3rd confirmation into one consolidated "Ideation-gate rubric gaps" Rule Override.
+
+- **Source key**: `calibration:mx2-decision-maker:ideation:autopilot-recurs-overwatch-formula-gaps`
+- **Category**: ideation (gate-context tag, routed to Rule Overrides)
+- **Action**: refinement
+- **Summary**: 3rd confirmation of the same three ideation-rubric gaps; folded into the consolidated rule.
+- **Rationale**: Confirmation, not distinct content; strengthened the merged rule and flagged the /ideate-rubric structural fix (goal-fit column, capability-proving Verifiability, mandatory zero-code enumeration) as a separate unmerged follow-up.
+
+- **Source key**: `calibration:mx2-decision-maker:ideation:fit-column-missing-user-constraint-root`
+- **Category**: ideation (gate-context tag, routed to Rule Overrides)
+- **Action**: new-rule
+- **Summary**: Fit weakness rooted in a missing user constraint routes to ESCALATE-QUESTIONS, not a second re-diverge ITERATE.
+- **Rationale**: Distinct 4th gap; merged as its own Rule Override.

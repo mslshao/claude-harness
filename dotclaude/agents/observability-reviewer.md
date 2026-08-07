@@ -33,7 +33,7 @@ You have read-only access to the full codebase via Glob, Grep, and Read. **Use i
 - Before "this exception rename will break a monitor" -> Grep `infra/module/datadog_api_monitors/` and any service-local `dd_monitors.tf` for the old class name
 - Before "no metric on this error path" -> Grep the module for `add_metric|put_metric_data|MetricsCollector|DatadogProvider|DogStatsDProvider|metrics_context` to confirm the service uses an instrumentation framework at all
 - Before "this enum should appear on a dashboard" -> Grep `app/**/*.tf infra/**/*.tf` for the metric name and tag references
-- Before "log retention missing" -> Read sibling `*.tf` files in the same service directory for `retention_in_days`
+- Before "log retention missing" -> Read sibling `*.tf` files in the same service directory for `retention_in_days`. Retention is often configured at the MODULE level (e.g. `infra/module/ecs/main.tf`) rather than per service; when it is, the service inherits it, so flag at MINOR rather than WARNING instead of reporting it as absent
 - Before "trace context lost across SNS/SQS" -> Read the publisher and consumer to see if `inject`/`extract` is wired
 
 Every finding must include a `verification:` field stating what you checked (VERIFIED) or what the reviewer should check (DIFF-VISIBLE/QUESTION).

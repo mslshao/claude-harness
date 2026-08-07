@@ -24,8 +24,13 @@ specialists.
 **Before dispatching specialists (default and --quick modes only):**
 1. Create a temporary worktree at the PR's HEAD commit:
    ```bash
-   WORKTREE_DIR=$(mktemp -d /tmp/pr-intel-XXXXXX)
-   git worktree add --detach "$WORKTREE_DIR" <headRefOid> 2>&1
+   # Stable path, NOT /tmp: parallel specialist dispatch can run 10+ min, and the
+   # codespace /tmp reaper reclaims the dir mid-run (observed PR #10714, 2026-07-20:
+   # 7 of 8 agents found the worktree gone and recreated it). ~/.claude/worktrees is
+   # not /tmp-reaped and is where other worktrees already live.
+   mkdir -p ~/.claude/worktrees
+   WORKTREE_DIR=$(mktemp -d ~/.claude/worktrees/pr-intel-XXXXXX)
+   git worktree add --detach -q "$WORKTREE_DIR" <headRefOid> 2>&1
    ```
 2. Verify: `git -C "$WORKTREE_DIR" log -1 --oneline` should show `<headRefOid short>`.
 3. Save `$WORKTREE_DIR` - all specialist prompts must include it as the
@@ -41,10 +46,11 @@ specialists.
    git worktree prune
    ```
    Do NOT `rm -rf "$WORKTREE_DIR"`: it trips the destructive-command floor
-   (observed 2026-06-26) and is unnecessary (the worktree lives under /tmp,
-   which the OS reclaims; `git worktree prune` clears the registry). If a
-   locked dir genuinely must be force-removed, surface the path to the user
-   rather than running `rm -rf` yourself.
+   (observed 2026-06-26) and is unnecessary (`git worktree remove` in step 4
+   deletes the dir; `git worktree prune` clears any stale registry entry). The
+   worktree now lives under `~/.claude/worktrees` (not /tmp), so proper teardown
+   matters: it is not OS-reclaimed. If a locked dir genuinely must be
+   force-removed, surface the path to the user rather than running `rm -rf` yourself.
 
 The user's working tree is never modified. No branch save/restore needed.
 
@@ -57,7 +63,7 @@ from a different branch. Rely primarily on the inline diff for analysis."
 
 When `spot_check_eligible: true` AND mode is `default`, the diff sent to
 each specialist is reduced from the full PR diff to N=3 representative
-files. the engineering lead's Code Review Guide #11: "Rather than reviewing every single
+files. The engineering lead's Code Review Guide #11: "Rather than reviewing every single
 changed line, focus your review on the methodology... spot-check a few
 instances, but focus your review on the methodology."
 

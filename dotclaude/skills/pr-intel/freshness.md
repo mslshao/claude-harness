@@ -34,6 +34,17 @@ merged first). This is a local git operation and always runs.
    ```bash
    git diff origin/main <headRefOid> --name-only
    ```
+   **Shallow-clone guard (load-bearing).** Use the TWO-dot form above (`git diff
+   origin/main <headRefOid>`), never three-dot (`origin/main...<headRefOid>`). The
+   codespace checkout is a shallow clone (`git rev-parse --is-shallow-repository`
+   returns true), where three-dot fails with `fatal: ... no merge base`. Piped through
+   `2>/dev/null` into a `comm`/`sort`, that failure is SILENT: the check reports zero
+   stale AND zero ghost files via the failure path, not via real verification (a false
+   "clean" on a high-consequence check; observed PR #10714, 2026-07-20). If either
+   two-dot diff returns empty unexpectedly, confirm it is a real result and not a
+   swallowed `no merge base` error before trusting it; the PR files API
+   (`gh api /repos/{owner}/{repo}/pulls/{n}/files --jq '.[].filename'`) is the fallback
+   ghost/stale oracle when local history is too shallow.
 2. Compare against the PR's full file list (from the `files` field in PR metadata).
 3. Files present in the PR's file list but **absent** from the 2-dot diff output are
    **already on main**: their content at the PR HEAD is identical to current main.
@@ -59,7 +70,24 @@ PR diff view. They typically appear when a PR is squashed/rebased and a rebase
 conflict resolution accidentally reverts a recently-merged change.
 
 1. Files present in the 2-dot `git diff` output but **absent** from the PR's `files`
-   metadata are ghost diffs.
+   metadata are ghost-diff CANDIDATES, not confirmed ghosts.
+
+   **False-positive filter (load-bearing; see `correction:skill:pr-intel-ghost-diff-false-positive`).**
+   A candidate is a real revert ONLY if the PR branch's own commits changed the file.
+   A file the branch never touched appears in the 2-dot diff purely because main
+   advanced past the branch's merge-base (branch behind main, or a merge-from-main
+   older than a sibling PR), and squash/merge preserves main's version: no revert.
+   Filter candidates against the branch's own changes:
+   ```bash
+   git rev-list --count <headRefOid>..origin/main                            # >0 = branch behind main
+   git log origin/main..<headRefOid> --name-only --pretty=format: | sort -u  # files the branch's commits touched
+   ```
+   Keep a candidate only if it appears in the second list. Precise oracle when the
+   merge-base is reachable: a real revert requires `git show <merge_base>:<path>` !=
+   `git show <headRefOid>:<path>`. Two false positives this kills: PR #9036
+   (2026-05-13, merge-from-main predated a sibling by ~40 min) and PR #10709
+   (2026-07-20, 26 commits behind main gave 79 phantom candidates; branch touched one
+   file, in the PR list, so zero true ghosts).
 2. For each ghost file, check `git log origin/main -- <path>` (last 5 commits) to
    identify what recently-merged PR touched it. This reveals whether the ghost diff
    is an accidental revert of a specific PR.

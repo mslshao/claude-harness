@@ -222,6 +222,15 @@ Treat as the 'you decide' opt-out: orchestrator-derive
 VERDICT=LOW_CONFIDENCE, proceed, and carry the unanswered narrowing
 questions into the plan's Open Assumptions.
 
+EXCEPTION: `--gate=agent` launches (unattended epic nodes, docr-mpgav) do
+NOT use the LOW_CONFIDENCE opt-out. Unattended nodes run pre-converged
+plans; if 3.6 still has narrowing questions, the node's spec was not
+actually converged, and proceeding on low confidence unattended compounds
+the error across a stacked chain. Halt loudly per durable-state.md
+"Unattended decision-point policy" and fold the questions into the halt
+report. (/autopilot embedding keeps the LOW_CONFIDENCE path: its own Gate 1
+supervises the outcome.)
+
 Frame the ask: "I have a few narrowing questions before launching
 the agent team would be productive. If you don't want to answer,
 reply 'you decide' and I'll proceed with the current plan as
@@ -332,6 +341,71 @@ bd update "$LAUNCH_BEAD_ID" --append-notes \
 Cold-start sees gate=escalate-questions without user-answered →
 re-prompt. Sees both → fold answers into refined scope and resume
 Phase 1 round=N+1.
+
+## Phase 4 Agent Approval Gate (`--gate=agent`)
+
+Added 2026-07-17 (docr-he4j9; decision record docr-1vqfg). When the invocation
+carries `--gate=agent`, the Phase 4 approval hard-stop is performed by
+`mx2-decision-maker` instead of the human. This is a DIFFERENT call site and a
+DIFFERENT job than the Phase 3.6 gate above: 3.6 judges plan quality
+mid-pipeline; Phase 4 authorizes execution. Keep them distinguishable in
+dispatch and in calibration data.
+
+**Double-run guard (before dispatching)**: if this run's bead log already
+contains a `[LAUNCH_STAGE stage=gate ... status=proceed]` entry from Phase 3.6
+(non-bypass runs), Phase 4 auto-passes on that durable evidence: write the
+approval event (below) with `via=3.6-evidence` and continue. A resumed or
+rolled-over session that lands at Phase 4 WITHOUT that event re-runs this
+dispatch; never auto-pass from an unrecorded verdict. Bypass runs (the normal
+/campaign path) skipped 3.6 entirely, so this dispatch always runs there.
+
+```
+Agent(
+  subagent_type="mx2-decision-maker",
+  description="Phase 4 approval gate (agent-substituted)",
+  prompt="**MODE: LAUNCH GATE, POSITION: approval.** You are substituting for
+  the HUMAN at /launch's Phase 4 execution-approval hard stop (--gate=agent;
+  unattended run, typically a /campaign node on a pre-converged bead). This is
+  NOT the Phase 3.6 plan-quality gate: your question is 'authorize executing
+  this plan now', the one-shot commitment a human would otherwise make.
+
+  Record calibration drift under
+  calibration:mx2-decision-maker:launch-approval:<topic> (distinct namespace
+  from the 3.6 gate's launch:* entries).
+
+  Verdict semantics for THIS position: PROCEED authorizes execution. Use
+  anything else ONLY for a genuine stop-condition: the plan/bead is not
+  actually pre-converged (bypass elements missing), a still-in-force ESCALATE
+  condition fires (security/PII, hard-to-reverse, cross-team), or the artifact
+  contradicts a ratified decision. Do NOT return ITERATE for polish: there is
+  no converge loop behind this gate to iterate into.
+
+  <converged node plan: the bead description + evidence>
+
+  Return your standard output contract (DECISION/VERDICT + GATES block +
+  CALIBRATION on PROCEED)."
+)
+```
+
+**Unattended verdict contract (branching)**: PROCEED continues to Phase 5.
+ANY other verdict = node failure: write the event, then halt loudly per
+durable-state.md "Unattended decision-point policy" (PushNotification + bead
+comment + stop). Never loop into bypass-skipped phases; never surface
+ESCALATE-QUESTIONS to a user who is not there (fold the questions into the
+halt report instead).
+
+**Stage event write**:
+
+```bash
+# via = agent | 3.6-evidence | human (the default path writes human)
+bd update "$LAUNCH_BEAD_ID" --append-notes \
+  "[LAUNCH_STAGE stage=approval status=$STATUS via=$VIA ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)]"
+```
+
+Cold-start rule: Phase 5 must never start without a
+`stage=approval status=proceed` event in the log; a resumed session that finds
+execution artifacts but no approval event halts loudly (this is the durable
+equivalent of the human hard-stop).
 
 ## Iteration Log Format
 

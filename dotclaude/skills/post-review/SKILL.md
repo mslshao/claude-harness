@@ -127,18 +127,30 @@ For each comment, record:
 **Flagged comments**: present to the user with the actual line content AND the reason so
 they can decide whether to adjust the line number, drop the comment, move it to the review
 body, or post as-is. Do not silently drop them. `NOT_IN_HUNK` comments in particular should
-prompt the user to either pick a nearby in-hunk line, fold the comment into the review body
-as a file:line bullet, or drop it.
+prompt the user to pick a nearby in-hunk line FIRST (preferred: the finding keeps a
+resolvable thread, and the comment text can self-locate the real line), falling back to a
+review-body file:line bullet only when no in-hunk line relates to the finding, and to a
+drop last.
 
 **Clean comments**: include in the preview without annotation.
+
+**Body-prose line-reference check**: the Draft Review Summary body often points at
+inline comments by line ("see inline on line N", "lines N and M"). Step 2 may adjust an
+inline anchor (off-by-one against actual file content), but that adjustment does NOT
+propagate to the body prose, and post-review otherwise never re-checks body line numbers.
+After finalizing the verified inline anchors, scan the extracted body for `line \d+` /
+`lines \d+ and \d+` references and confirm each matches a posted inline's verified line;
+flag any mismatch in the Step 2.6 preview ("body says line 43; inline posts on 44, update
+body?") so the prose is corrected before posting. Observed on PR #10836: pr-intel wrote
+"lines 29 and 43" while the second inline resolved to line 44.
 
 ## Step 2.5: Attribution Check
 
 **Skip for --quick mode** (no inline comments). Runs in default mode before the preview.
 
 Every inline comment pr-intel emits is tool-discovered: it passed through a specialist
-agent or an orchestrator pattern check, not Michael's unaided reading. Per the engineering lead's
-2026-05-26 ask (review-voice.md T5 / reviewer-discipline.md T5), each posted inline
+agent or an orchestrator pattern check, not Michael's unaided reading. Per the
+engineering lead's 2026-05-26 ask (review-voice.md T5 / reviewer-discipline.md T5), each posted inline
 comment MUST open with an explicit attribution lede, never in Michael's first-person
 voice, and the attribution is the lede, not parenthetical. The review SUMMARY body is
 exempt (it is allowed to be in reviewer voice).
@@ -171,7 +183,13 @@ which also runs the @-mention guard (no `@person` in any posted body; only `@cla
   path the Bash hook cannot see (e.g. a Python subprocess calling `gh ... --input <file>`).
 
 The review summary, reactions, and replies endpoints are exempt. Both hooks are the backstop;
-do not rely on the prose instruction alone. **Convention:** write review payload JSON via the
+do not rely on the prose instruction alone.
+
+**Run the check yourself before the preview**, against the payload file rather than
+per-comment strings: `python3 ~/.claude/scratch/scripts/check-review-attribution.py
+<payload.json>`. It calls the same `evaluate()` both hooks call, so a pass here means the
+post will not be blocked. Do NOT `cd` into `hooks/lib` to import the module ad hoc; the
+Bash cwd persists and the next `gh`/`git` call fails. **Convention:** write review payload JSON via the
 Write tool (not an in-script `json.dump`), so the backup hook sees it; a payload both built and
 posted entirely inside one subprocess is invisible to both hooks. See
 `bd memories correction:skill:post-review-attribution-enforcement`.
@@ -200,7 +218,7 @@ Present the verified data for confirmation before any API call. Render as regula
 
 **⚠ Line number warnings** (review before posting):
 - Comment N (`file.py:42`, BLANK/SUSPICIOUS): line content is `<actual content>` - adjust line number, drop, or post as-is?
-- Comment N (`file.py:213`, NOT_IN_HUNK): line exists at HEAD but is outside the PR's diff hunks. GitHub will 422 this. Options: pick an in-hunk line nearby, move to the review body as a file:line bullet, or drop.
+- Comment N (`file.py:213`, NOT_IN_HUNK): line exists at HEAD but is outside the PR's diff hunks. GitHub will 422 this. Options in preference order: re-anchor to the nearest in-hunk line and let the comment text name the real line, else fold into the review body as a file:line bullet, else drop.
 
 Reply with:
 - **approve** / **comment** / **request-changes** to post the review with that event type as-is (must match the displayed event, or pass a different one to override)
@@ -210,6 +228,17 @@ Reply with:
 - **edit: [new summary text]** to replace the review summary before posting
 
 The verb-named confirmation (`approve` / `comment` / `request-changes`) is required because a posted review is a cross-system write visible to the PR author and reviewers. Generic acknowledgments ("yes", "go", "ok") are ambiguous to the auto-mode classifier and will be blocked on first attempt; the verb names what's being authorized. See CLAUDE.md "Destructive-op confirmation: name the verb."
+
+**Verb named in the invocation (`/post-review comment|approve|request-changes`).**
+When the invocation already carries the event verb, that verb IS the confirmation
+(CLAUDE.md "Don't re-confirm within a directive's scope"; asking for the verb again
+after the user typed it is a disguised re-confirm). Render the preview for
+transparency so the user sees the exact draft, but do NOT wait for a second verb
+reply: post once Step 2 (line verification) and Step 2.5 (attribution) pass clean.
+The safety catch still holds: if line verification raises BLANK / SUSPICIOUS /
+NOT_IN_HUNK, or attribution fails, STOP and surface the preview for adjudication
+before posting, regardless of the named verb. A bare `/post-review` (no verb) always
+shows the preview and waits.
 
 ---
 
@@ -249,9 +278,11 @@ TWO-STEP sequence (never a stdin heredoc; heredocs trip the destructive-command
 and vocab scans and bypass the attribution hook's payload validation):
 
 1. Write the payload with the Write tool to
-   `/home/vscode/.claude/scratch/<pr_number>-review-<YYYY-MM-DD>.json` (on a
-   same-day second round the file collides again; the Write read-before-write
-   guard is the safety net there, Read then overwrite):
+   `/home/vscode/.claude/scratch/<pr_number>-review-<YYYY-MM-DD>.json`. On a
+   same-day second round, append `-N` (`<pr>-review-<date>-2.json`) to match the
+   Step 5 memory-key scheme rather than overwriting: each round is a distinct
+   artifact, and the prior payload is the only local record of exactly what was
+   posted. The Write read-before-write guard is the backstop if you reuse the path:
 ```json
 {
   "body": "<review summary>",
@@ -418,10 +449,24 @@ After Step 5, also write the review state to the `pr-review` DynamoDB table
 Slack bot, future review tooling) see this round. Best-effort: gate on
 `aws sts get-caller-identity --profile dev` (skip with a logged note if SSO is
 inactive), then write a `Review` record (one `ProposedComment` per posted
-inline) via `pr_review_state.write_review` using
-`AWS_PROFILE=dev AWS_DEFAULT_REGION=us-east-1 uv run --with boto3 --with 'pydantic>=2'`.
-On write failure, log and continue; the GitHub post (Step 3) is authoritative
-and the beads memory (Step 5) is the durable record. For the full heredoc, the
+inline) by calling the existing script, NOT by hand-writing the record:
+
+```bash
+AWS_PROFILE=dev AWS_DEFAULT_REGION=us-east-1 uv run --with boto3 --with 'pydantic>=2' \
+  python3 ~/.claude/scratch/scripts/pr_review_ddb_writeback.py <params.json>
+```
+
+`params.json`: `{"repo", "pr", "timestamp", "head_sha", "title", "author", "size",
+"briefing_path", "comments": [{"id", "path", "line", "body"}]}` (omit `comments` for a
+body-only review). On write failure, log and continue; the GitHub post (Step 3) is
+authoritative and the beads memory (Step 5) is the durable record.
+
+Hand-constructing `Review(...)` inline is the recurring failure mode here: the field
+names are not what an agent guesses (`pr`, not `pr_number`; `briefing_md` is REQUIRED
+with no default), so the guessed call dies on a pydantic `ValidationError` and costs a
+re-draft. Six occurrences as of 2026-08-06, the last one in a session where the sub-file
+already carried this warning but Step 6 did not surface the script name. For the inline
+form (only when the script does not expose a field you need), the
 `ProposedComment.id` str-wrap type note, and placeholder population, see
 [dynamodb-writeback.md](dynamodb-writeback.md).
 

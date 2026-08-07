@@ -20,7 +20,7 @@ After specialist results return, synthesize into the final briefing.
    on 2026-05-20, is canonical: 'TypeAdapter(Trigger) version-dependent on
    Pydantic' was reworded to 'Pydantic 2.4+ follows __value__ for
    TypeAdapter, worth a smoke check' and posted as a fresh top-level inline,
-   surfacing the engineering lead feedback 'you posted the same comment with different
+   surfacing engineering-lead feedback 'you posted the same comment with different
    wording twice in 2 separate threads on the same line'). The rule:
    - If the new finding restates the prior comment with no new context: drop
      the finding entirely (do NOT post a second top-level inline on the same
@@ -69,7 +69,7 @@ After specialist results return, synthesize into the final briefing.
      the same code post-update: **keep it** as a fresh assessment.
 3. **Resolve disagreements** - surface both perspectives, don't silently pick sides
 4. **Categorize by GitHub surface** - specific file+function = inline comment; architectural = review summary
-4b. **CI-catchable filter** (the engineering lead 2026-05-26 mx2-eng fortnightly: "find things that the linter's gonna catch anyway, or SonarCloud's gonna catch anyway, and then it's like, it's not really worth commenting on, necessarily"): for each finding heading to an inline comment, check whether merged-CI tooling will catch the same issue on the same diff lines. If yes, drop the inline emission entirely and demote to a single-bullet acknowledgment in the Draft Review Summary "Smaller notes" subsection (referencing the CI check by name). The author will see the CI failure with the canonical message; an inline comment that restates it is duplication.
+4b. **CI-catchable filter** (the engineering lead, 2026-05-26 mx2-eng fortnightly: "find things that the linter's gonna catch anyway, or SonarCloud's gonna catch anyway, and then it's like, it's not really worth commenting on, necessarily"): for each finding heading to an inline comment, check whether merged-CI tooling will catch the same issue on the same diff lines. If yes, drop the inline emission entirely and demote to a single-bullet acknowledgment in the Draft Review Summary "Smaller notes" subsection (referencing the CI check by name). The author will see the CI failure with the canonical message; an inline comment that restates it is duplication.
 
    Catchable patterns (drop the inline, demote to summary if useful):
    - **Ruff**: any finding that maps to a Ruff rule code (E, F, W, I, N, UP, B, SIM, PL, etc.). Ruff runs in `pants tlc` and CI.
@@ -135,7 +135,7 @@ After specialist results return, synthesize into the final briefing.
       despite substantive local analysis.
 
     The compression target: design-judgment findings default to ≤ 25 words and
-    ≤ 2 sentences (calibrated 2026-05-13 against the the engineering lead corpus ceiling),
+    ≤ 2 sentences (calibrated 2026-05-13 against the engineering lead's corpus ceiling),
     often a bare question. Defect-class BLOCKING and design-judgment findings
     that require a named alternative are the only legitimate paths to longer
     comments. When even those don't fit, the finding renders as a longer direct inline
@@ -283,15 +283,23 @@ provenance-classification.md):
       mechanical edit pattern repeated across files + the PR description
       does NOT describe the methodology (script, rule, or command applied).
       Reviewer cannot spot-check without the methodology statement.
+    - **Capability duplication**: the orchestrator Active Reuse-Search
+      (dispatch.md) or any specialist names an existing endpoint, service,
+      or shared-library symbol that already owns a capability the diff
+      adds. The strongest send-back class there is: refining a duplicate
+      wastes the entire downstream review. Sourced from `architecture.md`
+      Reuse Across Boundaries, not from the engineering lead's guide. The backing inline
+      comment must carry the incumbent `file:line` AND the literal search
+      terms tried (output-formats.md Draft Inline Comments).
 
     Add `front_door: true` as an attribute on the finding object; preserve
     its severity (BLOCKING/DISCUSSION/MINOR) separately. The two tags are
     orthogonal: a type smell can be FRONT-DOOR + DISCUSSION (cheap to fix,
     but ripples), a security finding is NOT-FRONT-DOOR + BLOCKING (just
     fix inline). Boolean-param smells, pragma misuse, and exception-design
-    smells are NOT Front Door; they're iterate-inline findings. the engineering lead
-    explicitly puts the "send back quickly" framing on description (#1)
-    and types (#2); the rest are inline-iterate.
+    smells are NOT Front Door; they're iterate-inline findings. The
+    engineering lead explicitly puts the "send back quickly" framing on
+    description (#1) and types (#2); the rest are inline-iterate.
 
     Description-quality issues do not flow through this step because Phase 0
     short-circuits before specialist dispatch. If Phase 0 passed and Front
@@ -334,7 +342,7 @@ provenance-classification.md):
     PR #11 of the day) lets stupid findings ship under his name. If the output
     exceeds his own review-capacity at posting time, it cannot serve the trust
     signal it was built for. The 5-decision ceiling is calibrated against the
-    the engineering lead corpus pattern (median ~3 substantive comments per PR with headroom
+    engineering lead's corpus pattern (median ~3 substantive comments per PR with headroom
     for AC + design surfaces) and against working-memory limits.
 
     The gate fires AFTER provenance classification (step 5d) so compression
@@ -462,7 +470,7 @@ trust the diff.
    string literals matching base64 patterns (≥ 16 chars, `^[A-Za-z0-9+/]+=*$`),
    numeric constants without a named identifier, or unexplained env-var defaults,
    emit a "where does this come from?" finding with VERIFIED + DISCUSSION severity.
-   the engineering lead's two highest-leverage moves on PR #8931 were both provenance questions
+   The engineering lead's two highest-leverage moves on PR #8931 were both provenance questions
    on opaque base64 IDs (`arize_space_id = "U3BhY2U6..."`, prompt_ids in
    `prompt_client.py`). This is mechanical to detect and the highest-frequency
    missing question in pr-intel output today. The draft comment shape: "where does
@@ -484,7 +492,7 @@ review pattern (see decision bead `docr-59ev` item 8).
 For each `bot-review` finding, build the link as:
 
 ```
-[Fix this →](https://claude.ai/code?q=<URI_ENCODED_INSTRUCTIONS>&repo=lawfirm/main)
+[Fix this →](https://claude.ai/code?q=<URI_ENCODED_INSTRUCTIONS>&repo=<company>/docr)
 ```
 
 `<URI_ENCODED_INSTRUCTIONS>` is the URL-encoded form of a self-contained instruction
@@ -707,6 +715,25 @@ treat as cover. The cost of running specialists when an existing approval was
 genuine is small; the cost of skipping them when the approval was rubber-stamp is
 the failure this gate prevents.
 
+### Peer-Reviewer Findings Baseline (delta re-review)
+
+When a non-mslshao reviewer has already posted a SUBSTANTIVE findings list on the PR
+(an inline-comment set, or a review-body findings list, especially an automated
+multi-agent / "@claude-fix-round" review), treat it as a dedup-AND-verify baseline,
+not merely a dedup source. On a PR the author has since iterated, the highest-value
+output is the DELTA: for each of the peer's findings, verify against CURRENT HEAD
+whether it is fixed or still-live (read the code, reproduce if cheap), and make that
+fixed-vs-still-open split the spine of the review. Re-deriving from scratch buries the
+one signal that matters (which already-flagged items the author's fixes actually
+resolved). A peer finding still-live after an explicit fix round is a strong
+Comment/Request-Changes signal; a now-resolved one gets no re-raise (same moot gate as
+bot-reactions.md). Spend fresh specialist dispatch on the angles the peer's pass did
+NOT cover. Distinct from the Third-Party Approval Quality Gate above (that governs
+whether a peer APPROVAL defers analysis; this governs how a peer's FINDINGS feed the
+delta). Grounded: PR #10807 (2026-07-23) - vin's automated-workflow findings list had
+been through an @claude fix round; the review's value was verifying still-live-at-HEAD
+(find_superseded soundness bug still-live; routes AttributeError fixed).
+
 ### Recommendation Table (re-review or second round)
 
 | Finding type | Consequence | Recommendation effect |
@@ -720,12 +747,13 @@ the failure this gate prevents.
 
 When multiple findings exist, the most restrictive recommendation wins.
 
-**Front Door rationale.** A FRONT-DOOR finding (type/model smell or
-large-refactor methodology gap; see step 7b) is not always a runtime defect,
+**Front Door rationale.** A FRONT-DOOR finding (type/model smell,
+large-refactor methodology gap, or capability duplication; see step 7b) is
+not always a runtime defect,
 but downstream review effort depends on it being right. Approving with
 inline comments invites the author to address the type smell in the same
 round as 5 other comments on code that may itself need re-shaping once the
-type is fixed. the engineering lead's framing: "send them back, and quickly." The
+type is fixed. The engineering lead's framing: "send them back, and quickly." The
 recommendation lands at Comment with the Draft Review Summary opening
 "the priority for this round is X; let's iterate on that before deeper
 review." BLOCKING + FRONT-DOOR still resolves to Request Changes (BLOCKING
@@ -829,6 +857,29 @@ Patterns to detect:
    reviewer expect more scrutiny than the label suggests?" Detected by scanning
    PR body and title for self-assessment claims and cross-checking against
    changed files and behavioral scope.
+
+9. **Goal-fit and mechanism necessity (does this need to exist at all?).** Anchor
+   on the PR's stated goal (the "why" in the description or ticket), then ask the two
+   questions the how-well-built lenses skip: (a) does the implementation actually
+   achieve that goal, or only a narrower or adjacent slice of it? (b) is there a
+   materially simpler path to the same goal that the deployment platform, runtime,
+   framework, or an existing service ALREADY provides, so part of this diff is
+   redundant? Before evaluating HOW a newly added mechanism is built (a custom client,
+   helper, metric-submission path, table, queue, or abstraction), confirm the
+   capability is not already provided for free by the Lambda layer/extension or a
+   sidecar, the framework, a managed service, or a published boundary. Signal: "this
+   PR builds mechanism X to achieve goal G, but the platform already provides Y that
+   achieves G, so X may not need to exist." Reviewer question: "does this need to exist
+   at all, given what the platform already does?" This is the highest-leverage surface:
+   a review that only checks whether a mechanism is well-built will approve a mechanism
+   that should not exist, and the how-it-is-built debate (this import vs a shared
+   package) is wasted effort when the answer is delete it. Detected by reading the PR's
+   goal, then checking the runtime and platform primitives (the Lambda extension env
+   vars, framework features, existing service endpoints) against every net-new mechanism
+   the diff introduces. (2026-07-23, PR #10911: a folio Lambda submitted a custom
+   Datadog gauge through an HTTP client imported cross-service from sf_sync, when the
+   Datadog Lambda extension already forwarded the service's structured logs; the review
+   debated how to import the client, never whether the metric path was needed.)
 
 Present these in the output as "Design Review Surfaces" - explicitly framed as
 places where the reviewer's domain knowledge and judgment matter most. These are

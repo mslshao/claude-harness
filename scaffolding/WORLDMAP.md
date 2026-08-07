@@ -2,7 +2,7 @@
 component: scaffolding
 type: directory-map
 status: V0 complete (all 7 scaffolding docs have entries)
-authored_by: Claude Opus 4.7
+authored_by: Claude Opus 5
 ---
 
 # WORLDMAP: Scaffolding

@@ -38,8 +38,9 @@ Author Preamble: "CI has not run yet. Flag everything: style, types, lint, namin
 and design issues. The goal is to pre-empt CI failures and catch design problems early."
 
 Reviewer Preamble: "CI has passed (pylint, mypy, flake8, bandit, yapf, isort,
-autoflake, SonarCloud, Datadog, Copilot). Focus on design judgment that automated
-tools cannot catch."
+autoflake, SonarCloud, Datadog, Copilot). Weight your attention toward design judgment
+that automated tools cannot catch, but report every real finding: tag a lint-level one
+`CI-catchable: <tool>` rather than withholding it, and I will filter in synthesis."
 
 ## When You're Invoked
 

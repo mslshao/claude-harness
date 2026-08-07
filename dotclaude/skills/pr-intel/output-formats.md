@@ -16,6 +16,8 @@ Adds: +N | Removes: -N | Files: N [if stale files: "(M net-new, K already on mai
 [if checks pending with no failures: "CI: N check(s) still running"]
 [if prior reviews exist: "Revision: rev <current_commits> (delta +N commits since last review on <date>)"]
 [if third-party reviews exist on the PR: "Existing reviews: <EVENT> by `<handle>`<, ...> [(treated as non-signal: <reason>)]". The non-signal annotation is required when the Third-Party Approval Quality Gate in synthesis.md fails for that approval. Required when any third-party review is APPROVED; omit only when no third-party reviews exist.]
+[always, when specialists were in scope: "Specialists: <dispatched, comma-separated> | skipped: <name (one-word reason)>". Enumerate the FULL triggered roster from dispatch.md against the computed Dispatch Signals, not just the ones that ran; a triggered specialist that did not run must appear under `skipped:` with its reason (dispatch.md requires this for `module-cohesion-reviewer` explicitly). Writing the roster out is the attention floor: a silently-skipped lens is invisible otherwise, and the reuse/coupling lens in particular has no other surface (PR #10807, 2026-07-24: `module-cohesion-reviewer` was skipped on a 91-file Python PR and the reuse findings surfaced only when the reviewer asked for them directly).]
+[always in default/`--once`/`--mine` modes: "reuse-search: <state>", one of `searched <terms>, no existing owner found` (the literal terms are mandatory; a search whose terms are not stated is indistinguishable from one that never ran), `N candidate owner(s) (see Front Door)`, or `skipped (no new capability in diff)`. Computed from the `adds_capability` Dispatch Signal at every size; at XS/S, where no specialist roster renders, this line is the reuse lens's only surface.]
 
 ### Prior Reviews
 [Present ONLY when `bd memories pr-<N>` returned one or more `review:pr-<N>:*`
@@ -52,18 +54,22 @@ sequenceDiagram
 
 ### Front Door
 [Present ONLY when at least one finding from synthesis step 7b is tagged
-`front_door: true` (type/model smell, large-refactor methodology gap). Omit
+`front_door: true` (type/model smell, large-refactor methodology gap,
+capability duplication). Omit
 entirely when empty. Position: above Review Recommendation so the reviewer
 sees it before the verdict header.]
 
 The priority for this round is fixing the items below before iterating on
 the rest. Type/model decisions ripple downstream; a large-refactor PR
-without a methodology statement cannot be spot-checked. the engineering lead's framing:
+without a methodology statement cannot be spot-checked; a change that
+reimplements what an incumbent already owns wastes every downstream review
+round. The engineering lead's framing:
 send back quickly. The Draft Review Summary opens with this framing.
 
 | Class | Anchor | One-line summary |
 |---|---|---|
 | types / methodology | `file:line` OR `PR description` | <what's wrong, what to do instead> |
+| reuse | `<incumbent file:line>` | <what the incumbent already owns; searched: <terms>> |
 
 [Each row preserves the underlying severity in the briefing context for the
 inline comment that backs it (BLOCKING / DISCUSSION / MINOR), but the Front
@@ -147,7 +153,7 @@ are resolved or from the author, note "All design comments resolved."]
 
 **One-home rule (body, inline, and outer prose).** Every finding has exactly ONE home: its inline comment, or the Draft Review Summary when it has no inline. The Review Recommendation header, the Verdict, the Scope, and any outer briefing prose reference a finding by line number; they never re-narrate its substance or its verification rationale. If a finding renders inline, the body's reference to it is a pointer ("see inline on line 37"), not a paraphrase. The 9304 anti-pattern (2026-05-21) is canonical: the `sqlworkbench:ListDatabases` question rendered substantively in BOTH the body's numbered list AND inline:37 with ~80% prose overlap. Both venues contained the same hedge ("Either way it's harmless") and the same evidence (the `RedshiftDataApi` statement reference). Body must compress to a pointer in this case, not duplicate. The pre-emit check at synthesis time (enforced as synthesis.md step 11b, the body-inline dedup pass): for each body sentence, ask "does an inline comment share both this core claim AND its anchor?" If yes, replace it with `see inline on line N` or drop it. See `bd memories calibration:pr-intel-voice-body-inline-duplication-2026-05-21`.
 
-**No process meta-narration in the body.** The Draft Review Summary carries the assessment and pointers to findings, never narration of the review process itself. Three recurring noise classes to strip before emitting: (1) do not reference a bot comment in the body AT ALL: not its substance, not that you agree, not that you reacted ("reacted 👍", "confirming the bot's flags are accurate", "Copilot's note is fair, thumbs-up'd rather than repeat it"). The Bot Reactions phase is the entire signal: a `+1`/`-1` says "the bot was right/wrong" without spending a word of body prose, and the author already sees the bot's own comment. If a bot finding genuinely warrants more than a reaction, that is an inline comment carrying NEW analysis, never a body paraphrase. (2) Do not include "Reviewed for X / no concerns identified" positive-confirmation prose UNLESS `mx2-security-auditor` was actually dispatched (the sole sanctioned exception, SKILL.md Section Conditionality); a non-security specialist (devops, style, etc.) returning clean is not summary-worthy and reads as unactionable filler. (3) Do not narrate CI or quality-gate status in the body or Scope: not "CI is green", not the description-check failures, not the Require-Reviewers / approval gate, not "merge unblocks on approval", and not the SonarCloud (or any quality-gate) pass/fail, INCLUDING a "the gate is red but it's pre-existing / misattributed / not yours to fix" clarification. The author sees the checks tab; passing or pending CI is not review signal, the approval gate is mechanical, and explaining away a red gate is still gate narration, not a finding. A static-analyzer issue earns body or inline space ONLY when it lands on a changed line AND is independently actionable (then it routes as a normal finding via the Static Analyzer Pre-Check, attributed to the tool); a gate failure driven by pre-existing or line-shifted issues outside the diff gets NO mention at all. The only CI mention is the terse header line, and only for PR-specific failures (see the header template). Classes (1) and (2) were stripped by the user on PR #9885 (2026-06-15); class (3) plus the sharpened (1) on PRs #9993/#9996 (2026-06-18); the gate-misattribution sub-case on PR #9979 (2026-06-18), where a correct "the red SonarCloud gate is pre-existing, not yours" paragraph was still cut as noise (the author has eyes on the gate).
+**No process meta-narration in the body.** The Draft Review Summary carries the assessment and pointers to findings, never narration of the review process itself. Four recurring noise classes to strip before emitting: (1) do not reference a bot comment in the body AT ALL: not its substance, not that you agree, not that you reacted ("reacted 👍", "confirming the bot's flags are accurate", "Copilot's note is fair, thumbs-up'd rather than repeat it"). The Bot Reactions phase is the entire signal: a `+1`/`-1` says "the bot was right/wrong" without spending a word of body prose, and the author already sees the bot's own comment. If a bot finding genuinely warrants more than a reaction, that is an inline comment carrying NEW analysis, never a body paraphrase. (2) Do not include "Reviewed for X / no concerns identified" positive-confirmation prose UNLESS `mx2-security-auditor` was actually dispatched (the sole sanctioned exception, SKILL.md Section Conditionality); a non-security specialist (devops, style, etc.) returning clean is not summary-worthy and reads as unactionable filler. (3) Do not narrate CI or quality-gate status in the body or Scope: not "CI is green", not the description-check failures, not the Require-Reviewers / approval gate, not "merge unblocks on approval", and not the SonarCloud (or any quality-gate) pass/fail, INCLUDING a "the gate is red but it's pre-existing / misattributed / not yours to fix" clarification. The author sees the checks tab; passing or pending CI is not review signal, the approval gate is mechanical, and explaining away a red gate is still gate narration, not a finding. A static-analyzer issue earns body or inline space ONLY when it lands on a changed line AND is independently actionable (then it routes as a normal finding via the Static Analyzer Pre-Check, attributed to the tool); a gate failure driven by pre-existing or line-shifted issues outside the diff gets NO mention at all. The only CI mention is the terse header line, and only for PR-specific failures (see the header template). (4) On a continuation or sibling-PR review (a slice of the same stack, a re-review, or one of a set of related PRs), do NOT restate the prior review's shared findings: reference the prior review in ONE clause ("same base/resolve blockers as #10633; see that review") and spend body prose ONLY on what is NEW to this PR. A "Recurring from #X" block that re-explains blockers the author already has on a sibling PR is noise; the author read the other review. Classes (1) and (2) were stripped by the user on PR #9885 (2026-06-15); class (3) plus the sharpened (1) on PRs #9993/#9996 (2026-06-18); the gate-misattribution sub-case on PR #9979 (2026-06-18), where a correct "the red SonarCloud gate is pre-existing, not yours" paragraph was still cut as noise (the author has eyes on the gate); class (4) on PR #10634 (2026-07-17), where a "Recurring from #10633" block restating the sibling slice's blockers was cut as noise.
 
 ---
 
@@ -158,7 +164,7 @@ to paste on the PR. The reviewer can copy them verbatim or edit before posting.
 
 **Comment budget**: Scale to the number of real findings, not to a fixed cap. Zero is a legitimate count: a 2XL infra PR with nothing to flag should get an approval with no inline comments, not padded findings to meet a typical-range floor (empirical case: PR #9022, 696-line Redshift Serverless PR approved with zero inline comments by a high-trust reviewer). Typical range when findings exist: 2-3 for a clean PR with minor observations, 5-8 for one with real issues, 10-15 for a large PR with multiple discussion-class concerns. Beyond 15, consolidate related findings into the review summary or use cross-references to point multiple sites at the same canonical thread (P13 in reviewer-discipline.md). BLOCKING findings always get a comment regardless of count. When trimming, drop MINOR findings first. When in doubt, drop the comment: a PR with two precise questions is more useful than one with eight padded observations.
 
-**Structural variation**: Not every comment needs the same shape. Mix these forms (examples lifted from the the engineering lead corpus across PRs #8931, #8741, #8066):
+**Structural variation**: Not every comment needs the same shape. Mix these forms (examples lifted from the engineering lead's corpus across PRs #8931, #8741, #8066):
 - Bare question: "where does this come from?", "why?", "intentional?", "must they be?"
 - Short observation: "this silently drops the error context from the original exception."
 - Suggestion with concrete anchor: "consider extracting a `create_worker` function in another module."
@@ -168,7 +174,7 @@ to paste on the PR. The reviewer can copy them verbatim or edit before posting.
 
 Avoid uniform [SEVERITY] / title / code quote / explanation structure on every comment. Use severity tags in the briefing context (for the reviewer) but omit them from the pasteable text (for the PR author). A human reviewer does not prefix comments with [BLOCKING].
 
-**Tool-source attribution rule** (the engineering lead 2026-05-26 mx2-eng fortnightly: tool-discovered findings must be posted as the tool, not as Michael):
+**Tool-source attribution rule** (the engineering lead, 2026-05-26 mx2-eng fortnightly: tool-discovered findings must be posted as the tool, not as Michael):
 
 Every finding emitted by pr-intel passed through a specialist agent or an orchestrator pattern check; none of them came from Michael's unaided reading. Treat ALL of them as bot-discovered for voice purposes. Open each draft inline comment with an explicit attribution prefix naming the source. Examples:
 
@@ -178,7 +184,10 @@ Every finding emitted by pr-intel passed through a specialist agent or an orches
 - SonarCloud: "SonarCloud flagged this as `python:S<code>`: ..."
 - bot-review: "Cross-file consumers of this symbol assume X (`<consumer file:line>`); this change weakens that invariant: ..."
 - Orchestrator pattern check (Pre-Synthesis Analysis Patterns 1-6 in synthesis.md): "Pattern check flagged a frozen-Pydantic mutation here: ..." / "Opaque constant detected: where does this come from?"
+- Orchestrator reuse-search (Active Reuse-Search in dispatch.md): "An automated reuse-search check flagged that `<incumbent module.symbol>` (`<file:line>`) already owns this capability (searched: `<terms>`); worth calling it instead of reimplementing?" The incumbent `file:line` and the literal search terms are mandatory in the body; keep the whole comment inside the 2-3 sentence ceiling.
 - Multi-specialist convergence: when two specialists flag the same finding, still lead with ONE specialist and note the other mid-sentence (e.g. "My `agent-a` specialist flagged this, and `agent-b` independently agreed: ..."). The attribution hook (`check_review_attribution.py`) matches the singular "My `<agent>` specialist <verb>" shape; a plural "My `a` and `b` specialists both flagged ..." lede fails the matcher and blocks the post at write time (observed 2026-06-24, PR #9664).
+
+**For a tool-name lede, the tool name must be the FIRST token, with no leading article.** `check_review_attribution.py` anchors its openers at position 0 (only markup and severity words such as `Nit:` are stripped first), and the bot-name openers carry no optional article, so `A Datadog check surfaced ...` and `A SonarCloud rule flagged ...` are BLOCKED while `Datadog log analysis surfaced ...` and `SonarCloud flagged ...` pass. The `automated` opener is the exception: its pattern allows a leading `a`/`an`, so `An automated code-review pass flagged ...` passes. Verified against `is_attributed()` on 2026-07-24 after #10973, where a valid `datadog ... surfaced` lede was rejected solely for the leading `A `, costing a blocked Write plus a re-draft at post time.
 
 The attribution prefix is the lede; the finding follows. A human reading the posted PR can tell at a glance that a tool surfaced the finding rather than Michael's unaided reading, which is the trust signal the engineering lead asked for. The reverse failure (an automation-discovered finding posted in Michael's voice with no signal that a tool fed it) is the exact pattern the engineering lead called out by name at the 2026-05-26 fortnightly.
 
@@ -186,7 +195,7 @@ The speed-amplified vs bot-surfaced provenance classification (synthesis.md step
 
 The only voice exception: comments Michael personally writes during his editing pass (after pr-intel output is rendered but before /post-review consumes it). Those stay in Michael's voice with no attribution prefix, because they ARE Michael's unaided judgment. Pr-intel itself does not emit them.
 
-This is structural enforcement of `review-voice.md` "Attribute tooling findings to tooling" and reviewer-discipline.md T5 (Transparent Tooling). Replaces the prior speed-amplified-no-attribution rule (which let bot findings ride under Michael's voice when the classifier judged them reachable from diff reading); the 2026-05-26 the engineering lead feedback surfaced that even those findings should be attributed because Michael didn't actually catch them himself, the tool did.
+This is structural enforcement of `review-voice.md` "Attribute tooling findings to tooling" and reviewer-discipline.md T5 (Transparent Tooling). Replaces the prior speed-amplified-no-attribution rule (which let bot findings ride under Michael's voice when the classifier judged them reachable from diff reading); the 2026-05-26 feedback from the engineering lead surfaced that even those findings should be attributed because Michael didn't actually catch them himself, the tool did.
 
 Format: file heading, then numbered comments. Each comment has a target line, a fenced block with the ready-to-paste text, and a briefing-context section the reviewer can read but does not post.
 
@@ -386,6 +395,16 @@ For --mine mode, deviations are framed as "fix before review" or "add rationale 
 [If a Cross-System Investigation trip-wire (synthesis.md) fired and the mirror column did not resolve, Verdict is "Needs work first" with the column-confirm item under Issues to Fix Before Review, not a posted bot question.]
 ```
 
+**Agent-handoff variant.** When the invocation says the feedback goes back to an
+implementing agent (a launch-implementer, executor, or "hand this back to the main
+agent") rather than to a human author, keep the same `--mine` sections but make the
+output self-contained for a fresh agent with no conversation context: state the
+definition-of-done, reference the worktree/branch if one exists, and phrase "Issues
+to Fix Before Review" as ordered, individually-actionable items, each with a file:line
+anchor and the verification command to confirm the fix. The agent cannot see this
+conversation; the handoff must stand alone. (PR #10669, 2026-07-17: `--mine` review
+requested "as a handoff back to the main implementing agent.")
+
 ## Mode: Quick Triage (`--quick`)
 
 ```
@@ -444,7 +463,11 @@ continuous line; let the reader's viewport wrap it.
 text this skill emits. Scope covers ALL output: the outer briefing prose (Service
 Context, Scope, Review Recommendation commentary, Verdict), the Draft Review
 Summary, the Draft Inline Comments, AND any free-form text between structural
-sections. Before writing each of these sections, scan the composed text for U+2014
+sections, AND every string echoed from an upstream system (the PR title in the H1
+header, quoted bot or author comment text, Jira summaries). Echoed strings are the
+one class self-review cannot catch, because the dash is not in prose you wrote;
+sanitize those at fetch time per SKILL.md's Data Gathering note.
+Before writing each of these sections, scan the composed text for U+2014
 and replace it. Before the final message goes out, do one final scan across the
 entire composed response. This is a required step, not a style preference.
 Four reported violations on record across sessions; the rule is not "resolved"
@@ -485,7 +508,7 @@ Before emitting any draft comment, attempt to compress to its question core. If 
 - (b) the comment carries a concrete code anchor or file reference,
 - (c) the finding is a defect-class BLOCKING (rule violation, runtime crash, security boundary, data loss). In that case the directive tone overrides compression.
 
-The diff line is half the comment; do not restate it. The the engineering lead corpus on PR #8741 includes a 1-word inline comment ("why?"). The table below accepts that shape; the compression step makes it the default for design-judgment findings.
+The diff line is half the comment; do not restate it. The engineering lead's corpus on PR #8741 includes a 1-word inline comment ("why?"). The table below accepts that shape; the compression step makes it the default for design-judgment findings.
 
 Strip Michael's verbosity tells during synthesis (see reviewer-discipline.md). The verbosity tells appear in BOTH inline comments AND the Draft Review Summary body; scan both venues for them before emitting.
 
@@ -509,9 +532,9 @@ Maps evidence + severity + class to default shape. Compression is the discipline
 | DIFF-VISIBLE | MINOR | any | Single-sentence question | Never |
 | QUESTION | any | any | Interrogative, ≤ 15 words | Never. If more is needed, downgrade evidence and route to summary |
 
-**Ceiling calibration**: word counts above are post-hoc empirical, not aspirational. The the engineering lead corpus median for design-judgment DISCUSSION is ~12 words; the corpus ceiling (when concrete anchors are present) lands around 25-30 words. Hard 15-word ceilings produce false over-ceiling flags on legitimate scaffolded comments and lead to either trim-too-far compression or apparent rule violations on perfectly fine comments. Calibrated 2026-05-13.
+**Ceiling calibration**: word counts above are post-hoc empirical, not aspirational. The engineering lead's corpus median for design-judgment DISCUSSION is ~12 words; the corpus ceiling (when concrete anchors are present) lands around 25-30 words. Hard 15-word ceilings produce false over-ceiling flags on legitimate scaffolded comments and lead to either trim-too-far compression or apparent rule violations on perfectly fine comments. Calibrated 2026-05-13.
 
-**Severity override** (T2 exception): When a clear rule violation is detected, use directive tone regardless of evidence level. Ground the directive: "(per our error-handling standards)", "don't use `@patch` - use monkeypatch or mockito per python-testing.md", etc. the engineering lead's only directive across 34 comments in 3 sample PRs was this exact shape.
+**Severity override** (T2 exception): When a clear rule violation is detected, use directive tone regardless of evidence level. Ground the directive: "(per our error-handling standards)", "don't use `@patch` - use monkeypatch or mockito per python-testing.md", etc. The engineering lead's only directive across 34 comments in 3 sample PRs was this exact shape.
 
 **Pattern deviation voice**: Code that works but doesn't match project patterns uses collaborative inquiry backed by a codebase reference: "We typically use X for Y (see `other_file.py:42`). Any reason not to follow that here?"
 

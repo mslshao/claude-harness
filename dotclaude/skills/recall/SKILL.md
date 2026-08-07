@@ -35,7 +35,7 @@ Do NOT trigger when:
 
 Extract from the user's prompt:
 - **Topic keywords**: free-text terms that might match bead titles, memory keys, topic file names.
-- **Named entities**: people (a teammate, a solo-team engineer, a team lead), projects (dyn2red, <service>, folio), tickets (MX2-N), beads (docr-XXXX).
+- **Named entities**: people (a teammate's first name, last name, or GitHub handle), projects (dyn2red, <service>, folio), tickets (MX2-N), beads (docr-XXXX).
 - **Time hints**: "yesterday", "last week", "earlier" suggest a time-narrowed window.
 
 If the query is too vague to extract seeds, ask ONE clarifying question; otherwise proceed with the best-guess seed.
@@ -50,14 +50,34 @@ Run these in parallel where independent. All return BFS-shape output (ID/path + 
    ```
    Returns: memory keys (matches + bridges + siblings + cousins), topic file paths.
 
+   **Split underscore- and hyphen-joined seeds into space-separated tokens before calling.**
+   The walker scores on whole word tokens, so an identifier-shaped seed silently returns
+   `(no neighbors)` even when the corpus holds a directly relevant memory. Measured 2026-08-06:
+   `require_full_window` returned nothing while `require full window` reached
+   `gotcha:datadog-new-monitor-registration-lag`, and `MX2-NNNNN` returned nothing while the
+   plain-word seeds in the same query worked. Pass BOTH forms when the seed is an identifier
+   (a terraform attribute, metric name, ticket key, function name, env var). This is the same
+   whole-token matching behaviour documented for `search_datadog_monitors` in
+   `memory/datadog-query-gotchas.md` Gotcha 9.
+
+   A genuine `(no neighbors)` is still possible and is not a failure: `clamp` returns nothing in
+   both forms because no memory keys on it. Treat an empty result as "not in the graph", not as
+   "the walker is broken", but only after trying the split form. Never let an empty walker result
+   stand as the answer on its own; steps 2 and 3 below are independent and regularly hit where
+   the walker misses (they did for every seed in the 2026-08-06 run).
+
 2. **Bead titles + descriptions**:
    ```bash
    bd search "<seed>" --status all 2>/dev/null | head -20
-   bd list --status all --json 2>/dev/null | jq -r '.[] | select((.description // "") | test("<seed>"; "i")) | "\(.id) \(.title)"' | head -20
+   bd list --status=all -n 100000 --json 2>/dev/null | jq -r '.[] | select((.description // "") | test("<seed>"; "i")) | "\(.id) \(.title)"' | head -20
    ```
    Two separate passes: `bd search` matches titles; the `bd list | jq` pass is
    a TRUE description search (do NOT use `bd search --desc-contains`, which
    ANDs with the title query and returns a strict subset of the title pass).
+   `-n 100000` is mandatory: `bd list` silently caps at 50 rows without it,
+   which made this pass a silent no-op against a ~1300-bead corpus
+   (root-caused 2026-08-06; two same-session empty results looked like
+   "no matches").
    `--status all` is mandatory on both: recall's purpose is finding work other
    sessions produced, which predominantly lives in CLOSED beads that bd
    excludes by default. There is no comment-search flag, so comments are not
@@ -77,7 +97,7 @@ Run these in parallel where independent. All return BFS-shape output (ID/path + 
 4. **Recent bead activity** (if time hint present): filter on bead updated
    timestamps (bead list JSON does not carry comment timestamps):
    ```bash
-   bd list --status all --json 2>/dev/null | jq -r '.[] | select(.updated_at >= "<window-start-ISO>") | "\(.updated_at) \(.id) \(.title)"' | sort -r | head -20
+   bd list --status=all -n 100000 --json 2>/dev/null | jq -r '.[] | select(.updated_at >= "<window-start-ISO>") | "\(.updated_at) \(.id) \(.title)"' | sort -r | head -20
    ```
 
 ### Phase 3: Merge and rank

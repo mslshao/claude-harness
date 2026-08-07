@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # install.sh: drop-in install of dotclaude/ into the user's ~/.claude/
 #
-# Symlinks dotclaude/{agents,skills,hooks}/* and dotclaude/CLAUDE.md into
+# Symlinks dotclaude/{agents,skills,hooks,commands}/* and dotclaude/CLAUDE.md into
 # the user's ~/.claude/ directory. Skips memory/ and scratch/ explicitly.
 # Backs up existing target files before symlinking.
 #
@@ -88,7 +88,7 @@ link_one() {
 
 # Link agents (skip _shared and calibration subdirs since they contain
 # multiple files; link the parent dirs as a whole).
-for top in agents skills hooks; do
+for top in agents skills hooks commands; do
   if [ -d "$DOTCLAUDE_SRC/$top" ]; then
     for item in "$DOTCLAUDE_SRC/$top"/*; do
       link_one "$item"

@@ -67,7 +67,19 @@ Show to user. Confirm or edit before creating.
 
 ### 4. Create
 
-Use `mcp__atlassian__createJiraIssue` with the cloudId. ADF format for `description`:
+Use `mcp__atlassian__createJiraIssue` with the cloudId.
+
+**`contentFormat: "adf"` is REQUIRED when `description` is an ADF object.**
+`createJiraIssue` and `editJiraIssue` default to `contentFormat: "markdown"`
+and reject an ADF object with `Invalid value for field "description":
+expected a markdown string when contentFormat is "markdown", got object`.
+Pass `contentFormat: "adf"` alongside the payload below, or pass plain
+markdown as a string instead. Note the asymmetry with `customfield_11220`,
+which must be an ADF object REGARDLESS of what `contentFormat` is set to
+(see `memory/jira.md` "Editing tickets"): the two fields follow different
+rules in the same call. (Verified 2026-08-06, MX2-NNNNN first attempt.)
+
+ADF format for `description`:
 
 ```json
 {
@@ -83,6 +95,7 @@ Use `mcp__atlassian__createJiraIssue` with the cloudId. ADF format for `descript
 **customfield_11220**:
 - Salesforce issue types (`Bug - Salesforce`, `Story - Salesforce`): mirror the attributed ADF doc from `description`
 - All other types (Task, Story, Bug): empty ADF doc `{ "type": "doc", "version": 1, "content": [] }`. Do not omit; Jira fills a verbose placeholder otherwise.
+- Placement on CREATE: `createJiraIssue` has no top-level customfield parameter; pass it INSIDE `additional_fields`, e.g. `additional_fields: {"customfield_11220": {"type":"doc","version":1,"content":[]}, ...}`. The `block-jira-blind-write` hook rejects any create whose payload lacks it entirely (observed 2026-07-22, MX2-NNNNN first attempt).
 
 Set `assignee_account_id` to current user's account ID.
 

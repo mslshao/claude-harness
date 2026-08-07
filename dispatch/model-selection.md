@@ -1,10 +1,12 @@
 # Model Selection
 
-When to use the strong model (Opus, in this author's setup) vs the smaller model (Sonnet). The pattern is captured more fully in `patterns/cost-via-delegation.md`; this file is the operational quick-reference for routing decisions.
+When to use the strong model (Claude Opus 5, in this author's setup) vs the smaller model (Claude Sonnet 5). The pattern is captured more fully in `patterns/cost-via-delegation.md`; this file is the operational quick-reference for routing decisions.
+
+The lineup this doc is written against, as of 2026-08: Opus 5 (flagship), Sonnet 5, Fable 5 (a sibling generation, see the availability section below), Haiku 4.5 (cheapest tier). The rules are written in tier terms rather than generation numbers, because the tiers outlive the numbers; which agent is pinned to which tier is a separate question, answered by the gate in `agent-tiers.md`.
 
 ## The default
 
-The main conversation uses the strongest available model.
+The main conversation uses the strong model, pinned explicitly in settings (`opus[1m]` here, the long-context variant) rather than left to track whatever the installed build happens to default to. Build defaults move without announcement, and a silent downgrade of the supervising conversation is the change you least want to discover after the fact.
 
 Cost optimization happens through delegation:
 
@@ -24,11 +26,15 @@ Net cost is lower than pure-strong-model, with strong-model-quality outcomes.
 
 When unsure: stay on the strong model. The asymmetry (wrong-Sonnet-call means wasted work plus a strong-model rescue) makes strong-model the correct default.
 
-## Surface-map nuance: a newer generation is not an ambient default
+## Availability nuance: a sibling generation is not an ambient default
 
-A newer model generation (Fable-class) can be available in some surfaces (CLI, web) but blocked in others. In this setup it is blocked in the IDE/editor surface because that model's terms require data retention while the org runs zero-data-retention (ZDR); the strong default model carries no such requirement. So where the newer model is allowed, it is an explicit per-session opt-in, not something the harness reaches for automatically.
+Claude Fable 5 is a sibling of the flagship (a different point on the cost, latency, and behavior curve, not a strict upgrade), and its availability in this setup moved through three states in about five weeks:
 
-Keep the strong model as the deliberate default. The portable lesson: model availability is surface-conditional and policy-conditional, not just capability-conditional. "Newer and more capable" does not make a model the right default if the surface you are in cannot run it under your org's data policy. Confirm the surface and the policy before reaching for a newer generation.
+1. Allowed in the CLI and web surfaces, blocked in the IDE/editor surface, on the stated grounds that the model's terms require data retention while the org was believed to run zero data retention (ZDR). The strong default model carries no such requirement.
+2. Disabled org-wide, then found to rest on a mistaken premise: the org did not actually have ZDR enabled, so the retention conflict that justified the block did not exist.
+3. Re-enabled, with access granted per person by an admin rather than self-serve.
+
+Two rules survive that history. First, the strong model stays the deliberate default; where a sibling generation is allowed, using it is an explicit per-session opt-in (`/model`), not something the harness reaches for automatically, and a `/model` switch saved in one session is a session convenience rather than a policy change. Second, verify availability instead of assuming it. Model availability is surface-conditional, policy-conditional, and account-conditional, not just capability-conditional: "newer" or "also available" does not make a model the right default if the surface you are in cannot run it under your org's data policy, and in this case a policy claim that sounded authoritative went unchecked against the actual account configuration for weeks while it was wrong.
 
 ## When the smaller model alone is fine (Sonnet mode)
 

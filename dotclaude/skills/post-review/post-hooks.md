@@ -59,6 +59,8 @@ separate commands, --input file) are summarized at the Step 3 pointer.
 > round's payload and the stale-content read is avoided. Always: (1) write the
 > payload file in its own tool call, then (2) post with `gh api --input` in a
 > separate call, so the hook validates the fresh payload. The one residual
-> collision is a same-day second round (same date suffix): there the Write tool
-> blocks with "File has not been read yet", so Read once then overwrite.
+> collision is a same-day second round (same date suffix): append `-N`
+> (`<pr>-review-<date>-2.json`) so each round keeps its own payload, matching the
+> Step 5 memory-key scheme. If you do reuse the path, the Write tool blocks with
+> "File has not been read yet", so Read once then overwrite.
 > Recurrence context: `bd memories gotcha:post-review-build-then-post-separate-commands`.

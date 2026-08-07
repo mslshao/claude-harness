@@ -45,6 +45,23 @@ that said a gather step "returns items" for a cross-repo GitHub PR search
 never specified the key; a bare PR number collides across repos and would
 have silently dropped a genuinely new review request.
 
+**Subtrigger - State-Ownership (the WHERE)**: any work item that introduces a
+new piece of persistent or coordinating state (a table, queue, lock, claim,
+flag, cache, index) without naming which service/worker OWNS it and which
+component is its FIRST consumer. Treat unnamed ownership as FRAGILE + HIGH by
+default. Challenge: "Which component acquires/writes this state first, at what
+point in the pipeline does that happen (before or after fan-out, at the
+document or the chunk level, per-request or per-run), and does the named owner
+actually possess the concepts the state is keyed on (does the proposed owner
+have a run_id at all)? If the design says only WHAT the state is and not WHERE
+it lives, the implementer's guess gets baked into every downstream item."
+Added 2026-07-17: a multi-PR pilot's design said "IAM grant for the workers"
+without naming which worker owns a dedup claim; the implementer bound it to
+the chunk worker (a defensible reading), but the claim runs at the document
+level before chunks exist. A reviewer's ownership question had already
+surfaced the problem and was read past as advisory; the fix cost a mid-run
+design amendment across the remaining items.
+
 **Subtrigger - Control-Verb State-Transition Completeness**: item text
 contains an operator control verb (stop/start/pause/resume/restart/cancel)
 applied to a recurring, scheduled, or background mechanism. Treat the

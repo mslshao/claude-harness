@@ -120,9 +120,46 @@ Key invariants:
 - Sibling-bead sweep is mandatory, not optional. Ratified architectural
   decisions in sibling beads supersede any plan formed fresh.
 - Domain-matcher misfires must NOT block convergence (best-effort).
+- **Underlying-defect precondition.** When the problem is review-quality,
+  process-quality, or "how do we catch X sooner", check whether the defect
+  that motivated it is still unfixed. If it is, say so BEFORE running the
+  pipeline and offer to fix it first. A planning pass on how to have caught
+  a bug faster, run while the bug is live, inverts the priority for the
+  entire duration of the pipeline. Observed 2026-08-06: two `/ideate` rounds
+  and two `/converge` rounds on a review-lens gap while the prod monitor that
+  motivated them stayed broken for 13 days, with its one-line fix already
+  filed as MX2-NNNNN on day one.
 
 Output: refined scope (1-3 sentences with constraints surfaced) plus
 the `Loaded context:` block and the `INPUT_MODE:` classification.
+
+### Delta-reconvergence (input already carries a stress-tested brief)
+
+When the input ticket/bead carries a prior converged brief (structural
+check: pinned decisions, work items with AC, verification paths, an
+iteration/stress-test provenance note), do NOT re-run the full pipeline
+against the original problem, and do NOT bypass (that is launch's move
+for execution). Instead:
+
+1. **Verify the brief's load-bearing citations at current HEAD** in
+   Phase 2 (files, line-shapes, "X does not exist yet" claims, open
+   decisions). Every stale citation is a delta.
+2. **Scope Phase 3 dispatches to the deltas**: instruct every specialist
+   to challenge only the drift (shipped siblings, changed contracts,
+   resolved blockers), explicitly listing the ratified core as
+   not-to-be-relitigated.
+3. **Output shape**: an AMENDMENTS block (authoritative where it
+   conflicts) prepended over the preserved prior body, versioned
+   (v3 -> v4), updating the canonical comment IN PLACE
+   (addCommentToJiraIssue supports commentId updates) so there is one
+   brief, not a trail of partial supersessions.
+4. Open PRs in the same ticket family are part of the drift surface:
+   dispatch at least one specialist against the open PR's actual
+   contract/behavior, not just main (the 2026-07-22 MX2-NNNNN run found
+   a completion-quorum bug in the open Phase 2 PR this way).
+
+Convergence Delta compares against the PRIOR BRIEF, not against a fresh
+draft: CONFIRMED means the brief survived the drift check.
 
 ### Phase 2: Scope & Decompose (internal)
 
@@ -138,7 +175,12 @@ Using the refined scope, perform the core bead-forge analysis:
    unverified mirroring claim is exactly the failure mode Phase 3
    (Challenge/Consult) and Phase 4.5 (Skeptic) exist to catch, but
    catching it there costs a full stress-test-and-re-synthesize cycle;
-   catching it here costs one Read call.
+   catching it here costs one Read call. The same verification applies to
+   precedents cited in Phase 3 dispatch prompts: confirm the artifact
+   exists on `origin/main` before naming it as precedent in a specialist's
+   framing; an in-flight PR's artifact must be labeled as unmerged
+   (2026-07-17: a dispatch cited a client class living only on an open PR
+   and a specialist spent its pass refuting the framing).
 
    **Infrastructure pull-up**: Before scoping to the named service,
    check whether the prompt touches a cross-cutting concern

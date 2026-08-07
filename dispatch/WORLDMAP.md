@@ -2,7 +2,7 @@
 component: dispatch
 type: directory-map
 status: V0 complete (all 4 dispatch docs have entries)
-authored_by: Claude Opus 4.7
+authored_by: Claude Opus 5
 ---
 
 # WORLDMAP: Dispatch

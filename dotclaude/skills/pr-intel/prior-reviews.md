@@ -79,6 +79,28 @@ Reach for this when a steer says "look at the prior review for #N", or when delt
    reason to skip that read. Conversely, if the prior review was REQUEST_CHANGES,
    verify the requested changes landed before any new approval.
 
+   **Mechanical consequence when your own prior review was REQUEST_CHANGES:** a new
+   COMMENT review does NOT clear it on GitHub (reviewDecision stays
+   `CHANGES_REQUESTED`, merge stays blocked); only an APPROVE or an explicit dismiss
+   clears it. So once the blockers ARE resolved and only non-blocking discussion
+   items remain, surface the choice explicitly rather than defaulting to Comment:
+   Comment holds the block (correct when a remaining item genuinely should gate
+   merge), Approve-with-comments clears it and logs the discussion inline (correct
+   when the remaining items are non-blocking, i.e. approve-while-logging-dissent).
+   Do not post a Comment assuming it lifts your prior block.
+
+**Gate-state check before clearing blockers (mandatory, not size-gated).** Before
+reporting any prior-round blocker as resolved, confirm the PR's actual gate state:
+`gh pr checks <n>` plus `gh pr view <n> --json mergeStateStatus,statusCheckRollup`.
+A red check or BLOCKED/UNSTABLE from a real failure means the blocker is NOT
+cleared, regardless of whether the code change is present. Code-presence is not
+mergeability; trace a red check to root cause before rendering the verdict, since
+the live blocker is often a DIFFERENT failure than the reviewed one (a BUILD glob,
+a coverage gate, a lint failure). (2026-07-15, #9725: a 404-guard blocker was
+declared "cleared" on code presence while CI was red from a `python_tests` BUILD
+glob with no test files plus a 0%-new-code-coverage Sonar gate; `merge=BLOCKED`
+was visible and went unchased.)
+
 **Re-review anti-anchoring (fresh perspective over carried opinion).** On a
 re-review with a real content delta (not the empty/rebase short-circuit below),
 the orchestrator is the most anchored input present: it carries its own
@@ -174,7 +196,7 @@ AWS_PROFILE=dev AWS_DEFAULT_REGION=us-east-1 uv run --with boto3 --with 'pydanti
 import sys, json
 sys.path.insert(0, '/home/vscode/.claude/tooling/pr-review-bot/pkg')
 from pr_review_state import list_reviews_for_pr
-reviews = list_reviews_for_pr("lawfirm/main", <PR_NUMBER>)
+reviews = list_reviews_for_pr("<company>/docr", <PR_NUMBER>)
 for r in reviews:
     print(json.dumps({
         "timestamp": r.timestamp,
@@ -209,7 +231,7 @@ AWS_PROFILE=dev AWS_DEFAULT_REGION=us-east-1 uv run --with boto3 --with 'pydanti
 import sys, json
 sys.path.insert(0, '/home/vscode/.claude/tooling/pr-review-bot/pkg')
 from pr_review_state import get_review
-review = get_review("lawfirm/main", <PR_NUMBER>, "<TIMESTAMP>")
+review = get_review("<company>/docr", <PR_NUMBER>, "<TIMESTAMP>")
 print(json.dumps(review.__dict__ if review else None, default=str))
 PY
 ```

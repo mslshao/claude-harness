@@ -49,6 +49,11 @@ Execution launcher: takes a Jira ticket or bead, enriches context, converges on 
 **Recommend when**: Ticket is well-scoped and you want hands-off implementation. Multiple invocations run in parallel via worktrees.
 **Not for**: Ambiguous scope (use /converge first). Single-file mechanical changes (direct edit per routing rule 7 carve-out; mx2-executor only for a fully-specified few-file change outside a PR iteration).
 
+## /campaign
+Walk-away epic runner: sequences an epic's pre-converged node beads through /launch --gate=agent unattended, producing a chain of stacked draft PRs with a crash-resumable cursor bead. Owns only the epic layer (node ordering, stack bases, whole-chain halt/abandon, run report); one human /converge happens BEFORE it runs. Sequential nodes only in v1.
+**Recommend when**: A multi-node epic is fully decomposed into bypass-shaped node beads (scope + AC + verification + consequence) and the user wants to kick it off and leave ("run the campaign for <epic>", "walk-away build the stack").
+**Not for**: Single tickets (use /launch). Epics not yet decomposed and converged (use /converge; /ideate before that). Merging, flipping drafts ready, or terminal Jira transitions (human-owned, always).
+
 ## /autopilot
 Autonomous pipeline: converge on a plan or build a feature without human approval gates. Uses mx2-decision-maker as quality gate at each checkpoint. Modes: plan (converge only, output = beads) or build (converge + launch, output = draft PR).
 **Recommend when**: User wants to kick off work and walk away; lower-stakes work where decision-maker calibration is sufficient.

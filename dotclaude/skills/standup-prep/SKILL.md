@@ -72,7 +72,7 @@ Everything must be binned by the user's LOCAL day, not UTC. Worktree/CI commits 
 
 ## Step 1: gather (run the independent queries in parallel)
 
-Identities: GitHub login `gh api user --jq .login`; git author `git config user.email`; repo `gh repo view --json nameWithOwner --jq .nameWithOwner` (default scope is the current repo). Jira: accountId from `mcp__atlassian__atlassianUserInfo`, cloudId from `getAccessibleAtlassianResources`. Always take these from the live MCP lookup; a stale accountId silently breaks the 1d author filter (drops everything or keeps the wrong person). Last-known Morgan-instance values, to be re-verified, not trusted blindly: accountId `<your-jira-account-id>`, cloudId `<your-atlassian-cloud-id>`.
+Identities: GitHub login `gh api user --jq .login`; git author `git config user.email`; repo `gh repo view --json nameWithOwner --jq .nameWithOwner` (default scope is the current repo). Jira: accountId from `mcp__atlassian__atlassianUserInfo`, cloudId from `getAccessibleAtlassianResources`. Always take these from the live MCP lookup; a stale accountId silently breaks the 1d author filter (drops everything or keeps the wrong person). Last-known Morgan-instance values, to be re-verified, not trusted blindly: accountId `712020:e7620f9a-43fa-4ea6-9b7a-38bc2ee47ff5`, cloudId `<atlassian-cloud-id>`.
 
 When the candidate sets are large (a full project day of Jira, or many PRs), delegate the heavy filtering to parallel subagents (one per source) so the raw payloads never enter the main context; for a single normal day inline queries are fine.
 

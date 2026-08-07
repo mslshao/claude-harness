@@ -1,9 +1,9 @@
 # Sequence Diagrams
 
 Auto-renders a Mermaid sequence diagram in `/pr-intel` briefings for M+ PRs touching
-2+ services. Targets the reviewer audience that skims PRs across services (a team lead, a team lead manager,
-the engineering lead); a diagram carries more signal than another bullet of prose about call-path
-changes.
+2+ services. Targets the reviewer audience that skims PRs across services (a team lead,
+a team lead manager, the engineering lead); a diagram carries more signal than another
+bullet of prose about call-path changes.
 
 Status: experimental enhancement, personal-tier first per lab-to-production rule.
 Tracked in bead `docr-lvaq`.

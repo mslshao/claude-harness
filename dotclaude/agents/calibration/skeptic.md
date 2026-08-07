@@ -29,8 +29,30 @@ These are past skeptic outputs the user dismissed, with reasoning. Used as
 few-shot calibration so the agent recognizes the pattern next time and either
 suppresses or reframes.
 
-(None yet. First entries land after the first round of `/converge` Phase 4.5
-runs in the field.)
+### Strand-scenario dismissed on pipeline order-of-operations, residual kept (2026-07-17, campaign gate)
+
+Headline claimed node K+1 forks BEFORE node K's Phase-4 gate approval, so a
+non-PROCEED could strand published downstream PRs. Dismissed the premise: cursor
+advance requires K terminal_success (gate passed, PR created, CI green) before
+K+1 forks, so gate-fails-after-fork cannot occur within one node. KEPT the
+residual: a mid-chain halt (node K+2 fails) leaves earlier-forked downstream
+drafts live with only draft status as the merge gate; folded
+halt-comments-on-downstream-PRs + termination-gate-on-every-entry + a lock-race
+drill into the plan. Lesson: check pipeline order-of-operations before crediting
+a strand scenario, but always extract the residual state-liveness concern
+underneath (the premise can be wrong while a real concern hides below it).
+
+### "Citation fabricated" dismissed after direct-grep verification (2026-07-09, /converge overwatch)
+
+Challenge agent claimed a 15min-start / back-off-to-30-60 interval citation was
+fabricated (it found only different 30min/8h-cap numbers in another file).
+Dismissed after direct grep: the exact quoted guidance DID exist in the
+office-hours transcript captured earlier in the same session. Kept the citation;
+added a note distinguishing it from the different (shift-bounded) numbers.
+Lesson: a specialist's grep-based "source does not exist" claim can miss a file
+written earlier in the SAME session; verify via direct grep before accepting a
+not-cited or fabrication finding, especially when the orchestrator authored the
+cited source moments earlier.
 
 ---
 

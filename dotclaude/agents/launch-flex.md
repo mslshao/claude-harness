@@ -54,22 +54,6 @@ STANDUP:
 Emit the STANDUP block in your output stream (you have no messaging tool; the
 orchestrator reads your output). Do not skip standups.
 
-## Terminal RESULT Contract (MANDATORY)
-
-<!-- summary-from: skills/launch/SKILL.md key: result-contract -->
-End your FINAL message with a terminal RESULT block (a SubagentStop hook treats a missing block as truncation, and the orchestrator resumes you to produce it):
-
-RESULT:
-  STATUS: done | partial | blocked
-  DONE: [completed work items / acceptance criteria, one line each]
-  REMAINING: [unfinished work and why, or "none"]
-  DISCOVERED: [unforeseen work found en route, one line each, classified as either "blocking-AC: <what> | proposed-fix: <one line> | files: <paths>" or "non-blocking: <what>" (non-blocking goes to a linked ticket; do NOT fix it inline)]
-  NEEDS-DECISION: [questions only the orchestrator or user can answer, or "none"]
-  VERIFICATION: [commands run + outcomes, e.g. "pants tlc <target>: green", or "not run: <why>"]
-
-To ASK the orchestrator something mid-task, end your turn with STATUS: blocked and the question in NEEDS-DECISION; the orchestrator answers by resuming you with your context intact. Ending the turn beats idle-polling whenever a decision gates your next step.
-<!-- /summary-from -->
-
 ## Authority Fence
 
 <!-- summary-from: skills/launch/SKILL.md key: authority-fence -->
@@ -138,8 +122,23 @@ without a tracked bead context.
 
 When all your work items are done and acceptance criteria are met:
 1. Run any relevant verification commands for your domain
-2. Send a final standup with DONE summarizing what you built
+2. Close with the terminal RESULT block (see Terminal RESULT Contract, the last
+   section of this file), with DONE summarizing what you built. Do NOT close
+   with a standup: STANDUP blocks are mid-task check-ins only; the RESULT block
+   is the terminal output.
 3. Your output is available for the next phase's agents
+
+## Retry Context Handling
+
+If your startup prompt includes a `## RETRY CONTEXT` block, you are on a retry
+iteration. Your prior work is already committed to the branch.
+
+1. Run `git -C $WORKTREE log $BASE_REF..HEAD --oneline` to see what you already built (BASE_REF is supplied in your prompt; when absent, use `origin/HEAD`; on a stacked launch the base is the parent node's branch, and `origin/HEAD` would wrongly show the whole parent stack as yours).
+2. Read the files you already produced before touching anything.
+3. Focus ONLY on the "Specific gap to fix" described in the block.
+4. Do NOT modify items listed under "What is already correct."
+5. Do NOT create a new branch. Commit to the existing branch named in the block.
+6. Do NOT amend prior commits. Add new commits only.
 
 ## Final Result Block
 
@@ -165,14 +164,16 @@ message; the orchestrator reads the block to decide whether to resume or
 re-dispatch.
 <!-- END SHARED-PROTOCOL:final-result-block -->
 
-## Retry Context Handling
+## Terminal RESULT Contract (MANDATORY)
 
-If your startup prompt includes a `## RETRY CONTEXT` block, you are on a retry
-iteration. Your prior work is already committed to the branch.
+<!-- summary-from: skills/launch/SKILL.md key: result-contract -->
+Any turn you end with no pending tool call MUST close with a terminal RESULT block (a SubagentStop hook treats a missing block as truncation, and the orchestrator resumes you to produce it). The rule is unconditional: use STATUS: done when all your work items are complete; use STATUS: partial or STATUS: blocked when ending a turn mid-task. To ASK the orchestrator something mid-task, end the turn with STATUS: blocked and the question in NEEDS-DECISION; the orchestrator answers by resuming you with your context intact. Ending the turn beats idle-polling whenever a decision gates your next step.
 
-1. Run `git -C $WORKTREE log origin/HEAD..HEAD --oneline` to see what you already built.
-2. Read the files you already produced before touching anything.
-3. Focus ONLY on the "Specific gap to fix" described in the block.
-4. Do NOT modify items listed under "What is already correct."
-5. Do NOT create a new branch. Commit to the existing branch named in the block.
-6. Do NOT amend prior commits. Add new commits only.
+RESULT:
+  STATUS: done | partial | blocked
+  DONE: [completed work items / acceptance criteria, one line each]
+  REMAINING: [unfinished work and why, or "none"]
+  DISCOVERED: [unforeseen work found en route, one line each, classified as either "blocking-AC: <what> | proposed-fix: <one line> | files: <paths>" or "non-blocking: <what>" (non-blocking goes to a linked ticket; do NOT fix it inline)]
+  NEEDS-DECISION: [questions only the orchestrator or user can answer, or "none"]
+  VERIFICATION: [commands run + outcomes, e.g. "pants tlc <target>: green", or "not run: <why>"]
+<!-- /summary-from -->

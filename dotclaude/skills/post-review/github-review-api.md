@@ -25,7 +25,7 @@ Payload shape (write this to e.g. `/tmp/pr-review-<number>.json`):
 Then post it:
 
 ```bash
-gh api -X POST /repos/lawfirm/main/pulls/{pull_number}/reviews --input /tmp/pr-review-<number>.json
+gh api -X POST /repos/<company>/docr/pulls/{pull_number}/reviews --input /tmp/pr-review-<number>.json
 ```
 
 Returns: `{"id": <review_id>, "html_url": "...#pullrequestreview-<id>", "state": "COMMENTED"}`

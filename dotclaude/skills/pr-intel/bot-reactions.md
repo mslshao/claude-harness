@@ -103,13 +103,25 @@ with a synthesizer finding during Synthesis Step 2:
 
    ```
    {
-     comment_id: "<id from gh api comments fetch>",
+     comment_id: "<NUMERIC REST id, see gotcha below>",
      endpoint: "pulls" | "issues",
      reaction: "+1" | "-1",
      bot_name: "Copilot" | "Sentry" | "Datadog" | "SonarQube" | "Vercel" | "PR Metrics" | ...,
      finding_summary: "<one-line description of what the bot caught>"
    }
    ```
+
+   **Comment-ID gotcha (load-bearing for `issues`-endpoint reactions).** The
+   `endpoint: "pulls"` comments were fetched via `gh api /repos/.../pulls/N/comments`,
+   whose `id` is already the numeric REST id the reactions endpoint wants. The
+   `endpoint: "issues"` comments (SonarQube, PR Metrics, Vercel, Datadog PR-summary)
+   were fetched via `gh pr view --json comments`, whose `id` is a GraphQL NODE id
+   (`IC_kwDO...`), NOT a numeric REST id. Posting a node id to
+   `/issues/comments/{id}/reactions` 404s. Record the NUMERIC id in `comment_id`:
+   parse it from that comment's `url` field (`.../#issuecomment-<N>` -> `<N>`), or
+   re-fetch via `gh api /repos/{owner}/{repo}/issues/comments`. Capturing it here
+   means `/post-review` Step 3.5 posts directly with no resolution step.
+   (Observed 2026-07-16, PR #10639: `IC_kwDOJRisZs8AAAABKZzavw` -> `4993112767`.)
 
 4. Append to the `bot_reactions` list.
 
@@ -182,8 +194,8 @@ match this phase's name).
 
 ## Recurrence Context
 
-- `bd memories feedback:bot-comment-reaction-the engineering lead-2026-05-20`: the engineering lead's
-  original "thumbs-up instead of repeating" feedback
+- `bd memories feedback:bot-comment-reaction-lead-2026-05-20`: the engineering
+  lead's original "thumbs-up instead of repeating" feedback
 - `bd memories calibration:mx2-decision-maker:ideation:pr-intel-cross-cutting`:
   the /ideate gate that ESCALATE-ROUTE'd to instrumentation-first
 - Transcript inspection on 2026-05-21 of PRs #9276 and #9146 R3 sessions

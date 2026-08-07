@@ -98,7 +98,8 @@ def _aged_ids(rows: list[dict[str, Any]], now: datetime, age_days: int) -> list[
 
 def seed_baseline(sources: dict[str, Any], now: datetime, age_days: int) -> dict[str, Any]:
     """Preflight baseline: membership sources seed full; in_progress seeds aged-only;
-    errored sources are left unset so they re-baseline on first success."""
+    prs_reviewing seeds each key's updatedAt watermark; errored sources are left
+    unset so they re-baseline on first success."""
     per_source: dict[str, Any] = {}
     iso = now.isoformat()
     for name, rec in sources.items():
@@ -106,6 +107,8 @@ def seed_baseline(sources: dict[str, Any], now: datetime, age_days: int) -> dict
             continue
         if name == "in_progress":
             known = _aged_ids(rec["items"], now, age_days)
+        elif name == "prs_reviewing":
+            known = {_pr_key(i): i.get("updated_at", "") for i in rec["items"]}
         elif name in ("prs_authored", "review_requests"):
             known = [_pr_key(i) for i in rec["items"]]
         elif name == "jira":
@@ -149,6 +152,25 @@ def diff_and_update(
                 delta = newly_aged
             rows_by_id = {r["id"]: r for r in rec["items"]}
             deltas[name] = [rows_by_id[i] for i in delta if i in rows_by_id]
+        elif name == "prs_reviewing":
+            # Watermark source, not membership: known_items maps each key to the
+            # last-seen updatedAt, and a delta is a watermark ADVANCE (author
+            # pushed or replied on a PR the user already reviewed). A key's FIRST
+            # appearance is baselined silently, never alerted: the usual cause is
+            # the user's own just-posted review bumping updatedAt. Rebuilding the
+            # map from current in one step advances fired watermarks, records new
+            # keys, and prunes keys absent from current (closed/merged PRs).
+            current_rows = {_pr_key(r): r for r in rec["items"]}
+            prev_marks = prev.get("known_items") or {}
+            new_known = {k: r.get("updated_at", "") for k, r in current_rows.items()}
+            if never_succeeded:
+                deltas[name] = []  # re-baseline silently
+            else:
+                deltas[name] = [
+                    r for k, r in current_rows.items()
+                    if k in prev_marks and r.get("updated_at") and prev_marks[k]
+                    and _parse_iso(r["updated_at"]) > _parse_iso(prev_marks[k])
+                ]
         else:
             if name in ("prs_authored", "review_requests"):
                 keys = [_pr_key(i) for i in rec["items"]]
@@ -178,6 +200,8 @@ def compose(deltas: dict[str, list], sources: dict[str, Any], age_days: int, cat
         lines.append(f"👀 review requested: {_pr_key(r)} {r.get('title', '')} {r.get('url', '')}")
     for r in deltas.get("in_progress", []):
         lines.append(f"⏳ stalling (in_progress, no update in >{age_days}d): {r['id']} {r.get('title', '')}")
+    for r in deltas.get("prs_reviewing", []):
+        lines.append(f"🔁 activity on reviewed PR: {_pr_key(r)} {r.get('title', '')} {r.get('url', '')}")
     for r in deltas.get("prs_authored", []):
         lines.append(f"other: opened PR {_pr_key(r)} {r.get('title', '')}")
     for r in deltas.get("jira", []):

@@ -45,7 +45,7 @@ Determine what work unit just completed. Pull from every surface where a complet
 **Local (bash)**:
 
 ```bash
-bd list --status=in_progress --json | jq -r '.[] | "\(.id) \(.title)"'
+bd list --status=in_progress --json -n 0 | jq -r '.[] | "\(.id) \(.title)"'
 git log --since='6 hours ago' --oneline -20
 gh pr list --author @me --state all --limit 5 --json number,title,state,updatedAt
 ```
@@ -97,7 +97,7 @@ KW_GREP="<same keywords as a pipe-separated regex>"
 
 bd memories habit:                                                                    # habit-tier
 bd memories correction:                                                                # correction-tier (recurring slips)
-bd list --label=memory --status=open --json | jq -r '.[] | "\(.id) \(.title)"'        # forge memory beads
+bd list --label=memory --status=open --json -n 0 | jq -r '.[] | "\(.id) \(.title)"'   # forge memory beads
 grep -iE "$KW_GREP" ~/.claude/projects/-workspaces-main/memory/workflow.md
 grep -riE "$KW_GREP" ~/.claude/projects/-workspaces-main/memory/*.md
 grep -riE "$KW_GREP" /workspaces/main/.claude/rules/

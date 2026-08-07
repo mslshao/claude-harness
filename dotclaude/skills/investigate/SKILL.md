@@ -1,6 +1,6 @@
 ---
 name: investigate
-description: (personal; shadows the project-tier `investigate` and takes precedence) Delta vs the project version: beads-aware downstream routing (/bead-forge fix planning, /consult multi-specialist) instead of the generic ticket/SME handoff. Structured investigation of production errors. Use when investigating any production error, Lambda failure, unexpected behavior, or silent regression, especially when an error message or stack trace is pasted into the conversation. Traces backward from the failure point through call path, git history, AWS deploy state, and Datadog signals to identify contributing factors and the leading hypothesis. Produces a structured investigation document with file:line citations ready to paste into Jira or Slack. Does NOT propose fixes (investigation only). Use before /bead-forge (fix planning) or /consult (multi-specialist review) when contributing factors are not yet known. Also trigger on phrases like "what's causing this", "prod issue", "error in Lambda", "why is X failing", "this error started after".
+description: (personal; shadows the project-tier `investigate` and takes precedence) Delta vs the project version: beads-aware downstream routing (/bead-forge fix planning, /consult multi-specialist) instead of the generic ticket/SME handoff. Structured investigation of production errors. Use when investigating any production error, Lambda failure, unexpected behavior, or silent regression, especially when an error message or stack trace is pasted into the conversation. Traces backward from the failure point through call path, git history, AWS deploy state, and Datadog signals to identify contributing factors and the leading hypothesis. Produces a structured investigation document with file:line citations ready to paste into Jira or Slack. Does NOT propose fixes (investigation only). Use before /bead-forge (fix planning) or /consult (multi-specialist review) when contributing factors are not yet known. Also trigger on phrases like "what's causing this", "prod issue", "error in Lambda", "why is X failing", "this error started after", and, when a concrete error, failing behavior, or production signal is in scope, "find the bug", "what's broken", "debug this".
 ---
 
 # investigate
@@ -94,7 +94,7 @@ Use `mcp__aws__call_aws` with `GetFunctionConfiguration` (Lambda) or `DescribeTa
 
 - The `LastModified` timestamp on the function or task definition (Lambda: `LastModified` field; ECS: task definition `registeredAt`)
 - The currently active alias target (Lambda: `GetAlias` for aliases like `live` or `prod`)
-- Environment variable values are typically non-secret configuration in MX2 services: table names, queue URLs, region, log level, SecretsManager ARN references (the secret payloads themselves are fetched at runtime, not stored in env). Record values that bear on the investigation; redact anything that looks like a raw credential or token. `DD_VERSION` is especially useful: it holds the commit hash of the deployed build, so `git log <DD_VERSION>` lists exactly which commits are running.
+- Environment variable **names only**, to confirm which configuration is present. Do not record values: env vars can include SecretsManager ARN references and table/queue names that reveal infrastructure topology, and both `.claude/rules/security.md` ("No indiscriminate payload logging") and `.claude/rules/debugging.md` (log variable names and presence, not values) apply. One explicitly allowlisted exception: the value of `DD_VERSION` is a commit hash (non-sensitive) and is load-bearing here, since `git log <DD_VERSION>` lists exactly which commits are running.
 - **When AWS is blocked (SSO expired, fork PR with restricted access): recover the deployed build without AWS via the Datadog `version` metric tag** (populated from `DD_VERSION`). Query `get_datadog_metric` with `by {version}` on any metric the service emits (e.g. `sum:<service_metric>{*} by {version}.as_count()`); the version tag still receiving data is the live build, and `git log <version>` lists what is running. It is a proxy, not a direct config read, so flag that caveat in the writeup. (Verified 2026-06-01 on the <service>-coverage SLI investigation when `GetFunctionConfiguration` returned an expired-token error.)
 
 **Critical note on deploy lag.** `LastModified` reflects when the function was last deployed, not when the commit was merged. The lag between a merge and the corresponding deploy can be days or weeks. Do NOT assume a recent commit is running in production unless the deploy timestamp confirms it. If `LastModified` predates the regression commit, the regression is not yet in production and the investigation focus shifts.
@@ -149,7 +149,7 @@ If blast radius requires production data to verify precisely, say so and provide
 
 ## Phase 4: Output
 
-Produce a structured investigation document using this format. The structure is the output; use it verbatim. Include the AWS evidence and Datadog evidence sections when those sources were relevant to the investigation.
+Produce a structured investigation document using this format. The structure is the output; use it verbatim. The AWS Evidence and Datadog Evidence sections are ALWAYS present: populated when the source was queried, otherwise carrying a single explicit line `Not queried: <mechanical reason>` (e.g. "frontend TypeScript exception; no Lambda/ECS surface"). A missing evidence section is indistinguishable from a silently skipped live-state check, which is the exact failure the 2026-07-15 review-depth benchmark measured; the explicit not-queried line keeps the skip honest and reviewable. Enforced post-hoc by `stop-validate-investigate.sh`.
 
 ---
 
@@ -173,7 +173,7 @@ For each question from Phase 2, answer it with evidence. Cite files and line num
 
 ### AWS Evidence
 
-*(Include this section when the error originates in Lambda or ECS.)*
+*(Always present. Populate when the error originates in Lambda or ECS; otherwise a single `Not queried: <mechanical reason>` line.)*
 
 - **Function/service name**: [Lambda function name or ECS service name]
 - **Last deploy timestamp** (`LastModified`): [timestamp from GetFunctionConfiguration or task definition registeredAt]
@@ -182,7 +182,7 @@ For each question from Phase 2, answer it with evidence. Cite files and line num
 
 ### Datadog Evidence
 
-*(Include this section when Datadog was queried to confirm current firing state.)*
+*(Always present. Populate when Datadog was queried to confirm current firing state; otherwise a single `Not queried: <mechanical reason>` line. A production-error investigation that skips the current-firing-state check needs a stated reason, not silence.)*
 
 - **Case ID** (if Error Tracking case found): [ET-XXXXX or "not found"]
 - **first_seen**: [timestamp]

@@ -417,6 +417,54 @@ bd update "$LAUNCH_BEAD_ID" --append-notes \
   "[LAUNCH_EVENT type=SESSION_STARTED session=$CLAUDE_SESSION_ID ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)]"
 ```
 
+#### Step 4e: Single-Writer Session Lock (check BEFORE any mutation)
+
+Concurrent orchestrator sessions are the sharpest resumption hazard: a crashed
+session resumed while a replacement session is already running the same launch
+will double-execute agent slots and force-push competing branches over the
+live stack (observed 2026-07 in a pilot of exactly this shape; reconciliation
+required forensic diffing). The `SESSION_STARTED` event doubles as the lock:
+
+1. BEFORE writing your own `SESSION_STARTED` and before ANY worktree, branch,
+   or bead mutation, read the most recent `SESSION_STARTED` in the event log.
+2. If its `session` is not this session AND any event in the log is newer
+   than 30 minutes, the launch is potentially live elsewhere: do NOT resume.
+   Append `[LAUNCH_EVENT type=SESSION_HOLD session=$CLAUDE_SESSION_ID ts=...]`,
+   surface to the user ("another session appears to own this launch; last
+   event <ts>; resume anyway?"), and stop.
+3. If the log has been quiet for over 30 minutes, assume the prior session is
+   dead: write your `SESSION_STARTED` (above) and proceed. During long waits
+   (CI, reviews) re-append a `SESSION_STARTED` heartbeat so a genuinely live
+   session is never mistaken for a dead one.
+4. Never resolve a suspected double-writer by force-pushing over the other
+   session's work: hold, reconcile from `git log` and PR state, then continue.
+
+#### Unattended decision-point policy (`--gate=agent` runs)
+
+Added 2026-07-17 (docr-mpgav; decision record docr-1vqfg). In an unattended
+run there is no human to answer, so EVERY human-decision point resolves the
+same way: **halt loudly, never wait, never loop, never auto-resume.**
+
+The four decision points this covers:
+1. **Phase 3.6 ESCALATE-QUESTIONS** (gate-prompts.md): no narrowing-question
+   round; the questions fold into the halt report.
+2. **Phase 4 approval**: covered by the agent-gate verdict contract
+   (gate-prompts.md "Phase 4 Agent Approval Gate").
+3. **Phase 5 escalation rows that say "Ask user"** (SKILL.md Escalation
+   Protocol, e.g. external verification needed): halt instead of asking.
+4. **Step 4e SESSION_HOLD** (above): step 2's "surface to the user ...
+   resume anyway?" becomes a halt; auto-resume would recreate the exact
+   double-writer incident this lock exists to prevent, and a silent hang is
+   the walk-away failure mode nobody notices.
+
+Halt loudly means, in order: (a) append the relevant event
+(`SESSION_HOLD`, `AGENT_GATE_HALT`, or `UNATTENDED_ESCALATION`) to the bead
+log; (b) `bd comment` the launch bead with the decision needed and the
+evidence gathered so far; (c) send a PushNotification naming the bead and the
+decision; (d) STOP all work on this node/launch. An orchestrating skill
+(e.g. /campaign) treats the halt as node failure per its own whole-chain
+policy. Resume is always an explicit human action, never a timer.
+
 ---
 
 ## Retry Loop Protocol
@@ -444,7 +492,10 @@ FOR EACH agent in current phase (respecting COMPLETED_AGENTS from event log):
   ELSE:
     spawn_prompt = standard agent prompt + RETRY_CONTEXT block (see below)
     Assemble RETRY_CONTEXT:
-      prior_commits   = run: git -C $WORKTREE log origin/HEAD..HEAD --oneline
+      # BASE_REF (docr-ib6nd): recover from bead metadata; on stacked launches
+      # origin/HEAD would mis-attribute the entire parent stack as this node's.
+      BASE_REF        = bd metadata launch_base_ref (default origin/HEAD)
+      prior_commits   = run: git -C $WORKTREE log $BASE_REF..HEAD --oneline
       last_failure    = last AGENT_FAILED reason for this agent+phase from event log
       passed_files    = files from AGENT_COMPLETED entries for other agents in this phase
                         + any acceptance criteria already passing per verification output
@@ -468,7 +519,7 @@ FOR EACH agent in current phase (respecting COMPLETED_AGENTS from event log):
 
   IF verification passes:
     # Collect artifact file paths from agent standups and worktree diff
-    ARTIFACTS=$(git -C $WORKTREE diff origin/HEAD..HEAD --name-only | tr '\n' ',')
+    ARTIFACTS=$(git -C $WORKTREE diff "${LAUNCH_BASE_REF:-origin/HEAD}"..HEAD --name-only | tr '\n' ',')
     bd update $LAUNCH_BEAD_ID --append-notes \
       "[LAUNCH_EVENT type=AGENT_COMPLETED agent=$agent phase=$phase iteration=$iteration artifacts=$ARTIFACTS ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)]"
     BREAK  # Done with this agent slot
@@ -498,7 +549,8 @@ You are on iteration {N} of this task. Your prior work exists in the worktree.
 Do not start from scratch - build on what you already completed.
 
 **Prior commits (what you already built):**
-{output of: git -C $WORKTREE_DIR log origin/HEAD..HEAD --oneline}
+{output of: git -C $WORKTREE_DIR log $BASE_REF..HEAD --oneline, where BASE_REF
+comes from the launch_base_ref bead metadata (default origin/HEAD)}
 
 **What is already correct - do NOT modify these files:**
 {comma-separated list of files whose acceptance criteria are already passing}

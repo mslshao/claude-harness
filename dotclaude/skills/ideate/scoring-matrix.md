@@ -1,7 +1,7 @@
 # Phase 3: Scoring Matrix
 
 The deterministic ranking layer of `/ideate`. Each approach gets scored
-across 8 columns; one is annotation, seven are numeric. SKILL.md
+across 9 columns; one is annotation, eight are numeric. SKILL.md
 references this file; do not duplicate here.
 
 ## Column Definitions
@@ -12,9 +12,10 @@ references this file; do not duplicate here.
 | **Effort** | S / M / L / XL | Implementation effort. S = under 1 day, M = 1-3 days, L = 3-7 days, XL = over a week. Include test + review burden. |
 | **Risk** | low / med / high | Probability of failure or production incident if shipped. Consider blast radius. |
 | **Reversibility** | easy / hard | Can we roll back if it does not work? "easy" = single commit revert. "hard" = data migrations, schema changes, downstream consumer impact. |
-| **Fit** | match / new | Does this approach match existing codebase patterns (`match`), or introduce a new one (`new`)? Cite the matched pattern or note the divergence. |
+| **Fit** (codebase pattern) | match / new | Does this approach match existing codebase patterns (`match`), or introduce a new one (`new`)? Cite the matched pattern or note the divergence. This is PATTERN fit, not goal fit (see the next row). |
+| **Goal fit** | full / partial / weak | How completely does the approach deliver the user's STATED want, judged against the goal as the user framed it (not a lighter proxy)? `full` = delivers the stated outcome; `partial` = delivers a subset or a lighter proxy of it; `weak` = ships something adjacent that leaves the stated want largely undelivered. Cite the stated want. This is the counterweight to Effort and the Right-Sizing flag: proportionality catches OVER-building, Goal fit catches UNDER-delivering (the failure where the least-shipping candidate wins on Effort while delivering little of what was asked). When a `partial`/`weak` score traces to an UNDECLARED user constraint (a required autonomy floor, an expected frequency) rather than a real candidate limitation, do NOT just score it low: that is the Phase 4 ESCALATE-QUESTIONS-on-missing-constraint trigger, not a second re-diverge. |
 | **Rules alignment** | aligned / contradicts / N/A | Is the approach covered or recommended by an existing `.claude/rules/*.md` rule? Does it contradict one (e.g., a Redshift query in operational code contradicts `architecture.md` Data Store Selection)? |
-| **Verifiability** | high / med / low | How confidently can we validate this approach works BEFORE committing to it? `high` = working reference code in the codebase that mirrors this approach, or a prototype achievable in under 1 hour. `med` = similar patterns exist; prototype 1-3 hours. `low` = novel approach; validation requires shipping or a multi-day prototype. |
+| **Verifiability** | high / med / low | How confidently can we validate the approach DELIVERS THE OUTCOME before committing? The validation must prove the CAPABILITY or DECISION is correct, not merely that the mechanism executes without error. `high` = working reference code that mirrors this approach AND demonstrates the outcome, or a prototype achievable in under 1 hour that proves the capability (e.g. the crash-resume actually resumes state; the ranking is actually correct). `med` = similar patterns exist; a capability-proving prototype is 1-3 hours. `low` = novel, OR the only available check proves the mechanism RUNS but not that the outcome is right; proving the capability requires shipping or a multi-day prototype. A path that shows only "it runs without error" is `low`, never `high`. |
 | **Consequence of wrong** | low / med / high | If this approach turns out to be wrong AFTER shipping, what is the cost? `low` = single PR revert, no data loss, no customer impact. `med` = data migration to undo, customer-visible regression. `high` = data corruption, irreversible state, trust loss, lost workstream. |
 
 ## Composite Score Formula
@@ -25,6 +26,7 @@ Map each scored column to a numeric value, then sum. Higher is better.
 - Risk: low=4, med=2, high=1
 - Reversibility: easy=3, hard=1
 - Fit: match=3, new=1
+- Goal fit: full=3, partial=0, weak=-3
 - Rules alignment: aligned=2, N/A=1, contradicts=-2
 - Verifiability: high=3, med=2, low=1
 - Consequence of wrong: low=3, med=1, high=-3
@@ -32,7 +34,9 @@ Map each scored column to a numeric value, then sum. Higher is better.
 (Context is annotation, not scored. It modifies how the user reads
 Effort and Fit.)
 
-Max score = 4+4+3+3+2+3+3 = 22. Use the Score column to break ties.
+Max score = 4+4+3+3+3+2+3+3 = 25. Use the Score column to break ties.
+The Goal-fit `weak=-3` mirrors the Consequence penalty: a candidate that
+under-delivers the stated want cannot win on low Effort alone.
 Do not present the formula to the user; the narrative rationale (see
 Phase 5) is what the user reads.
 
@@ -61,6 +65,17 @@ MUST justify the extra complexity against the minimal-viable variant
 the minimal-viable candidate. "We might need it later" does not justify;
 the justification must be a STATED constraint (CLAUDE.md Scope
 discipline / YAGNI).
+
+## Goal-Fit Surfacing (symmetric to Right-Sizing)
+
+The Right-Sizing flag catches OVER-building. Goal fit catches the inverse: a
+top-Score approach with Goal fit = `partial` or `weak` MUST be surfaced in
+Phase 5, and the winner narrative MUST state what of the stated want it leaves
+undelivered (or the recommendation switches to a fuller-goal-fit candidate). A
+candidate cannot win on low Effort while quietly under-delivering the want. When
+the weak goal fit traces to an UNDECLARED user constraint (autonomy floor,
+expected frequency), the Phase 4 gate ESCALATE-QUESTIONs on that constraint
+rather than accepting the low score or re-diverging.
 
 ## Composite Overrides (force last place regardless of Score)
 

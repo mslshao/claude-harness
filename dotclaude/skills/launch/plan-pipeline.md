@@ -54,6 +54,12 @@ For each seam, draft a work item with:
 - **Context**: `greenfield` / `legacy` / `hybrid`. Building net-new,
   adjusting existing production code, or both. Annotation only; it
   affects how the reviewer reads Effort and Risk.
+- **Counts are unbounded**: any count a work item relies on (consumers,
+  call sites, blast radius) comes from an unbounded count (`grep -c`,
+  `wc -l`, `jq length`), never from a head-capped or paginated listing
+  (`| head`, `bd list` without `-n`). Name the counting command in the
+  item. (2026-08-06: a `head -10`-derived "~10 consumers" shipped into a
+  plan whose real blast radius was 77; three reviewers had to correct it.)
 
 Items with `Consequence=high` AND no concrete Verification path are
 workstream-killers. The Phase 3.6 decision-maker gate enforces this

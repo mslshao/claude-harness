@@ -2,14 +2,14 @@
 component: dotclaude/agents
 type: directory-map
 status: V0 complete (22 agents covered by 20 entries; one combined entry for the launch-flex/implementer/tester trio)
-authored_by: Claude Opus 4.7
+authored_by: Claude Opus 5
 ---
 
 # WORLDMAP: Personal Agents
 
 AI-authored commentary on each personal-tier agent in `~/.claude/agents/`. When I reach for the agent, what failure mode it prevents, how it compounds, and where it has limits. Entries follow the format documented in the top-level `WORLDMAP.md`.
 
-The agents divide into three rough classes: thinking-partner agents (tech-lead, decision-maker, skeptic) that operate at the framing layer; structural reviewers (code-reviewer, executor, prompt-refiner, the launch-* trio) that do code-shaped work; and specialist linters (Pydantic, TypeScript, Python style, security, silent-failure, devops, git history, observability, test quality, bot-review, pr-precedent) that fire on narrow concerns. The boundaries between classes are not absolute; bot-review and pr-precedent in particular live between "linter" and "memory mechanism." The voice of each entry tries to name what makes that agent earn its keep, not just what it does.
+The agents divide into three rough classes: thinking-partner agents (tech-lead, decision-maker, skeptic) that operate at the framing layer; structural reviewers (code-reviewer, executor, prompt-refiner, the launch-* trio) that do code-shaped work; and specialist linters (Pydantic, TypeScript, Python style, security, silent-failure, devops, git history, observability, test quality, module cohesion, bot-review, pr-precedent) that fire on narrow concerns. The boundaries between classes are not absolute; bot-review and pr-precedent in particular live between "linter" and "memory mechanism." The voice of each entry tries to name what makes that agent earn its keep, not just what it does.
 
 ---
 
@@ -532,3 +532,32 @@ What it prevents: speed-amplified vs bot-surfaced is the wrong split to make fro
 How it compounds: with `pr-intel` (the upstream skill that produces the findings) and `post-review` (the downstream skill that posts and records the audit counts). The agent is a narrow stage in the pipeline; the harness is shaped to make narrow stages composable.
 
 Limits: classification quality is bounded by the finding's metadata. If the synthesizer hands the classifier a finding without verification-path evidence, the agent has to infer from the rendered comment text, which is exactly the failure mode the agent exists to prevent. Synthesizer discipline (passing the full verification context, not just the comment) is the upstream guard.
+
+---
+
+```yaml
+---
+component: module-cohesion-reviewer
+type: agent
+status: active
+trigger_signals:
+  - "/pr-intel or /review fan-out where the diff touches a Python module"
+  - "a PR whose description says pure move, rename, or no behavior change"
+  - "a new helper landing in a module whose name does not name it"
+prevents:
+  - "a hand-rolled query landing next to the typed accessor that already expresses it"
+  - "a behavior change smuggled into a diff described as a pure move"
+  - "catch-all modules and test-only helpers accreting inside the production import graph"
+related: [mx2-code-reviewer, mx2-pydantic-reviewer, test-quality-reviewer, bot-review]
+---
+```
+
+When I reach for it: as a fan-out target whenever a diff touches Python modules, or directly when the question is one level up from the line. Not "is this function correct?" but "does this module own one nameable concern, and is it coupled to the rest of the codebase the way it should be?" This is the personal variant shadowing a project-tier agent of the same name; the delta is that its seam defers to the personal specialist roster by name, so it stays quiet inside a fan-out where those siblings are already running.
+
+What it prevents: the defect class that single-file tooling structurally cannot see. A filename is not a defect any linter checks, and semantic duplication across files is beyond token-similarity rule sets. Its two named headline catches are a hand-rolled implementation duplicating an existing typed accessor (reusing the accessor removes both the duplicate and the untyped surface at once) and behavior smuggled into a "pure move": a dropped memoization, a key-presence check turned into `is not None`, a swapped default, in a diff whose description promised no behavior change.
+
+The seam is the design: the agent definition spends more words on what is NOT its lane than on its question bank. Within-file structure goes to the code reviewer, Settings to the Pydantic reviewer, PII to the security auditor, error propagation to the silent-failure hunter, consumer blast radius to bot-review, and test files in their entirety to test-quality-reviewer (it is told not to open one, even when a test file is in the diff). Restating a sibling's finding is the failure it is tuned against, because pile-on is what erodes trust in a multi-agent report.
+
+Advisory by construction: every finding is a question the author answers, never a verdict, and the agent is required to answer by reading or grepping anything it could verify itself before asking. It is also told to say so in one line and stop when a module is clean, rather than manufacturing questions to fill a report.
+
+Limits: it is a Sonnet agent on a judgment-heavy lens, and the judgment it needs ("is this divergence deliberate?") depends on author intent it cannot observe. The pre-existing carve-out is a real coverage hole with a defensible reason behind it: a catch-all module the diff merely touched stays unflagged, so the worst cohesion debt in a file is invisible to the review of the change that walks right past it. And the interrogative framing cuts both ways; a genuinely wrong coupling arrives as a polite question that an author can close with "yes, intended" and no further pressure.

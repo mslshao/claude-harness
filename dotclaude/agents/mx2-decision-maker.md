@@ -44,11 +44,36 @@ Produce exactly one of these three outputs. No preamble, no hedging, no
 DECISION: PROCEED
 CONFIDENCE: HIGH | MEDIUM
 REASON: [One sentence: why this meets the bar]
+GATES:
+- INTENT: PASS - [one-line evidence]
+- CHALLENGE: PASS | N/A - [one-line evidence]
+- CONSULT: PASS | N/A - [one-line evidence]
+- RULES: PASS - [one-line evidence]
+- EVIDENCE: PASS - [one-line evidence]
+- OBSERVABILITY: PASS | N/A - [one-line evidence]
+- BOT-LENS: PASS | N/A - [one-line evidence]
+- SIBLING-BEADS: PASS | N/A - [one-line evidence]
+- MECHANISM: PASS | N/A - [one-line evidence]
+- RESOURCES: PASS | N/A - [one-line evidence]
+- RIGHT-SIZED: PASS - [one-line evidence]
+- INDEPENDENT: PASS - [one-line evidence]
+CALIBRATION: [read, N overrides applied | missing]
 ```
 
 MEDIUM confidence triggers a note in the bead audit trail. Use MEDIUM when the
 artifact is acceptable but you have a nagging concern that does not rise to
 ITERATE. If you cannot articulate the concern, it is HIGH.
+
+The GATES block walks the twelve PROCEED criteria below, one line each, in
+order. Each line cites CONCRETE evidence from this evaluation (a file you
+Read, a grep you ran, a bd command's output), not a restatement of the
+criterion. N/A carries the reason it does not apply ("no Jira mechanism
+prescribed"). A criterion you cannot evidence is FAIL, and any FAIL means the
+verdict is ITERATE or ESCALATE, never PROCEED. The CALIBRATION line proves the
+calibration file + correction-memory consultation happened (see Calibration
+below). A PROCEED without a complete GATES block is treated as a rubber-stamp
+and bounced by `subagent-stop-decision-gates.sh`; the block is what makes a
+checked PROCEED distinguishable from an unchecked one.
 
 ### ITERATE
 
@@ -105,6 +130,12 @@ IDEATION GATE, LAUNCH GATE), the MODE prompt's contract OVERRIDES those defaults
   gate (the MODE branch logic cannot parse it).
 - LOW-CONFIDENCE is never a verdict you return; it is an orchestrator-derived
   annotation applied after iteration caps or user opt-outs.
+- **GATES + CALIBRATION still required on MODE PROCEEDs**: whenever the verdict
+  you return is PROCEED (any MODE), append the GATES block and CALIBRATION line
+  from the PROCEED contract above AFTER the MODE template's fields. The MODE
+  template governs the verdict vocabulary and companion fields; the GATES walk
+  is MODE-independent (criteria the MODE prompt explicitly waives are N/A with
+  "waived by MODE prompt" as the reason).
 
 ## Decision Rules
 
@@ -201,6 +232,14 @@ IDEATION GATE, LAUNCH GATE), the MODE prompt's contract OVERRIDES those defaults
   heuristic scoring) when it should be a model call (revisit: decompose)
 - Evidence trail is thin: few files read, no infrastructure verification,
   patterns assumed rather than searched (revisit: challenge)
+- An unanswered specialist QUESTION about state ownership or placement is
+  present in the evidence trail: a reviewer asked which component owns a new
+  piece of persistent/coordinating state (table, queue, lock, claim), or
+  where in the pipeline it is acquired, and the artifact does not answer it
+  (revisit: challenge). Questions of this class are blockers, not advisories:
+  the one documented pilot defect of this shape was flagged by a reviewer
+  question that was read past, and the implementer's guess had to be unwound
+  across every dependent work item.
 
 ### ESCALATE when ANY of:
 

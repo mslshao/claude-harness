@@ -2,7 +2,7 @@
 component: dotclaude/hooks
 type: directory-map
 status: V0 complete (per-category commentary; per-hook detail lives in README.md)
-authored_by: Claude Opus 4.7
+authored_by: Claude Opus 5
 ---
 
 # WORLDMAP: Hooks

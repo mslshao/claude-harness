@@ -101,7 +101,7 @@ The tracking bead holds all loop state. It is NOT one of the `overwatch`-labelle
 planning beads; it carries a distinct label so the two never collide.
 
 ```bash
-bd list --label=overwatch-state --status=all --json
+bd list --label=overwatch-state --status=all --json -n 0
 ```
 
 If a bead exists, use it. If none exists, create one (first-ever run):
@@ -115,6 +115,15 @@ bd update <new-id> --claim
 ```
 
 Record the id for the rest of the run.
+
+**Single-writer lock (2026-07-17, docr-bbj5d)**: the state JSON carries a
+`writer_session` + `writer_ts` pair. Before mutating state or scheduling a
+wakeup, compare `writer_session` to this session: if it is another session AND
+`writer_ts` is newer than one full arming interval, another live session owns
+the loop; do NOT write or schedule (a second writer double-fires alerts and
+replaces state blobs mid-cycle). Surface it and stop. If `writer_ts` is stale
+past an interval, take over: set both fields to this session on your next
+state write. Every state write refreshes `writer_ts`.
 
 ### 3. Load state and check the termination gate
 
@@ -156,6 +165,9 @@ uniform, and a baseline cycle surfaces NOTHING (nothing is a delta yet):
     age_days`). Seeding every in-progress item would permanently suppress the
     stall alert for work already in progress at loop start; seeding only the
     already-aged ones lets an item that ages AFTER baseline still fire.
+  - `prs_reviewing`: record each current key's `updatedAt` as its watermark
+    (a map, not a list). Nothing alerts at baseline; only a later watermark
+    advance does.
   - any source that returned `status: error` this baseline: leave its `known`
     unset, so it re-baselines silently on its first success (loop-body Step 3)
     rather than flooding on recovery.
@@ -233,12 +245,18 @@ python3 ~/.claude/skills/overwatch/gather.py
 ```
 
 This prints one status-contract record per bash-pollable source
-(`beads_ready`, `in_progress`, `prs_authored`, `review_requests`) as JSON:
+(`beads_ready`, `in_progress`, `prs_authored`, `review_requests`,
+`prs_reviewing`) as JSON:
 
 ```json
 {"beads_ready": {"status": "ok", "items": ["docr-..."]},
+ "prs_reviewing": {"status": "ok", "items": [{"number": 42, "repository": "o/r", "updated_at": "..."}]},
  "review_requests": {"status": "error", "error_detail": "..."}}
 ```
+
+`prs_reviewing` (PRs the user has already reviewed, still open) deliberately
+INCLUDES approved-but-still-open PRs: a push after the user's approval is
+exactly the author activity worth surfacing.
 
 The load-bearing rule the script enforces, and that the agent MUST preserve when
 folding in Jira below: **a source's exit code is authoritative, never its
@@ -280,6 +298,11 @@ spills the payload to a file (observed 2026-07-10: 30 issues, 150KB), and even
 harness compact projection or the saved file rather than the inline response; do
 not treat the spill as a source error (it is a successful `ok` result, just large).
 
+Use the default `issues` result mode; do NOT pass `searchResultMode: "count"`.
+Count mode returns only the total and omits the issue keys the diff requires,
+forcing a second `issues`-mode query (observed twice on 2026-07-22). The keys,
+not the count, are what the diff needs.
+
 ### Step 3: Diff each ok source, then update its known set
 
 For every source with `status == "ok"`, compute the delta against the persisted
@@ -305,10 +328,38 @@ bounded; do not skip it.
 - `jira` (key = issue key): `new = current_keys - known_keys`. Update:
   `known_items := current_keys`. Jira deltas are NOT one of the three named
   categories; they go to the "other changes" digest (Step 4).
+- `prs_reviewing` (WATERMARK, key = `"<repository>#<number>"`): not a membership
+  source. `known_items` maps each key to the last-seen `updatedAt`; the delta is
+  the keys whose CURRENT `updated_at` is newer than the known watermark (author
+  pushed or replied on a PR the user already reviewed). A key's FIRST appearance
+  is baselined silently (record the watermark, no alert): the usual first
+  appearance is the self-echo of the user's own just-posted review bumping
+  `updatedAt`. Update: `known_items := {key: current updated_at}` rebuilt from
+  the current result in full, which advances fired watermarks, records new keys,
+  and prunes keys absent from current (closed/merged PRs) in one step.
 
 Membership sources track current membership, so an item that leaves and re-enters
 re-alerts. That is deliberate: a bead that leaves `ready` (claimed, closed) and
 later returns is newly actionable again and worth surfacing.
+
+**Classify `prs_reviewing` deltas before surfacing (agent-side).** A watermark
+advance only says `updatedAt` moved, and the user's OWN actions also move it
+(posting a review or a reply is a self-echo). When a `prs_reviewing` delta fires,
+the agent SHOULD run:
+
+```bash
+gh pr view <number> -R <repository> --json headRefOid,comments \
+  --jq '{head: .headRefOid, last: .comments[-1].author.login}'
+```
+
+and DROP the alert if the only activity is the user's own, OR if the only
+post-watermark activity is an automated bot comment (e.g. `sonarqubecloud`,
+`graphite-app`, `github-actions[bot]`): a CI or static-analysis bot comment on a
+PR you have already reviewed is not a re-review trigger (observed on #10847
+across three cycles 2026-07-22). Keys also present in
+the `prs_authored` known set are skipped entirely (own PRs are already covered by
+that source). This classification is agent-side by design: gather.py stays
+one-command-per-source.
 
 A source with `status == "error"` is NOT diffed and its `known_items` is carried
 forward unchanged (nothing lost or falsely "seen"); it goes to the failure report
@@ -318,14 +369,18 @@ baseline) is re-baselined silently on its first success: record its current set 
 
 ### Step 4: Category-gate and compose output
 
-Three named categories each trigger a named alert line. Every other real delta
-lands in a single "other changes" digest line, so nothing is silently dropped.
-Source errors are reported in plain text in the same message.
+Three named categories each trigger a named alert line; `prs_reviewing`
+watermark deltas are NOT one of the three but get their own named line rather
+than the digest. Every other real delta lands in a single "other changes"
+digest line, so nothing is silently dropped. Source errors are reported in
+plain text in the same message.
 
 - **Newly unblocked bead** (`beads_ready` delta): render from the gathered row,
   which carries id, title, and priority: `🔓 newly unblocked: docr-XXXX [P<priority>] <title>`.
 - **New review request** (`review_requests` delta): `👀 review requested: <repo>#N <title> <url>`.
 - **Aged in-progress item** (`in_progress` newly-aged): `⏳ stalling (in_progress, no update in >Nd): docr-XXXX <title>`.
+- **Activity on a reviewed PR** (`prs_reviewing` watermark advance, after the
+  Step 3 self-echo classification): `🔁 activity on reviewed PR: <repo>#<number> <title> <url>`.
 - **Other changes** (any real delta that is not one of the three above, e.g. a
   newly opened authored PR, or Jira activity in the net): one digest line each,
   e.g. `other: opened PR <repo>#N <title>` or `other: jira MX2-XXXXX <summary>`.
@@ -472,6 +527,7 @@ cycle:
     "in_progress":     {"status": "ok", "known_items": ["docr-cccc"],              "last_success_at": "2026-07-09T21:15:00Z", "error_detail": null},
     "prs_authored":    {"status": "ok", "known_items": ["mslshao/docr#10484"],     "last_success_at": "2026-07-09T21:15:00Z", "error_detail": null},
     "review_requests": {"status": "ok", "known_items": [],                         "last_success_at": "2026-07-09T21:15:00Z", "error_detail": null},
+    "prs_reviewing":   {"status": "ok", "known_items": {"mslshao/docr#10601": "2026-07-09T20:58:00Z"}, "last_success_at": "2026-07-09T21:15:00Z", "error_detail": null},
     "jira":            {"status": "ok", "known_items": ["MX2-NNNNN"],              "last_success_at": "2026-07-09T21:15:00Z", "error_detail": null}
   }
 }
@@ -487,7 +543,9 @@ cycle:
   loop-body Step 3 (bead id for `beads_ready`/`in_progress`/`jira`,
   `"<repo>#<number>"` for `prs_authored`/`review_requests`). For `in_progress` it
   is the set of currently-aged ids already alerted, pruned to live in-progress
-  items, so each alerts once and the set stays bounded.
+  items, so each alerts once and the set stays bounded. For `prs_reviewing` it is
+  a MAP of `"<repo>#<number>"` to the last-seen `updatedAt` watermark, rebuilt
+  from the current result each cycle (so departed keys are pruned).
 - On an errored source, carry forward the prior `known_items` and
   `last_success_at` unchanged, set `status: "error"` and `error_detail`, so a
   transient failure never drops the baseline.

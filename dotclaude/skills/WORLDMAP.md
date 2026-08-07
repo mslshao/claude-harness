@@ -1,15 +1,15 @@
 ---
 component: dotclaude/skills
 type: directory-map
-status: V0 complete (all 27 skills have entries)
-authored_by: Claude Opus 4.7
+status: V0 complete (all 32 skills have entries)
+authored_by: Claude Opus 5
 ---
 
 # WORLDMAP: Personal Skills
 
 AI-authored commentary on each personal-tier skill in `~/.claude/skills/`. When I invoke the skill, what failure mode it prevents, how it compounds, and where it has limits. Entries follow the format documented in the top-level `WORLDMAP.md`.
 
-Skills fall into four loose buckets: planning / decomposition (converge, bead-forge, ideate, refine, synthesize, challenge, consult, enrich), execution and review (launch, pr-intel, review, post-review, babysit-pr, test-forge, autopilot), investigation and memory (investigate, handoff, reflect, compound, calibrate, snapshot-system-prompt, recall, bd-related, capture-transcript), and tactical chores (audit-worktrees, codility-review, skill-catalog). The boundaries blur (autopilot is execution but also planning; reflect is memory but also rule-enforcement); the buckets are reading aids, not strict taxonomy.
+Skills fall into four loose buckets: planning / decomposition (converge, bead-forge, ideate, refine, synthesize, challenge, consult, enrich), execution and review (launch, campaign, pr-intel, review, cold-review, post-review, babysit-pr, overwatch, test-forge, autopilot), investigation and memory (investigate, handoff, reflect, compound, calibrate, snapshot-system-prompt, recall, bd-related, capture-transcript), and tactical chores (audit-worktrees, codility-review, doc-sweep, standup-prep, skill-catalog). The boundaries blur (autopilot is execution but also planning; reflect is memory but also rule-enforcement; overwatch watches rather than executes); the buckets are reading aids, not strict taxonomy.
 
 ---
 
@@ -745,3 +745,142 @@ What it prevents: pasted transcripts are high-value and high-loss; they carry de
 How it compounds: it shares the durable-capture machinery with `bead-forge` (the recall bead, the `log-append.py` chronological entry) and is the meeting-transcript-shaped sibling of the other capture primitives. `/handoff` produces a cold-start prompt for the next session; `/bead-forge` checkpoint preserves in-flight conversation analysis; `bd remember` stores one fact; this skill captures a meeting that already happened. Its durable output then becomes discoverable through `recall`.
 
 Limits: classification and routing are only as good as the transcript and the org-context source of truth. A name that will not resolve gets marked tentative rather than guessed, and a misrouted decision-bearing standup (sent to ephemeral output because its form is a standup) is the named anti-pattern the skill guards against but still depends on the model recognizing the decision content. The chunked-streaming path adds a finalization discipline (one PARTIAL banner, defer the log append to the closing chunk) that a careless re-run per chunk would violate.
+
+---
+
+```yaml
+---
+component: campaign
+type: skill
+status: active
+trigger_signals:
+  - "an epic already decomposed into PR-sized node beads that are each bypass-shaped"
+  - "user says 'run the campaign for <epic>', 'execute the epic unattended', 'walk-away build the stack'"
+  - "bare re-invocation after a halt, an abandon, or a context-budget rollover (the resume path)"
+prevents:
+  - "an unattended runner improvising on a malformed node bead instead of stopping"
+  - "double-firing a node whose inner /launch is still live after a session died mid-node"
+  - "a downstream PR stacking on a failed or silently stale base"
+related: [launch, converge, ideate, audit-worktrees]
+---
+```
+
+When I reach for this: never for a single ticket, and never to plan. One human `/converge` happens BEFORE this skill enters the picture. Campaign owns only the epic layer (node ordering, stack bases, cursor durability, halt and abandon semantics, the run report) and hands every node to `/launch` inline with `--gate=agent`. It adds no judgment about WHAT to build.
+
+What it prevents: the incoherence failure of a walk-away runner filling in a gap. A node bead reading "implement the design" would fall through launch's pre-converged bypass into a full UNATTENDED re-converge, which is a plan nobody reviewed becoming code nobody asked for. The construction gate is the last attended moment in the run, and it fails loudly listing every deficient bead rather than proceeding. The second class is duplicate work on resume: node status is always re-derived from the node bead's own event log, never trusted from the cursor cache, so an `in_flight` node holding a live launch lock is waited on rather than re-driven.
+
+How it compounds: with `/launch` (the per-node engine, including its own review fan-out and draft-PR finalization) and with `audit-worktrees` (the cleanup pass for the orphans a halted chain leaves behind). Failure is a whole-chain halt, not a per-node skip: every open PR in the chain gets a status comment, including the green upstream ones, because a green parent merged mid-halt would strand the rest.
+
+Limits: sequential nodes only in v1, since worktree and branch naming is second-resolution and collides under concurrency. It never merges, never flips a draft ready, and never performs terminal ticket transitions. "Walk away" is bounded by the machine: a codespace that sleeps during a CI wait kills the poll, and recovery is a manual bare re-invocation. The mid-run merge case is a deliberate loud halt rather than an autonomous fix, because a lease push needs a human verb that round. And the skill gates itself on a drill suite (`docr-k8l6y`) that had to be green before its first real epic, which is the honest read: this was not trusted on arrival.
+
+---
+
+```yaml
+---
+component: cold-review
+type: skill
+status: active
+trigger_signals:
+  - "a consequential change is finished and this session wrote both the code and every review of it"
+  - "user says 'cold review', 'external review prompt', 'hand this to a fresh session'"
+  - "a review came back and its findings need to cross back to the implementing session"
+prevents:
+  - "same-session review inheriting the author's framing, so review misses stay correlated with author blind spots"
+  - "diff-anchored review missing the reuse and sibling-path-parity classes that live outside the hunks"
+  - "review findings dying at the boundary, since the implementing session never sees the review"
+related: [review, pr-intel, post-review, handoff]
+---
+```
+
+When I reach for this: after finishing a consequential change, in place of another `/review` plus `/pr-intel --mine` cycle. The skill PRODUCES a prompt; it does not run the review. Running it here, even by spawning a subagent, reintroduces the exact bias it exists to remove, because this session would be authoring the reviewer's prompt.
+
+What it prevents: two failures that are easy to conflate, and only one of them is about who reviews. Framing correlation is the WHO: multi-agent fan-outs give subagents fresh context windows, but the implementing session writes their prompts, and a 7-lens same-session pass missed or killed 8 findings that a human peer and a bot both caught (2026-07-24). Diff-anchoring is the HOW, and three independent retros found it the larger cause: on one PR, 5 or 6 of 9 substantive human findings were sibling-path parity divergences, a class no diff-anchored lens owns because the sibling code is unchanged and often in another package. That is why the emitted artifact carries four fixed contextual reaches (reuse search, sibling-path parity, reference resolution, invariant pinning) as template rather than advice.
+
+The operational rules in it are scar tissue, not polish: pin the head SHA and read and grep through it (a working-tree grep answers the reference-resolution question against the wrong branch and reports a rename as incomplete); fetch before diffing, or a stale local base reports 33 files for a 3-file PR; and check whether the acceptance criteria were amended after implementation, because an AC list carrying the author's own verification results is author framing wearing a requirement's clothes.
+
+How it compounds: it is the author-side third of the review surface (`/review` is same-session and local, `/pr-intel` is someone else's PR). The hand-back template is the half that is easy to overlook: the implementing session cannot see the review, so the per-round FIX REQUEST block is the only thing that crosses, and its ALREADY VERIFIED section is what keeps round N+1 from re-running the reviewer's work.
+
+Limits: the decorrelation half is explicitly unproven and under evaluation (bd `docr-qc87r`); only the diff-anchoring half rests on measured evidence today. Nothing enforces the handoff either. The skill can emit a perfect prompt and the user can paste it into a subagent of the authoring session, which buys the contextual reaches and none of the decorrelation, and the output will look identical.
+
+---
+
+```yaml
+---
+component: overwatch
+type: skill
+status: active
+trigger_signals:
+  - "'watch my work queue', 'tell me when something needs my attention' asked as a STANDING request"
+  - "user is heads-down and does not want to break focus to poll beads, PRs, and tickets"
+  - "a bare /overwatch arriving from its own scheduled wakeup"
+prevents:
+  - "hand-polling three sources every hour to answer 'what should I pick up next'"
+  - "a watcher that is itself a notification source (noisy no-op cycles)"
+  - "a source that errored being read as a source that was quiet"
+related: [babysit-pr, standup-prep, launch]
+---
+```
+
+When I reach for this: standing requests only. "What is ready right now" is `bd ready`; overwatch is for the case where the polling itself is the toil. It runs a self-paced wakeup loop over beads, PRs, and tickets, surfaces only deltas (a bead newly unblocked, a review newly requested, an in-progress item going stale), and keeps all state as one JSON blob in a tracking bead so any wakeup can cold-start.
+
+What it prevents: the obvious answer is manual polling, but the more interesting one is the failure of watchers generally, which is that they become noise. A cycle with no deltas and every source healthy prints nothing at all, so silence carries information. Two smaller disciplines back that up: a source's failure is its exit code and never an empty stdout (so an outage is never mistaken for a quiet queue), and state is persisted AFTER output, so a crash re-alerts rather than marking an alert seen that the user never received. Duplicate over drop, deliberately.
+
+How it compounds: it is the read-only counterpart to `babysit-pr` (single PR, mutating, window-bounded) and the forward-looking counterpart to `standup-prep` (backward-looking, one-shot). It also inverts babysit-pr's state mechanism on purpose: a fixed-size blob replacing the bead's notes each cycle, because babysit-pr's append-only comment log is fine across a handful of cycles and unbounded in a standing loop.
+
+Limits: the skill names its own tradeoffs, and they are real. Coverage is in-session only: both scheduling primitives fire only while the REPL is alive, so a codespace that sleeps on idle kills the loop, and there is no server-side mechanism in v1. Output is chat-only, which is the sharpest limit, because a delta can land in one of five concurrent windows and go unseen, and by construction the user does not notice a miss on a channel they are not watching. Lose the tracking bead and the loop re-baselines from scratch for one silent cycle rather than reconstructing what it knew.
+
+---
+
+```yaml
+---
+component: standup-prep
+type: skill
+status: active
+trigger_signals:
+  - "'prep my standup', 'verbal standup', 'what did I do yesterday / Friday', 'what did I ship'"
+  - "post-PTO catch-up across several days (`--days N`)"
+  - "a bare 'help me with standup' when recent context is code, PR, and ticket work"
+prevents:
+  - "work misfiled onto the wrong day because the sources are UTC-stamped and the day is local"
+  - "a Slack sweep that reads public-only or page one and silently drops most of the day"
+  - "bot comments posted under the user's token being reported as review activity"
+related: [capture-transcript, overwatch, handoff]
+---
+```
+
+When I reach for this: the user wants a spoken talk-track built from their own activity for a past day. Outbound generation, gathered across git, authored and reviewed PRs, PR and issue comments, tickets, Confluence, beads, and Slack. Read-only; it never posts or mutates.
+
+What it prevents: three concrete, observed errors. The day boundary is first and the skill treats it as load-bearing: the local UTC offset is derived mechanically from the user's own commit stamps and every source is re-binned against it, because hand-computing a date or a day of week is exactly where the wrong day creeps in. Second is the truncated sweep: a public-only Slack search returned 1 message where private plus DMs returned 109 across 6 pages, and stopping at page one drops the start of the day (descending sort puts the morning last), so the output must state how many pages were read. Third is overclaiming: stack-management and merge-activity comments the bot posts under the user's token are filtered out, and the exclusion is flagged rather than done silently.
+
+How it compounds: the inbound complement is `capture-transcript` (what others said in a meeting that already happened); the Slack plugin's `/standup` is the lighter Slack-only path when a postable channel message is all that is wanted. `overwatch` covers the forward-looking half of the same question.
+
+Limits: a good part of this file is a vendor-quirk ledger, and quirks expire. Bare dates in Confluence search evaluate in UTC while ticket search uses the profile timezone; the Slack tool's `after`/`before` parameters are epoch seconds rather than dates; a contributor filter returns pages the user ever touched, not pages they touched that day. Each is verified and each is true only until the vendor changes it, and nothing here detects when that happens. The Confluence last-modified value comes back as a friendly string ("yesterday at 6:23 PM") that cannot support exact gating at all, so that source is accepted approximately by design. Default scope is the current repo; multi-repo weeks need an explicit loop.
+
+---
+
+```yaml
+---
+component: doc-sweep
+type: skill
+status: active
+trigger_signals:
+  - "monthly cadence on one specific Confluence page series"
+  - "after a batch of agent, skill, or rule additions that the pages document"
+  - "a prior review left findings unapplied"
+prevents:
+  - "documentation describing a harness that no longer exists (inventory and model-lineup drift)"
+  - "editing a page from memory of what it said rather than from a fresh fetch"
+  - "a fix applied against a stale claim about what an enforcement hook actually blocks"
+related: [handoff, compound]
+---
+```
+
+When I reach for this: maintenance of one named Confluence series, on a monthly-ish cadence or after harness changes that the pages describe. Verify-then-fix in two workflows: parallel read-only agents check each page and fact-check external product claims, then per-page fix agents apply exact-substring edits, publish, and re-fetch to confirm.
+
+What it prevents: the drift classes that a docs corpus about fast-moving tooling accumulates by default (agent and command inventories going stale, third-party product claims rotting on roughly a monthly cycle, mechanical schema slips). More specific to this skill's shape: it prevents the fix pass from becoming its own source of damage. Edits are exact substrings against a freshly fetched body with an occurrence-count guard, the fetch aborts on version drift, and every replacement is verified by re-fetch.
+
+Two habits worth naming because they are unusual: the skill distrusts its own reviewers (a proposed "schema drift" finding is checked against the ratified schema first, after a reviewer flagged a deliberate special case as drift), and it reads enforcement claims from the hook source rather than a memory paraphrase (a stale memory claim about a hook degraded a fix once).
+
+How it compounds: with the page-format memory file, which is both its input and its output. Each sweep writes back a convergence-history entry and an updated held-items list, so the next sweep starts from what the last one could not close.
+
+Limits: narrow by construction, and it says so. One page series, one author, one space, personal-tier with no promotion path (the machinery reaches into personal memory files and hooks). Items owned by someone outside the loop are never fixed unilaterally, so a sweep can finish "converged" with known drift still standing. Cadence is a recurring bead check rather than cron because the codespace sleeps, which means in practice the sweep runs when someone remembers it. And it accepts a documented class of round-trip noise (trailing-space widening, bold-link normalization) rather than chasing it.

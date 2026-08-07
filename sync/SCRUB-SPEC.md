@@ -31,6 +31,16 @@ The concrete pattern list is deliberately NOT in this file or anywhere else in t
 
 Replacement: role-neutral phrasing (`a peer reviewer`, `a teammate`, `another engineer`) or removed entirely if not load-bearing.
 
+**Operational note: `sync/scrub-names.local` is required, not optional.** Because the file is gitignored, a fresh clone starts without it, and `scrub-check.sh` then runs with the Tier 1 scan disabled. It warns on stderr and qualifies its summary line (`Tiers 2-4 clean ... Tier 1 real-name scan SKIPPED`), but the exit code is still 0. An unattended CI run, or a quick eyeball on the last line of output, reads that as a pass. This has already happened once here: the file was absent across several syncs, so the load-bearing scan never ran and real teammate names sat in the published mirror while every check reported a qualified pass.
+
+Before trusting any scrub-check result on a fresh clone:
+
+1. Recreate `sync/scrub-names.local` (one extended-regex pattern per line; see the format header in an existing copy, or rebuild it from the current team roster).
+2. Run `bash sync/scrub-check.sh`.
+3. Confirm the summary line is the unqualified form: `scrub-check: clean (N files scanned, 0 findings)`. If it still says `SKIPPED`, the scan that matters did not run and the result means nothing about names.
+
+Prefer over-inclusive patterns. A false positive costs one human look; a false negative publishes a real coworker's name without their consent.
+
 ### Tier 2: Specific incident references
 
 These name an employer in a way that ties a specific incident to a specific company. Scrub even when the surrounding context would otherwise read as generic.
@@ -41,16 +51,21 @@ These name an employer in a way that ties a specific incident to a specific comp
 
 Replacement: anonymize ("a vendor", "a customer firm", "a peer review incident") or remove.
 
-### Tier 3: Bead IDs and internal-tracking references
+### Tier 3: Internal tracking IDs
 
-The harness uses `docr-*` bead IDs throughout `CLAUDE.md` and memory files. These IDs are meaningful only inside the author's beads workspace; they read as opaque references in any public artifact.
+Tier 3 covers identifiers that let a reader address an internal system directly, or that pin a public claim to one specific internal ticket. It deliberately does NOT cover bead IDs; see below.
 
-- All `docr-[a-z0-9]+` matches
-- Specific PR numbers `#NNNN` when they tie to identifiable individuals
-- Confluence page IDs (numeric, typically 9-10 digits, appearing in the patterns specific to atlassian.net URLs)
-- Specific Jira ticket numbers `MX2-NNNNN`
+Enforced by `scrub-check.sh` (`TIER3_PATTERNS`), and this list is the whole of it:
 
-Replacement: remove, or replace with anonymized placeholders (`a bead`, `a PR`, `a Jira ticket`).
+- The internal Confluence space ID (`712020e7620f9a43fa4ea69b7a38bc2ee47ff5`)
+- The Atlassian cloud ID (`f6ec428e-c64c-40d8-983b-9ac03ead43f5`)
+- Specific Jira ticket numbers, `MX2-` followed by digits. Placeholder forms (`MX2-XXXXX`, `MX2-NNNNN`) deliberately do not match, so an example can keep the shape of a ticket reference without carrying a real one.
+
+Replacement: remove, or substitute a placeholder that keeps the shape and drops the value (`a Jira ticket`, `MX2-XXXXX`, `a Confluence space`).
+
+Two things sit under Tier 3's heading conceptually but cannot be expressed as a detector pattern, so they are reviewer judgment rather than enforced rules: PR numbers that tie a specific review incident to an identifiable individual (`#NNNN`), and Confluence page IDs in `atlassian.net` URLs. Handle those in review; do not expect `scrub-check.sh` to catch them.
+
+**Bead IDs (`docr-*`) stay.** They are authentic operational flavor, not a leak. A bead ID resolves only inside the author's local beads workspace, carries no content, and reaches nothing a public reader can query, so it is opaque on its own. What it does carry is provenance: it marks a principle as having come from a specific real corrective instance rather than being invented for the writeup, and a calibration entry or a graveyard note keeps that tie legible even to a reader who cannot follow the reference. Scrubbing them would cost the whole provenance trail and buy nothing. As of 2026-08-07 the repo carries 161 bead-ID references across 42 scanned files, and `scrub-check.sh` passes clean with all of them present.
 
 ### Tier 4: Proprietary infrastructure detail
 
@@ -58,7 +73,7 @@ MX2 vocabulary is acceptable as authentic flavor (it tells the reader "this was 
 
 - Specific AWS resource names (DynamoDB table names, S3 buckets, Lambda function names) when they identify customer-facing or unreleased systems
 - Specific Datadog dashboard IDs, monitor IDs, query strings that reveal monitoring topology
-- Internal Confluence space IDs (`<confluence-space-id>`, the cloud ID `<atlassian-cloud-id>`)
+- Internal Confluence space IDs and the Atlassian cloud ID (same class of concern, but `scrub-check.sh` enforces them as Tier 3; see that section for the literal values)
 - Slack channel names that identify private channels
 
 Replacement: keep the principle, remove the identifier ("a Datadog dashboard"; "a private Slack channel").

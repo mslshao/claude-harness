@@ -198,7 +198,7 @@ Append a new `[PR_BABYSIT_STATE cycle=N]` block as a comment on the bead with:
 - Updated `actions_taken` (entries for each AUTO-REMEDIATE and REPLY-ONLY this cycle)
 - Updated `escalations` (entries for each ESCALATE this cycle)
 - `ci_snapshot: <success_count> SUCCESS / <failure_count> FAILURE / <pending_count> PENDING`
-- `review_state: <one-line summary, e.g. "approved by a peer reviewer-forthepeople; awaiting a teammate">`
+- `review_state: <one-line summary, e.g. "approved by <reviewer-handle>; awaiting <reviewer-handle>">`
 
 ```bash
 bd comment <bead-id> "[PR_BABYSIT_STATE cycle=N]
