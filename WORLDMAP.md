@@ -1,7 +1,7 @@
 ---
 component: claude-harness (top-level)
 type: meta
-status: V0
+status: V3
 authored_by: Claude Opus 5 (the AI that operates inside this harness)
 editorial_review_by: Michael Shao (factual accuracy + third-party privacy only; no steering toward flattering versions)
 ---
@@ -58,7 +58,7 @@ The honesty mechanism matters because the author's claim is that the harness com
 
 Specific limits worth naming, in approximate order of severity:
 
-1. **The empirical claim ("lower turnaround") is uninstrumented.** The author asserts the harness has reduced back-and-forth significantly. The closest existing evidence in this repo is third-party anecdata (other engineers' compression stories), not the author's own before-after measurements. The strongest portfolio version of this repo would include at least one own-loop empirical entry; that work is pending.
+1. **The empirical claim ("lower turnaround") is uninstrumented.** The author asserts the harness has reduced back-and-forth significantly. `evidence/` now holds seven own-loop entries alongside the third-party one, so the earlier version of this limit ("no own-loop evidence exists yet") no longer holds. What has not changed is the kind of evidence: every entry is a qualitative before-after narrative of a single instance, selected because it was notable. There is no baseline, no counterfactual, and no controlled comparison against working without the harness, so the entries establish that specific compressions happened, not the rate or the magnitude. Selection bias runs in the flattering direction, since a session where the harness added friction is less likely to get written up. Treat the corpus as existence proofs, not measurement.
 
 2. **The harness is highly personalized.** Many rules encode the author's specific preferences (multi-window operational reality, terse-input handling, calibrated language). Adopters with different working styles will need to tune. The portable parts (`patterns/`, `dispatch/`, `scaffolding/`) are the highest-leverage pieces for adopters; the `dotclaude/` mirror is the author's specific configuration, not a recipe.
 
@@ -68,21 +68,22 @@ Specific limits worth naming, in approximate order of severity:
 
 5. **The graveyard is partial.** `~/.claude/` is not git-versioned by default, so perma-deleted personal-tier files are unrecoverable. The graveyard captures what the author remembers; not what actually existed.
 
-## Status (V0)
+## Status (V3)
 
-| Directory | V0 contents | Pending |
+| Directory | V3 contents | Pending |
 |---|---|---|
-| `patterns/` | 11 philosophy docs; WORLDMAP pointer-shaped commentary complete | None for V0; expand on adoption |
-| `dispatch/` | 4 routing docs; WORLDMAP pointer-shaped commentary complete | None for V0 |
-| `scaffolding/` | 7 memory architecture docs; WORLDMAP pointer-shaped commentary complete | None for V0 |
+| `patterns/` | 12 philosophy docs; WORLDMAP pointer-shaped commentary complete | None; expand on adoption |
+| `dispatch/` | 4 routing docs; WORLDMAP pointer-shaped commentary complete | None |
+| `scaffolding/` | 7 memory architecture docs; WORLDMAP pointer-shaped commentary complete | None |
 | `learnings/` | 11 of 12 corpus pages lifted from Confluence with editorial scrubbing; PM-focused 12th page deferred | When/if the deferred PM-focused page returns, it returns as a fresh audience-broad write |
-| `evidence/` | 7 entries (1 third-party, 6 own-loop) | More own-loop entries as instances surface |
-| `dotclaude/agents/` | 21 agent files + calibration + shared; WORLDMAP per-agent commentary complete | None for V0; review for accuracy on agent rev |
-| `dotclaude/skills/` | 22 skill directories (47 files); WORLDMAP per-skill commentary complete | None for V0; review for accuracy on skill rev |
-| `dotclaude/hooks/` | description-first README + 6 portable examples; WORLDMAP category-shaped commentary complete | None for V0 |
-| `dotclaude/CLAUDE.md` | scrubbed personal global instructions | None for V0 |
-| `project-tier/` | 3 agents (observability-reviewer, test-quality-reviewer, silent-failure-hunter) + 3 skills (enrich, investigate, review) mirrored from team-reviewed PR promotions; README documents the lift and the scrubbing applied | Optional: mirror selected project-tier rules; deferred to patterns/lab-to-production.md cross-references for V1 |
-| `graveyard/` | placeholder README only | agentcore, medical-legal-specialist entries + git scan for project-tier deletions |
-| `sync/` | install.sh + uninstall.sh + scrub-check.sh + SCRUB-SPEC.md | None |
+| `evidence/` | 8 entries (1 third-party, 7 own-loop) | More own-loop entries as instances surface |
+| `dotclaude/agents/` | 22 agent files + calibration + shared; 20 WORLDMAP entries cover them (the launch flex/implementer/tester trio shares one combined entry) | None; review for accuracy on agent rev |
+| `dotclaude/skills/` | 32 skill directories (89 files); 32 WORLDMAP per-skill entries, campaign and cold-review included | None; review for accuracy on skill rev |
+| `dotclaude/hooks/` | 72 hooks, all 72 described in the description-first README, plus 8 portable runnable examples in `examples/`; WORLDMAP category-shaped commentary in 10 catalog sections plus a shared-library entry | None |
+| `dotclaude/commands/` | 2 commands (jira, confluence); WORLDMAP per-command commentary complete | None; both commands are personal-tier shadows of project commands, so the set grows only when a new project command needs a local delta |
+| `dotclaude/CLAUDE.md` | scrubbed personal global instructions | None |
+| `project-tier/` | 17 promoted artifacts, all re-synced against the live project tier on 2026-08-07: 6 agents (module-cohesion-reviewer, mx2-security-auditor, mx2-skeptic, observability-reviewer, silent-failure-hunter, test-quality-reviewer), 4 skills (enrich, ideate, investigate, review), 7 rules (debugging, exemplars, pr-size-discipline, python-testing, tenets, typescript-exploration, verification). Membership fixed by first-commit authorship; README documents the lift and the scrubbing applied | Re-sync is manual and unenforced. A mirrored snapshot of a living artifact goes stale silently, and a stale copy states something false about the codebase rather than merely being out of date (one did, before this pass) |
+| `graveyard/` | Keymaker principle in the README + 5 entries | None named; the graveyard stays incomplete by construction (see limit 5) |
+| `sync/` | install.sh + uninstall.sh + scrub-check.sh + SCRUB-SPEC.md, plus the gitignored `scrub-names.local` holding the Tier 1 real-name patterns | None |
 
-V0 is the foundational layout plus the philosophy content. The AI-authored per-component commentary (WORLDMAP files in agents/, skills/, patterns/, dispatch/, scaffolding/, hooks/) is now complete; V1 priorities are `evidence/` empirical entries and the `learnings/` migration from Confluence.
+V3 is the foundational layout, the philosophy content, and AI-authored per-component commentary now covering every `dotclaude/` subdirectory (agents, skills, commands, hooks) alongside patterns/, dispatch/, and scaffolding/. What is still open: the deferred 12th `learnings/` page has not been rewritten for a broader audience, and `evidence/` grows only when a new own-loop instance surfaces, not on a schedule. The Perplexity Spaces port named above is still unrun, so the transferability claim in the tool-boundary table remains untested.

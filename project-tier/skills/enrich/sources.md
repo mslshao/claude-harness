@@ -1,3 +1,16 @@
+---
+allowed-tools:
+  - mcp__atlassian__getJiraIssue
+  - mcp__aws__call_aws
+  - mcp__datadog__search_datadog_events
+  - mcp__datadog__search_datadog_logs
+  - mcp__datadog__aggregate_spans
+  - Bash(gh pr view:*)
+  - Bash(gh api:*)
+  - Grep
+  - Read
+---
+
 # Enrichment Sources
 
 Shared reference for context-gathering tools and bounds. Referenced by
@@ -17,7 +30,7 @@ Shared reference for context-gathering tools and bounds. Referenced by
 
 ```
 mcp__atlassian__getJiraIssue
-  cloudId: <your-atlassian-cloud-id>
+  cloudId: <atlassian-cloud-id>
   issueIdOrKey: MX2-XXXXX
   fields: ["summary", "status", "assignee", "priority", "description", "customfield_11220", "comment", "issuelinks"]
   responseContentFormat: markdown
@@ -72,9 +85,7 @@ service name. Skip for free-text inputs that contain no service identifier.
 **Lambda function config:**
 ```
 mcp__aws__call_aws
-  service: lambda
-  action: get_function_configuration
-  parameters: {"FunctionName": "<function-name>"}
+  cli_command: "aws lambda get-function-configuration --function-name <function-name>"
 ```
 
 Extract: `LastModified`, `Environment.Variables` (variable **names only** - do
@@ -88,17 +99,7 @@ code change time.
 **Recent error counts (CloudWatch):**
 ```
 mcp__aws__call_aws
-  service: cloudwatch
-  action: get_metric_statistics
-  parameters: {
-    "Namespace": "AWS/Lambda",
-    "MetricName": "Errors",
-    "Dimensions": [{"Name": "FunctionName", "Value": "<function-name>"}],
-    "StartTime": "<1 hour ago>",
-    "EndTime": "<now>",
-    "Period": 3600,
-    "Statistics": ["Sum"]
-  }
+  cli_command: "aws cloudwatch get-metric-statistics --namespace AWS/Lambda --metric-name Errors --dimensions Name=FunctionName,Value=<function-name> --start-time <1-hour-ago-ISO8601> --end-time <now-ISO8601> --period 3600 --statistics Sum"
 ```
 
 **Bounds:** 1 service per enrichment. Last 1 hour of error counts only.
@@ -115,14 +116,16 @@ name or ECS service name). Skip for free-text inputs without a service identifie
 ```
 mcp__datadog__search_datadog_events
   query: "service:<service-name> status:error"
-  timeframe: last_24h
+  from: "now-1d"
+  to: "now"
 ```
 
 **Top error patterns:**
 ```
 mcp__datadog__search_datadog_logs
   query: "service:<service-name> status:error"
-  timeframe: last_24h
+  from: "now-1d"
+  to: "now"
 ```
 
 **Bounds:** Last 24h hot tier. For any window longer than 7 days, use
@@ -157,7 +160,7 @@ gh pr view <N> --json title,body,changedFiles,url,state,author,baseRefName
 
 **For inline review comments** (when the briefing needs reviewer context):
 ```bash
-gh api /repos/<owner>/<repo>/pulls/<N>/comments \
+gh api /repos/<company>/docr/pulls/<N>/comments \
   --jq '[.[] | {user: .user.login, path: .path, line: .line, body: .body}]'
 ```
 Adds inline thread context (Copilot/Sentry comments live here). Also fetch

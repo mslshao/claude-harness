@@ -46,7 +46,7 @@ MX2 coding standards and testing conventions live in `.claude/rules/testing.md` 
 
 ## MX2 Testing Tenets
 
-These are the authoritative principles. When a test falls in a gray area, resolve it against these tenets. [Confluence source](https://<company>.atlassian.net/wiki/spaces/PPET/pages/5653987353).
+These are the authoritative principles. When a test falls in a gray area, resolve it against these tenets. Source: an internal Confluence page.
 
 1. **Test domain-meaningful behavior, not implementation.** Assert what the code _does_, not how it does it. Assert outcomes against domain expectations, not just existence or shape. Per `.claude/rules/testing.md` (The refactor test): "Does this test break ONLY if OUR code changes?" A refactor that preserves behavior should never break a test.
 2. **Fake at the lowest layer.** moto, responses, and aioresponses sit at the infrastructure boundary. Don't mock above them. When no infrastructure fake exists for an internal collaborator, `mockito` is the escape hatch (not `unittest.mock`). For LLM APIs (Anthropic, OpenAI, Bedrock, whether via LangChain or the raw SDK), use `FakeChatModel` / `FakeOpenAIClient` from `mx2.testing.llm` (object-layer fakes: these SDKs are httpx/botocore-based, so `responses` CANNOT intercept them). Flag tests that hand-roll LLM response payloads or fake LLM calls with `unittest.mock`.

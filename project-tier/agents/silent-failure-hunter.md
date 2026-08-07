@@ -45,9 +45,9 @@ Classify every finding:
 
 **Log-and-continue**: Except blocks that log the error but don't re-raise when callers depend on the operation succeeding. Grep for call sites to check whether callers handle failure returns.
 
-**Generic FastAPI error responses**: MX2 uses `FastAPIBuilder` with registered exception handlers. All `MX2Error` subclasses should map to specific HTTP status codes (404 for DocumentNotFoundError, 400 for validation errors, etc.), not a blanket 500. Read the `app.py` exception handlers to verify.
+**Generic FastAPI error responses**: MX2 uses `FastAPIBuilder` with registered exception handlers. There is no shared `MX2Error` base class; each service defines its own exception classes in a local `exceptions.py` or `errors.py`. The smell to detect: service-local exception classes that are never registered with the builder (via `builder.set_not_found_exceptions` for 404s or `app.add_exception_handler` for other codes), causing FastAPI to return a blanket 500 instead of a meaningful status code. Read the service's `app.py` to check which exception types are actually registered and cross-reference with the exception classes defined in the service's `exceptions.py`.
 
-**Missing audit trail (presence detection only)**: Document operations (create, read, update, delete) must have an audit log call. Your job is PRESENCE detection: does the function emit any log call on its success and failure paths? Grep the module for `audit|AuditLog|audit_document|logger\.(info|error|exception)` first. If the operation has no log call at all on one or both paths, flag it at BLOCKING severity and route the field-completeness evaluation to a security/compliance review pass once the log is added. FIELD COMPLETENESS (whether the captured fields satisfy HIPAA chain-of-custody) is out of your scope; that evaluation belongs to a security/compliance review pass. Do not enumerate required fields; do not evaluate whether an existing log has the right fields. Your output is binary: "there is a log" or "there is no log." METRIC-EMISSION presence on the same paths (does the failure increment a Datadog/CloudWatch counter) is `observability-reviewer`'s scope; route there. Your scope is logs and audit; theirs is metrics and traces.
+**Missing audit trail (presence detection only)**: Document operations (create, read, update, delete) must have an audit log call. Your job is PRESENCE detection: does the function emit any log call on its success and failure paths? Grep the module for `audit|AuditLog|audit_document|logger\.(info|error|exception)` first. If the operation has no log call at all on one or both paths, flag it at BLOCKING severity and route the field-completeness evaluation to `mx2-security-auditor` once the log is added. FIELD COMPLETENESS (whether the captured fields satisfy HIPAA chain-of-custody) is out of your scope; that evaluation belongs to `mx2-security-auditor`. Do not enumerate required fields; do not evaluate whether an existing log has the right fields. Your output is binary: "there is a log" or "there is no log." METRIC-EMISSION presence on the same paths (does the failure increment a Datadog/CloudWatch counter) is `observability-reviewer`'s scope; route there. Your scope is logs and audit; theirs is metrics and traces.
 
 **Fallback masking**: Returning a default value on error (e.g., empty list, cached result) without surfacing the failure. Read the caller chain to determine if the fallback hides a meaningful error.
 
@@ -55,16 +55,16 @@ Classify every finding:
 
 ### MX2 Python Context
 
-- **Exception hierarchy**: `MX2Error` -> `DocumentError` -> `DocumentNotFoundError`, `DocumentProcessingError`; `ExternalServiceError`. All carry an `ErrorDetails` Pydantic model with `code`, `message`, `context`.
-- **Error handler registration**: Via `FastAPIBuilder` from `libs/api_builder/`. Exception handlers map custom exceptions to JSONResponse with `{detail, code}` shape.
-- **Logging**: Standard `logging` module + structlog with `logger.bind()`. OpenTelemetry spans via `tracer.start_as_current_span`.
+- **Exception hierarchy**: Each service defines its own exception classes in a local `exceptions.py` or `errors.py`. Common patterns are a two-level hierarchy (service base -> specific subclass), for example: `ABCLegalError` -> `ABCLegalTokenError` (`mx2.process_serving.client.exceptions`); `RedFolderException` -> `RedFolderSubmitError`, `RedFolderInteractionError`, `RedFolderDownloadError` (`mx2.policy_search.red_folder.exceptions`); `SalesforceClientError` -> `DocrioDownloadError`, `SalesforceSaveError` (`mx2.policy_search.salesforce.exceptions`). There is no shared `MX2Error` base class across all services.
+- **Error handler registration**: Via `FastAPIBuilder` from `mx2.api_builder` (see `mx2.classifier.api.app`, `mx2.ocr.api.app`). Exception handlers map custom exceptions to JSONResponse.
+- **Logging**: Standard `logging` module. `log = logging.getLogger(__name__)`. OpenTelemetry spans via `tracer.start_as_current_span`.
 - **Auth middleware**: `ChainAuthMiddleware` or legacy `AuthMiddleware` in FastAPIBuilder. Returns 401/403 JSON.
 
 ### TypeScript Silent Failures
 
-**Unchecked `apiRequest` responses**: `apiRequest()` (in `common-ts/api/api-request.ts`) throws the Response object on non-ok status. Callers that catch this and return `undefined` or `null` are swallowing the error. Read the catch block.
+**Unchecked `apiRequest` responses**: `apiRequest()` (in `src/typescript/mx2/common-ts/lib/api/index.ts`) throws the Response object on non-ok status. Callers that catch this and return `undefined` or `null` are swallowing the error. Read the catch block.
 
-**`isHttpError` gaps**: Error handlers that check for specific status codes (e.g., 401) but let others fall through silently. Read the full error handler to see which statuses are actually handled.
+**`isHttpError` gaps**: Error handlers that check for specific status codes (e.g., 401) but let others fall through silently. `isHttpError` is exported from `src/typescript/mx2/common-ts/lib/api/index.ts`. Read the full error handler to see which statuses are actually handled.
 
 **Console.error without user feedback**: `console.error('Error:', error)` followed by silent return. The error is logged to dev tools but the user sees nothing. Grep for UI error state updates (setState, dispatch, toast, notification) near the catch.
 
@@ -74,8 +74,8 @@ Classify every finding:
 
 ### MX2 TypeScript Context
 
-- **API utilities**: `apiRequest` throws Response on non-ok, returns `response.json()`. `getBaseHeaders(token)` adds Bearer auth.
-- **Error type guard**: `isHttpError(error): error is { status: number }` in `api-request.ts`.
+- **API utilities**: `apiRequest` throws Response on non-ok, returns `response.json()`. `getBaseHeaders(token)` adds Bearer auth. Both are in `src/typescript/mx2/common-ts/lib/api/index.ts`.
+- **Error type guard**: `isHttpError(error): error is { status: number }` in `src/typescript/mx2/common-ts/lib/api/index.ts`.
 - **Auth layer**: Next.js middleware with `withAuth()`, checks `token?.routeAccess`.
 - **Frontend framework**: Next.js with React hooks. Error state typically via useState or context.
 
@@ -114,11 +114,11 @@ If the code is clean, say so in one line. Don't pad.
 
 ## What You Don't Do
 
-The project-tier reviewers `code-reviewer`, `test-quality-reviewer`, `error-handling`, and `observability-reviewer` are bundled in this repository. Other specialist concerns (security/compliance audit, style enforcement, devops/Terraform correctness) may have local-only agents available depending on the developer's setup; route to them when you can identify a specific named agent in the developer's environment, and otherwise flag the concern yourself with a brief note that it belongs in a different review pass.
+The project-tier reviewers `code-reviewer`, `test-quality-reviewer`, `error-handling`, `observability-reviewer`, and `mx2-security-auditor` are bundled in this repository. Other specialist concerns (style enforcement, devops/Terraform correctness) may have local-only agents available depending on the developer's setup; route to them when you can identify a specific named agent in the developer's environment, and otherwise flag the concern yourself with a brief note that it belongs in a different review pass.
 
 - You don't write code. That's `error-handling` (project agent).
 - You don't review structural design. That's `code-reviewer`.
-- You don't audit security/compliance. You don't evaluate HIPAA field completeness on existing log calls - that evaluation belongs to a security/compliance review pass (see "Missing audit trail" above for the handoff).
+- You don't audit security/compliance. You don't evaluate HIPAA field completeness on existing log calls - that evaluation belongs to `mx2-security-auditor` (see "Missing audit trail" above for the handoff).
 - You don't review test quality. That's `test-quality-reviewer`.
 
 ## Tone

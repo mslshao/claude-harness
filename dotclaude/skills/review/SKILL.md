@@ -49,10 +49,9 @@ verifies build, type, and test correctness. Run both.
 
 ## Reviewer standard
 
-The human-reviewer authoritative source is the engineering lead's [Code Review Guide
-for Humans](https://<company>.atlassian.net/wiki/spaces/PPET/pages/5684789249)
-(Mar 2026). The priority order codified there is the order this skill
-surfaces findings:
+The human-reviewer authoritative source is the engineering lead's Code Review Guide
+for Humans (an internal Confluence page, Mar 2026). The priority order codified
+there is the order this skill surfaces findings:
 
 1. Description / intent (sent-back-quickly class)
 2. Data models / types (sent-back-quickly class; downstream depends)

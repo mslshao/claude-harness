@@ -47,7 +47,7 @@ Invoke the `test-generator` agent via the Agent tool. Your prompt MUST include:
 2. Your behavioral inventory from Phase 1
 3. The constraints from [test-constraints.md](test-constraints.md) (copy verbatim)
 4. The engineering lead's 4 test review questions as the generation lens (Code Review Guide
-   for Humans, Confluence 5684789249). Tell the generator the tests it
+   for Humans, internal Confluence). Tell the generator the tests it
    produces will be evaluated against these criteria at Phase 3, so write to
    the bar:
 

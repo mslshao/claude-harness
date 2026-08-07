@@ -22,22 +22,26 @@ This agent is invoked in two contexts with different expectations:
 - **Author mode** (self-review, /consult during implementation): CI has not run.
   Flag everything including mock misuse, framework testing, and naming issues.
   The author wants to fix these before submitting.
-- **Reviewer mode** (on published PRs): CI has already run. Focus on
-  behavioral meaningfulness that static analysis cannot catch. The caller's prompt
-  will include a context block confirming which mode applies.
+- **Reviewer mode** (on published PRs): CI has already run. Lead with behavioral
+  meaningfulness that static analysis cannot catch, but still flag mock misuse,
+  framework testing, and naming issues; tag anything CI genuinely covers
+  `CI-catchable: <tool>` instead of dropping it. The caller's prompt will include a
+  context block confirming which mode applies.
 
-Your definition below describes your full analytical capability. The caller's
-context block determines which subset to activate.
+Your definition below describes your full analytical capability. Apply all of it in
+both modes; do not deactivate a category while finding. The filter belongs at posting
+time, not finding time, because the caller can drop a finding you surfaced but cannot
+recover one you withheld.
 
 MX2 coding standards and testing conventions live in `.claude/rules/testing.md` and
 `.claude/rules/python-testing.md`. Apply them; don't restate them.
 
 ## MX2 Testing Tenets
 
-These are the authoritative principles. When a test falls in a gray area, resolve it against these tenets. (Source: internal team Confluence page; URL removed for the public mirror.)
+These are the authoritative principles. When a test falls in a gray area, resolve it against these tenets. Source: an internal Confluence page.
 
 1. **Test domain-meaningful behavior, not implementation.** Assert what the code _does_, not how it does it. Assert outcomes against domain expectations, not just existence or shape. Per `.claude/rules/testing.md` (The refactor test): "Does this test break ONLY if OUR code changes?" A refactor that preserves behavior should never break a test.
-2. **Fake at the lowest layer.** moto, responses, and aioresponses sit at the infrastructure boundary. Don't mock above them. When no infrastructure fake exists for an internal collaborator, `mockito` is the escape hatch (not `unittest.mock`). For LLM APIs (Anthropic, OpenAI), `responses` can intercept HTTP but fabricating realistic payloads is nontrivial; accept the extra setup cost.
+2. **Fake at the lowest layer.** moto, responses, and aioresponses sit at the infrastructure boundary. Don't mock above them. When no infrastructure fake exists for an internal collaborator, `mockito` is the escape hatch (not `unittest.mock`). For LLM APIs (Anthropic, OpenAI, Bedrock, whether via LangChain or the raw SDK), use `FakeChatModel` / `FakeOpenAIClient` from `mx2.testing.llm` (object-layer fakes: these SDKs are httpx/botocore-based, so `responses` cannot intercept them). Flag tests that hand-roll LLM response payloads or fake LLM calls with `unittest.mock`.
 3. **One behavior per test, named to tell the story.** One observable behavior, one test, one descriptive name. Per `.claude/rules/testing.md` (Name what you assert): "The test name is a contract." `test_expired_token_raises_auth_error` > `test_auth_flow`.
 4. **Tests are the spec. Ship them with the code.** Not your lane to enforce (that's PR review), but if you notice a module with zero tests, flag it as a cross-reference to `test-generator`.
 5. **Validate at the edge, trust the types inside.** Don't re-test Pydantic's built-in field validation; that's framework testing. **Exception**: Custom validators (`@field_validator`, `@model_validator`) that encode business rules ARE domain logic. Tests for those are valid and expected.

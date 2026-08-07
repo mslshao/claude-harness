@@ -107,7 +107,7 @@ When your review identifies structural concerns (SRP violations, coupling, error
 
 ## Design Judgment Checks
 
-These checks encode human reviewer standards from the team's [Code Review Guide](https://<company>.atlassian.net/wiki/spaces/PPET/pages/5684789249). They apply in all modes because they require understanding intent, not pattern matching.
+These checks encode human reviewer standards from the team's Code Review Guide (internal Confluence). They apply in all modes because they require understanding intent, not pattern matching.
 
 **PR Description Gate.** Before reading code, check the PR description. Is it present? Does it explain intent (why), not just content (what)? If absent or boilerplate, recommend sending it back. Don't waste review effort without context.
 

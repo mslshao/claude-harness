@@ -563,7 +563,7 @@ even if clean: "Reviewed for: PII exposure, auth/authz, audit trails, encryption
 - **Depth by default, speed on request.** Specialist dispatch is default. `--quick` for triage.
 - **Don't duplicate existing tools.** No `pants` runs. Posting is delegated to `/post-review`, never reimplemented. The briefing itself is never auto-posted, and `/pr-intel` performs no posting of its own; all posting is `/post-review` after your explicit OK.
 - **The engineering lead's priority order is the human-reviewer standard.** The engineering lead's
-  [Code Review Guide for Humans](https://<company>.atlassian.net/wiki/spaces/PPET/pages/5684789249)
+  Code Review Guide for Humans (an internal Confluence page)
   (Mar 2026) defines the priority order: description, then types, then
   complexity / naming, then boolean / behavior-switching params, then tests,
   then correctness-via-tests (NOT in-head execution), then static analyzers,

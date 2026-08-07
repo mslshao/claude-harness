@@ -28,7 +28,8 @@ A personal-tier artifact is ready for promotion when:
 
 Personal and project versions of the same artifact CAN diverge intentionally. Examples observed in practice:
 
-- The project-tier code reviewer has limited tool access (read-only file operations). The personal-tier variant has write-capable tools and can invoke the skill catalog. The divergence is intentional: project tier is for team-wide use where unsupervised writes are risky; personal tier is for the author's own loop where the trust calculus differs.
+- The personal-tier code reviewer preloads the skill catalog so it can name the right escalation target; the project-tier one does not. That is the whole surviving delta. Both are read-only (`Bash`, `Glob`, `Grep`, `Read`).
+- That last point used to read differently here, and the correction is the more useful example. The personal variant did once carry write-capable tools, on the reasoning that project tier is for team-wide use where unsupervised writes are risky while the author's own loop has a different trust calculus. That reasoning was abandoned in July 2026: every review agent went read-only in both tiers, on the principle that reviewers report and never fix. A reviewer that can edit will sometimes edit instead of reporting, and the finding disappears into a diff nobody reviewed. The trust calculus was never the real variable; the role boundary was.
 - Personal CLAUDE.md and project CLAUDE.md cover related material with different framing. Personal version uses first-person rules; project version uses team-tier conventions.
 
 The convention: divergence is fine. Promote what generalizes; keep what is personal in personal.
@@ -48,7 +49,7 @@ This is the precedence convention for promoted artifacts. Keeping the name ident
 1. **Delta-first descriptions.** Each shadowed personal artifact opens its description with the shadow relationship and the delta, in the form `(personal; shadows the project-tier X) Delta: ...`. The reader (human or model) sees immediately that this is the precedence-winning variant and what it adds over the project version, without having to diff the two files.
 2. **Identical names, not renamed.** Do not disambiguate by renaming the personal version (`enrich-personal`, `enrich-v2`). A rename breaks the precedence: the model would see two distinct artifacts instead of one shadowing the other, and could invoke the project version when the personal one was intended.
 
-This was fleet-completed across all 9 same-name personal/project pairs (2026-06-10): every personal artifact that shadows a project-tier counterpart now carries the delta-first description, so the precedence is documented at the point of retrieval rather than buried in a separate convention doc.
+This was fleet-completed across all same-name personal/project pairs on 2026-06-10, when there were 9. The set has since grown to 11 (5 agents, 4 skills, 2 commands) as more artifacts were promoted, and every personal artifact that shadows a project-tier counterpart still carries the delta-first description, so the precedence is documented at the point of retrieval rather than buried in a separate convention doc. Worth noting that the convention held without a second sweep: the shadow relationship is stated in the description a promoting author is already writing, so new pairs arrive compliant instead of needing to be caught later.
 
 ## How this compounds
 

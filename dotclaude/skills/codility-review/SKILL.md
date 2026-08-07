@@ -7,7 +7,7 @@ description: Evaluate a Codility Legal Document Management API submission using 
 
 Two-pass evaluator rubric for the Legal Document Management API assessment.
 
-- Source rubric: https://<company>.atlassian.net/wiki/spaces/PPET/pages/5920882702
+- Source rubric: an internal Confluence page
 - Beads memory: `assessment-calibration`
 
 ## Inputs to gather

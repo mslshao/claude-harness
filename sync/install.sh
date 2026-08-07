@@ -52,9 +52,13 @@ link_one() {
   local dest_parent
   dest_parent="$(dirname "$dest")"
 
-  # Skip excluded paths
+  # Skip excluded paths. WORLDMAP.md files are this repo's AI-authored commentary,
+  # not harness config: linking one into ~/.claude/commands/ would register a bogus
+  # /WORLDMAP slash command, and into ~/.claude/agents/ a malformed agent.
   case "$rel" in
     memory/*|memory|scratch/*|scratch) return 0 ;;
+    WORLDMAP.md|*/WORLDMAP.md) return 0 ;;
+    README.md|*/README.md) return 0 ;;
   esac
 
   if [ -e "$dest" ] || [ -L "$dest" ]; then

@@ -1,6 +1,6 @@
 ---
 name: investigate
-description: Structured investigation of production errors. Use when investigating any production error, Lambda failure, unexpected behavior, or silent regression, especially when an error message or stack trace is pasted into the conversation. Traces backward from the failure point through call path, git history, AWS deploy state, and Datadog signals to identify contributing factors and the leading hypothesis. Produces a structured investigation document with file:line citations ready to paste into Jira or Slack. Does NOT propose fixes (investigation only). Use before fix planning or multi-specialist review (file a Jira ticket or route to a tech lead/SME) when contributing factors are not yet known. Also trigger on phrases like "what's causing this", "prod issue", "error in Lambda", "why is X failing", "this error started after".
+description: Structured investigation of production errors. Use when investigating any production error, Lambda failure, unexpected behavior, or silent regression, especially when an error message or stack trace is pasted into the conversation. Traces backward from the failure point through call path, git history, AWS deploy state, and Datadog signals to identify contributing factors and the leading hypothesis. Produces a structured investigation document with file:line citations ready to paste into Jira or Slack. Does NOT propose fixes (investigation only). Use before fix planning or multi-specialist review (file a Jira ticket or route to a tech lead/SME) when contributing factors are not yet known. Also trigger on phrases like "what's causing this", "prod issue", "error in Lambda", "why is X failing", "this error started after", and, when a concrete error, failing behavior, or production signal is in scope, "find the bug", "what's broken", "debug this".
 ---
 
 # investigate
@@ -90,11 +90,11 @@ If a fix is already in flight, note it. Deploy order often matters; code that wr
 
 When the error originates in a Lambda function or ECS task, fetch the current deployment configuration before forming theories about whether a regression commit is live.
 
-Use `mcp__aws__call_aws` with `GetFunctionConfiguration` (Lambda) or `DescribeTaskDefinition` / `DescribeServices` (ECS) to confirm:
+Use `mcp__aws__call_aws` with the corresponding CLI command for `GetFunctionConfiguration` (Lambda) or `DescribeTaskDefinition` / `DescribeServices` (ECS) to confirm:
 
 - The `LastModified` timestamp on the function or task definition (Lambda: `LastModified` field; ECS: task definition `registeredAt`)
 - The currently active alias target (Lambda: `GetAlias` for aliases like `live` or `prod`)
-- Environment variable values are typically non-secret configuration in MX2 services: table names, queue URLs, region, log level, SecretsManager ARN references (the secret payloads themselves are fetched at runtime, not stored in env). Record values that bear on the investigation; redact anything that looks like a raw credential or token. `DD_VERSION` is especially useful: it holds the commit hash of the deployed build, so `git log <DD_VERSION>` lists exactly which commits are running.
+- Environment variable **names only**, to confirm which configuration is present. Do not record values: env vars can include SecretsManager ARN references and table/queue names that reveal infrastructure topology; `.claude/rules/security.md` ("No indiscriminate payload logging") and `.claude/rules/debugging.md` (log variable names and presence, not values) both apply. One explicitly allowlisted exception: the value of `DD_VERSION` is a commit hash (non-sensitive) and is load-bearing for the investigation, since `git log <DD_VERSION>` lists exactly which commits are running.
 
 **Critical note on deploy lag.** `LastModified` reflects when the function was last deployed, not when the commit was merged. The lag between a merge and the corresponding deploy can be days or weeks. Do NOT assume a recent commit is running in production unless the deploy timestamp confirms it. If `LastModified` predates the regression commit, the regression is not yet in production and the investigation focus shifts.
 
@@ -102,9 +102,7 @@ Example: to check a Lambda named `my-service-prod`:
 
 ```
 mcp__aws__call_aws(
-  service="lambda",
-  operation="GetFunctionConfiguration",
-  parameters={"FunctionName": "my-service-prod"}
+  cli_command="aws lambda get-function-configuration --function-name my-service-prod"
 )
 ```
 
@@ -115,11 +113,13 @@ Check the `LastModified` field against the regression commit date before conclud
 Before concluding an error is actively causing production impact, verify it is currently firing using the `mcp__datadog__*` tool family. Checking git history tells you what code changed; Datadog tells you whether the error is actually happening now.
 
 Relevant tools:
-- `mcp__datadog__search_datadog_logs` - search for the error message in recent log windows
-- `mcp__datadog__aggregate_spans` - group by service or error type to confirm active traces
-- `mcp__datadog__search_datadog_events` - check for correlated deployment or alert events
+- `mcp__datadog__search_datadog_logs` - search for the error message in recent log windows; params: `query`, `from` / `to` with `now-*` syntax (e.g. `from="now-1d"`)
+- `mcp__datadog__aggregate_spans` - group by service or error type to confirm active traces; params: `query`, `computes`, `from` / `to`
+- `mcp__datadog__search_datadog_events` - check for correlated deployment or alert events; params: `query`, `from` / `to`
 - `mcp__datadog__search_datadog_incidents` - check for open incidents tied to the error
-- `mcp__datadog__search_datadog_errors` (Error Tracking) - get case-level first_seen, last_seen, count
+- `mcp__datadog__search_datadog_error_tracking_issues` (Error Tracking) - search Error Tracking issues; params: `query`, `from` / `to` with `now-*` syntax, `states`, `order_by`; returns `issue_id`, `total_count`, first/last seen timestamps
+- `mcp__datadog__get_datadog_error_tracking_issue` (Error Tracking) - fetch full details for a single issue by `issue_id`
+- `mcp__datadog__analyze_datadog_error_tracking_errors` (Error Tracking) - SQL aggregations over individual error events; params: `sql_query`, `filter`, `from` / `to`
 
 Target fields from a Datadog query:
 - Error count over last 24 hours

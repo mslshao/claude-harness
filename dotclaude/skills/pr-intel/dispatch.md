@@ -282,7 +282,7 @@ Use Grep/Read to verify structural claims against the full file, not just
 the diff hunk. Focus on production impact and maintenance risk.
 
 Surface findings in the engineering lead's priority order (Code Review Guide for Humans,
-https://<company>.atlassian.net/wiki/spaces/PPET/pages/5684789249):
+an internal Confluence page):
 1. Description / intent (already checked at Phase 0; surface only if you see
    intent drift between description and diff)
 2. Data models / types (Type System Subversion check: untyped dicts as

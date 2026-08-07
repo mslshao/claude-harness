@@ -9,9 +9,9 @@ Each file is a self-contained pattern with:
 3. How it compounds with use
 4. Where it has limits
 
-V0 scaffolding. Content arrives progressively as the WORLDMAP authoring sweep proceeds.
+All 12 docs are written, and each one has a WORLDMAP entry. What is not established is the claim at the top of this file: no port to another tool has been run, so "survives the boundary" is a design intent rather than a measured result. The Perplexity Spaces experiment that would test it is still planned.
 
-## Planned contents
+## Contents
 
 - `lab-to-production.md` (personal-tier sandbox to team-reviewed promotion)
 - `reflection-trigger.md` (two-strike pattern, mid-conversation correction to durable rule)
