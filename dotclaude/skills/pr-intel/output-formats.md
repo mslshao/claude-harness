@@ -195,7 +195,7 @@ The speed-amplified vs bot-surfaced provenance classification (synthesis.md step
 
 The only voice exception: comments Michael personally writes during his editing pass (after pr-intel output is rendered but before /post-review consumes it). Those stay in Michael's voice with no attribution prefix, because they ARE Michael's unaided judgment. Pr-intel itself does not emit them.
 
-This is structural enforcement of `review-voice.md` "Attribute tooling findings to tooling" and reviewer-discipline.md T5 (Transparent Tooling). Replaces the prior speed-amplified-no-attribution rule (which let bot findings ride under Michael's voice when the classifier judged them reachable from diff reading); the 2026-05-26 the engineering lead feedback surfaced that even those findings should be attributed because Michael didn't actually catch them himself, the tool did.
+This is structural enforcement of `review-voice.md` "Attribute tooling findings to tooling" and reviewer-discipline.md T5 (Transparent Tooling). Replaces the prior speed-amplified-no-attribution rule (which let bot findings ride under Michael's voice when the classifier judged them reachable from diff reading); the 2026-05-26 feedback from the engineering lead surfaced that even those findings should be attributed because Michael didn't actually catch them himself, the tool did.
 
 Format: file heading, then numbered comments. Each comment has a target line, a fenced block with the ready-to-paste text, and a briefing-context section the reviewer can read but does not post.
 
@@ -508,7 +508,7 @@ Before emitting any draft comment, attempt to compress to its question core. If 
 - (b) the comment carries a concrete code anchor or file reference,
 - (c) the finding is a defect-class BLOCKING (rule violation, runtime crash, security boundary, data loss). In that case the directive tone overrides compression.
 
-The diff line is half the comment; do not restate it. The the engineering lead corpus on PR #8741 includes a 1-word inline comment ("why?"). The table below accepts that shape; the compression step makes it the default for design-judgment findings.
+The diff line is half the comment; do not restate it. The engineering lead's corpus on PR #8741 includes a 1-word inline comment ("why?"). The table below accepts that shape; the compression step makes it the default for design-judgment findings.
 
 Strip Michael's verbosity tells during synthesis (see reviewer-discipline.md). The verbosity tells appear in BOTH inline comments AND the Draft Review Summary body; scan both venues for them before emitting.
 
@@ -532,7 +532,7 @@ Maps evidence + severity + class to default shape. Compression is the discipline
 | DIFF-VISIBLE | MINOR | any | Single-sentence question | Never |
 | QUESTION | any | any | Interrogative, ≤ 15 words | Never. If more is needed, downgrade evidence and route to summary |
 
-**Ceiling calibration**: word counts above are post-hoc empirical, not aspirational. The the engineering lead corpus median for design-judgment DISCUSSION is ~12 words; the corpus ceiling (when concrete anchors are present) lands around 25-30 words. Hard 15-word ceilings produce false over-ceiling flags on legitimate scaffolded comments and lead to either trim-too-far compression or apparent rule violations on perfectly fine comments. Calibrated 2026-05-13.
+**Ceiling calibration**: word counts above are post-hoc empirical, not aspirational. The engineering lead's corpus median for design-judgment DISCUSSION is ~12 words; the corpus ceiling (when concrete anchors are present) lands around 25-30 words. Hard 15-word ceilings produce false over-ceiling flags on legitimate scaffolded comments and lead to either trim-too-far compression or apparent rule violations on perfectly fine comments. Calibrated 2026-05-13.
 
 **Severity override** (T2 exception): When a clear rule violation is detected, use directive tone regardless of evidence level. Ground the directive: "(per our error-handling standards)", "don't use `@patch` - use monkeypatch or mockito per python-testing.md", etc. The engineering lead's only directive across 34 comments in 3 sample PRs was this exact shape.
 

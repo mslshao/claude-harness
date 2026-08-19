@@ -8,8 +8,10 @@ allowed-tools: ["Bash", "Glob", "Grep", "Read", "Agent", "Write", "Edit"]
 # Test Forge
 
 Generate high-quality behavioral tests for MX2 modules by running the `test-generator`
-agent and then feeding its output through the `test-quality-reviewer` agent in a feedback
-loop. Stop when the reviewer is satisfied or after 3 iteration cycles.
+agent (a team-authored project-tier agent, not included in this public mirror; adopters
+need an equivalent test-generation agent of their own) and then feeding its output through
+the `test-quality-reviewer` agent in a feedback loop. Stop when the reviewer is satisfied
+or after 3 iteration cycles.
 
 HARNESS CONSTRAINT (verified 2026-06-09): this skill must run in the main
 conversation, never as a `context: fork` execution; forked skill executions are

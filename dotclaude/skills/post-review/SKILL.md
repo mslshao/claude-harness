@@ -416,6 +416,18 @@ And report the residual, since one unresolved thread from anyone keeps the PR bl
 three rounds, and they were the entire blocker on a docs-only PR that carried two
 approvals. Resolving them left one thread, another reviewer's, still suppressing the gate.)
 
+Do not OFFER to resolve a same-round thread either. The author may have a fix in
+flight that your thread is the only signal for, and an offer framed as unblocking
+the merge makes accepting it the path of least resistance. If the user asks anyway,
+say that the author may be mid-fix and that resolving forecloses their amend, then
+do it if they confirm.
+
+(2026-08-19, #11832: an offered resolve on a comment-only wording nit closed the thread
+about 40 seconds before the author merged. The author had the fix queued, had to carry it in
+follow-up #11837, and named the resolve in a team channel: "Claude resolved the comment
+before pushing the change to update the comment, enabling it to merge without the changed
+comment." The rule above already barred doing it; nothing barred offering it.)
+
 ## Step 4: Report
 
 On success:
