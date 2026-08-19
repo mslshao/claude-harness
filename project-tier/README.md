@@ -6,7 +6,7 @@ This directory documents the promotion path itself. The lab-to-production patter
 
 ## How membership was decided
 
-17 artifacts: 6 agents, 4 skills, 7 rules. All re-synced against the live project tier on 2026-08-07.
+20 artifacts: 6 agents, 7 skills, 7 rules. All re-synced against the live project tier on 2026-08-19.
 
 Membership is not a curated highlight reel. It was decided mechanically, by first-commit authorship across the entire live `.claude/` tree: an artifact is mirrored here if its first commit is the repo author's, and is not if another engineer wrote it first. The live tier is a shared team surface, most of it is other people's work, and that part is deliberately absent rather than overlooked.
 
@@ -28,6 +28,9 @@ Every row below landed in the team's `.claude/` through a team-reviewed PR. The 
 | `skills/ideate/` | Divergent approach generation: 3-5 ranked approaches with a skeptic pass, stopping at presentation so the human picks the winner | added |
 | `skills/investigate/` | Production-error investigation: trace backward through call path, git history, deploy state, Datadog signals. Contributing factors only, no fix proposals | re-synced |
 | `skills/review/` | Local self-review fan-out to the project review agents, deduplicated into one grouped severity report. Read-only, posts nothing | re-synced |
+| `skills/refine/` | Transforms rough, terse input into a precise, actionable prompt before it's handed to a specialist | added |
+| `skills/synthesize/` | Combines N disparate inputs (tickets, docs, threads, analysis) into one structured, handoff-ready artifact. No opinions, no recommendations | added |
+| `skills/test-forge/` | Generates behavioral tests through an iterative quality-review loop, targeting domain logic over framework mechanics | added |
 | `rules/debugging.md` | No fixes without root cause: the process, the three-attempt circuit breaker, boundary instrumentation before theories | added |
 | `rules/exemplars.md` | Pairs a ratified design decision with the canonical file to copy from and a one-line reason (auth, operational store, API scaffolding, configuration, module split) | added |
 | `rules/pr-size-discipline.md` | The rules-tier exhibit, and the only entry with no live counterpart. See below | re-synced |
@@ -79,8 +82,9 @@ The live artifacts name internal systems. Those identifiers were substituted on 
 | One internal service name, in Datadog service-tag and module-path examples | `<service>` |
 | Specific Jira ticket numbers (three ESLint rule references, one campaign reference) | `MX2-NNNNN` |
 | Em-dashes in one copied rule (`rules/typescript-exploration.md`) | Hyphens, to match this repo's writing convention |
+| A teammate's name, cited as the author of an internal code-review guide (`skills/test-forge/SKILL.md`) | `the engineering lead` |
 
-Two substitution classes from the repo-wide scrub convention matched nothing in this directory: the workspace-path rewrite (`/workspaces/<repo>` becomes `/workspaces/main`) and the replacement of real teammate names with role-neutral phrasing. No mirrored artifact here contains a workspace path or a coworker's name.
+One substitution class from the repo-wide scrub convention matched nothing in this directory: the workspace-path rewrite (`/workspaces/<repo>` becomes `/workspaces/main`). No mirrored artifact here contains a workspace path.
 
 Confluence page IDs were the one open judgment call this pass had to settle. `sync/SCRUB-SPEC.md` puts them under reviewer judgment rather than under an enforced detector pattern, so `scrub-check.sh` passes clean either way, and the repo had drifted into holding both answers at once: an earlier pass dropped one such link and said so in a parenthetical, while seven others survived across `dotclaude/` and here. This pass removed them all. The reasoning is that the reference had already lost its value before the question was asked: the tenant hostname is a placeholder, so the URL resolves nowhere for a public reader, and the page would return 403 for a non-member even if it did. Keeping the space key and page ID bought a reader nothing and disclosed two internal identifiers. Each reference now names the document and marks it as internal Confluence, which is the part a reader can actually use.
 
