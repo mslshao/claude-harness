@@ -78,7 +78,7 @@ Specific limits worth naming, in approximate order of severity:
 | `learnings/` | 11 of 12 corpus pages lifted from Confluence with editorial scrubbing; PM-focused 12th page deferred | When/if the deferred PM-focused page returns, it returns as a fresh audience-broad write |
 | `evidence/` | 8 entries (1 third-party, 7 own-loop) | More own-loop entries as instances surface |
 | `dotclaude/agents/` | 22 agent files + calibration + shared; 20 WORLDMAP entries cover them (the launch flex/implementer/tester trio shares one combined entry) | None; review for accuracy on agent rev |
-| `dotclaude/skills/` | 32 skill directories (89 files); 32 WORLDMAP per-skill entries, campaign and cold-review included | None; review for accuracy on skill rev |
+| `dotclaude/skills/` | 32 skill directories (90 files); 32 WORLDMAP per-skill entries, campaign and cold-review included | None; review for accuracy on skill rev |
 | `dotclaude/hooks/` | 89 hooks, all 89 described in the description-first README, plus 8 portable runnable examples in `examples/`; WORLDMAP category-shaped commentary in 10 catalog sections plus a shared-library entry | None |
 | `dotclaude/commands/` | 2 commands (jira, confluence); WORLDMAP per-command commentary complete | None; both commands are personal-tier shadows of project commands, so the set grows only when a new project command needs a local delta |
 | `dotclaude/CLAUDE.md` | scrubbed personal global instructions | None |
