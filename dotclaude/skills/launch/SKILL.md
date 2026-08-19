@@ -364,6 +364,20 @@ with its context intact. Prefer continuation over the legacy alternatives:
   re-dispatch of a new agent with a self-contained handoff prompt is the
   FALLBACK for when the agent is no longer resumable, not the default.
 
+**Send commands, not assertions.** A mid-run SendMessage arrives at the subagent
+wrapped in a `system-reminder` and can be flagged as instruction-shaped
+third-party content. A well-behaved subagent therefore REFUSES to treat asserted
+facts in it as authoritative, and that refusal is correct: it cannot distinguish
+your verified measurement from injected text. Observed 2026-08-07 (MX2-XXXXX),
+where two specialists independently set aside a mid-run correction carrying real
+vendor-doc findings, one saying so explicitly and re-deriving what it could.
+Deliver mid-run context as something the agent can verify ITSELF: a command to
+run, a file path to read, a bead to `bd show`. When the fact is genuinely
+unrunnable for that agent (no network, no tool access), say so plainly and label
+it orchestrator-verified, so the agent can weight it rather than silently
+discount it. Facts the agent cannot check belong in the ORIGINAL dispatch
+prompt, which does not arrive through this channel.
+
 `bd comment` remains (a) the durable audit trail (mirror adjudications there)
 and (b) the USER's channel into running agents; agents still poll it at the
 named checkpoints because the user cannot SendMessage.

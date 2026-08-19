@@ -25,7 +25,7 @@ When pre-loaded context is available, triggers are pre-evaluated in
 | Signal | Triggers |
 |--------|----------|
 | `has_try_except_raise: true` OR `structural_risk_size: true` | Structural risks |
-| `has_security_patterns: true` OR `security_files` non-empty | Security & compliance |
+| `has_security_patterns: true` OR `security_files` non-empty OR `renders_model_output: true` | Security & compliance |
 | `has_test_files: true` | Test quality |
 | `has_terraform: true` | Infrastructure review |
 | `has_ci_workflow_change: true` | CI/CD workflow security review |
@@ -77,6 +77,19 @@ a differently-named submodule (`mx2.redshift_calls.RedshiftCalls` lives in
 `calls.py`), so a declaration-anchored term misses the call sites that
 prove the capability is already owned.
 
+**The same rule governs any no-consumer claim, and there the producer and
+consumer tokens are usually different STRINGS.** Before writing that a symbol,
+role, output or endpoint has no consumer, derive terms from the CONSUMER's
+vocabulary, not the producer's, and grep both. An IAM role is declared with the
+policy-action token `sts:AssumeRole` but consumed with the SDK call
+`assume_role(`; a Terraform output is declared as `output "x"` but consumed as
+`dependency.y.outputs.x`; a queue is declared by ARN but consumed by
+`send_message`. 2026-08-17 on #11733 a reader role was called dead wiring after
+a grep for `iam_role_arns|reader_trusted`, terms no consumer would ever contain,
+while the real consumer sat in sibling PR #11735 behind `assume_role(`. The
+retraction cost a round and a public correction, so state the literal terms tried
+in the briefing context and make one of them consumer-side.
+
 From the PR worktree root, run BOTH passes, source first (documentation
 hits otherwise crowd out the declaration):
 
@@ -126,7 +139,11 @@ Trigger: diff > 200 lines OR > 5 files changed OR diff contains `try`/`except`/`
 **Security & compliance** → `mx2-security-auditor`
 Trigger: changed files match `auth|security|token|jwt|permission|rbac|document|upload|
 download|access|audit|secret|credential|patient` OR diff contains `SecretStr|logger\.|
-\.info\(|\.error\(|\.exception\(`
+\.info\(|\.error\(|\.exception\(` OR `renders_model_output: true`
+(SKILL.md Dispatch Signals). The third disjunct exists because the path regex misses UI and
+chat diffs that render or round-trip model output; do NOT skip this lens on a model-output
+diff to protect the decision budget, since it is the lens whose findings that budget cannot
+reconstruct later.
 
 **Test quality** → `test-quality-reviewer`
 Trigger: PR includes files matching `*_test.py|test_*|conftest.py`
@@ -354,6 +371,16 @@ platform: PII, audit trails, and document access controls are critical.
 Return structured FINDING format with evidence categories.
 Use Grep to verify whether audit logging exists before claiming it is missing.
 If clean, provide positive confirmation of what was reviewed.
+
+PROBE: model-output surfaces (when `renders_model_output` fired). Model-produced content is
+attacker-influenced input whenever the source documents are adversarial, which on this platform
+is the normal case for discovery material and opposing-expert reports. Check three paths
+explicitly and report each, including a clean result: (a) DOM injection, whether payload text
+reaches `dangerouslySetInnerHTML`, a raw-HTML markdown plugin, or an `href`/`src`; (b) prompt
+round-trip, whether model-produced fields are interpolated into a string that becomes the user's
+next turn, and whether anything marks that text as machine-suggested rather than user-authored by
+the time it reaches the transcript or the request body; (c) validation asymmetry, whether the
+parse layer's format discipline covers every field feeding (a) or (b) or only some of them.
 
 PR context: <body>
 

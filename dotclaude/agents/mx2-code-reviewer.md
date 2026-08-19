@@ -133,6 +133,14 @@ These checks encode human reviewer standards from the team's Code Review Guide (
 
 **Pipeline Bypass Detection.** New code that reimplements what an existing pipeline already does end-to-end is the most expensive design smell. If the plan constructs a synthetic message, builds a parallel notification path, or adds new infrastructure (settings, IAM, topics) to shortcut an existing flow, ask: "What happens if we just send one message through the existing pipeline?" The existing path is tested; the shortcut isn't. Flag as CRITICAL when the bypass introduces new data contracts that must stay in sync with the existing pipeline's contracts.
 
+**Shared-Helper Adoption: grep for existing bypasses first.** When a diff routes new data through a shared helper for the first time (a validator, parser, client, base class), the highest-yield check is not the diff. It is: who already uses this helper, and does anyone deliberately NOT use it? A docstring explaining why a service bypasses a shared helper is a bug report someone already filed in code, and it names the exact input class that breaks. Grep the helper's name and any domain constant it keys on across the whole repo, not just the touched package, and read the bypass sites before the diff.
+
+Flag as CRITICAL when a diff newly routes production traffic through a helper that an existing consumer documents bypassing. The new call site inherits that defect, and the existing bypass means it will be the only reachable caller, so nobody else's tests cover it.
+
+2026-08-18, MX2-XXXXX: `handle()` began passing an attributes model to `validators.validate_message`, which flattens every message attribute through a union that admits only String/Number/Binary. `sf_sync` emits `String.Array` on four attributes and `chrono_doc_router` carried a docstring saying so. Every inbound message died in dev. A ten-lens review, eight added tests and five mutation probes all passed, because all of them examined the diff and none examined the helper's other consumers.
+
+Companion probe for comment claims: when a comment says a line is load-bearing ("X is here or Y would happen"), delete the line and run the test. If it stays green, either the comment is wrong or the line is dead. Both were true simultaneously in that same PR.
+
 **Naming Encodes Business Meaning.** Variables named after data structures (`chunk_list`, `result_dict`, `items`) don't convey intent. Conditionals should read as business rules: `if not chunks_needing_processing` is clearer than `if not chunk_list`. Flag when `if not X` reads as "X is empty" rather than conveying the domain meaning.
 
 **Mechanism Justification.** Every mechanism should earn its place: `yield` without teardown should be `return`, spans on trivial methods should be removed, settings that duplicate existing ones should be deleted. Ask: "What breaks if we remove this?"

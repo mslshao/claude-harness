@@ -36,6 +36,16 @@ BD_ROW_LIMIT = "2000"
 
 ERROR_DETAIL_CAP = 500
 
+# `gh search prs` defaults to 30 results sorted by RELEVANCE ("best-match"), which
+# is unstable between calls: a still-open PR can drop out of one cycle's result and
+# return in the next with exit 0, and the cycle logic reads absence as "closed or
+# merged" (it prunes the key's watermark and, past the hold grace, its pending
+# alert). An explicit cap plus `--sort updated --order desc` makes membership
+# deterministic and puts the recently-active PRs, the only ones that can be mid
+# burst, at the top of the window.
+GH_SEARCH_LIMIT = "100"
+GH_SEARCH_ORDER = ["--sort=updated", "--order=desc"]
+
 
 def classify(
     returncode: int,
@@ -185,6 +195,7 @@ SOURCES: dict[str, tuple[list[str], Callable[[str], list[Any]]]] = {
     "prs_authored": (
         [
             "gh", "search", "prs", "--author=@me", "--state=open",
+            "--limit", GH_SEARCH_LIMIT, *GH_SEARCH_ORDER,
             "--json", "number,title,url,state,isDraft,repository",
         ],
         _pr_rows,
@@ -192,6 +203,7 @@ SOURCES: dict[str, tuple[list[str], Callable[[str], list[Any]]]] = {
     "review_requests": (
         [
             "gh", "search", "prs", "--review-requested=@me", "--state=open",
+            "--limit", GH_SEARCH_LIMIT, *GH_SEARCH_ORDER,
             "--json", "number,title,url,repository",
         ],
         _review_request_rows,
@@ -201,10 +213,12 @@ SOURCES: dict[str, tuple[list[str], Callable[[str], list[Any]]]] = {
     # approved-but-still-open PRs are deliberately INCLUDED: a push after the
     # user's approval is exactly the author activity worth surfacing. updatedAt
     # rides along as the watermark cycle.py diffs on; membership alone cannot
-    # see new pushes or replies on an already-known PR.
+    # see new pushes or replies on an already-known PR. The explicit limit and
+    # updated-sort matter most here: this source's absence semantics prune state.
     "prs_reviewing": (
         [
             "gh", "search", "prs", "--reviewed-by=@me", "--state=open",
+            "--limit", GH_SEARCH_LIMIT, *GH_SEARCH_ORDER,
             "--json", "number,title,url,repository,updatedAt",
         ],
         _reviewing_rows,

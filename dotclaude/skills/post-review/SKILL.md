@@ -149,8 +149,8 @@ body?") so the prose is corrected before posting. Observed on PR #10836: pr-inte
 **Skip for --quick mode** (no inline comments). Runs in default mode before the preview.
 
 Every inline comment pr-intel emits is tool-discovered: it passed through a specialist
-agent or an orchestrator pattern check, not Michael's unaided reading. Per the
-engineering lead's 2026-05-26 ask (review-voice.md T5 / reviewer-discipline.md T5), each posted inline
+agent or an orchestrator pattern check, not Michael's unaided reading. Per the engineering lead's
+2026-05-26 ask (review-voice.md T5 / reviewer-discipline.md T5), each posted inline
 comment MUST open with an explicit attribution lede, never in Michael's first-person
 voice, and the attribution is the lede, not parenthetical. The review SUMMARY body is
 exempt (it is allowed to be in reviewer voice).
@@ -193,6 +193,51 @@ Bash cwd persists and the next `gh`/`git` call fails. **Convention:** write revi
 Write tool (not an in-script `json.dump`), so the backup hook sees it; a payload both built and
 posted entirely inside one subprocess is invisible to both hooks. See
 `bd memories correction:skill:post-review-attribution-enforcement`.
+
+**Also run the personal-tier vocab pre-check on the same payload file, before the preview.**
+This is a second mandatory gate, not a nicety, and it mirrors the pre-flight `/jira` already
+requires:
+
+```bash
+~/.claude/scratch/scripts/check-stakeholder-text.sh < <payload.json>
+```
+
+Non-zero exit means the payload carries harness-local vocabulary a teammate cannot resolve: the
+word bead, a `bd` subcommand, a personal slash command, or a `docr-` bead-ID slug. Fix it BEFORE
+the preview so Michael reviews clean text, and before the post so `block-personal-tier-vocab.sh`
+does not stop you mid-round.
+
+Why this is mandated rather than left to the hook: on 2026-08-13 seven `docr-` slugs reached
+public review comments on #11598, #11390 and #11388. Attribution had both a pre-check script and
+a two-layer hook; vocab had only a hook, and that hook could not see the payload file the bodies
+were posted from. `/jira` mandates this same script, which is exactly why the Jira drafts written
+the same day were caught and the review comments were not. When a follow-up is promised to a
+reviewer, cite the Jira key: a bead ID is unresolvable to anyone outside this harness, so the
+commitment reads as "tracked somewhere you cannot see."
+
+**Also run the markdown-safety pre-check on the same payload file.** GitHub accepts a
+mangled comment silently, so unlike attribution and vocab there is no hook backstop and
+draft time is the only chance:
+
+```bash
+python3 ~/.claude/scratch/scripts/check-review-markdown.py <payload.json>
+```
+
+Two hard findings, both observed on 2026-08-19. `unmatched-backtick`: an unpaired backtick
+outside a fenced region opens a code span that swallows the rest of the comment, which is
+acute whenever a comment QUOTES corrupted or partial source text (on #11386 a quoted
+fragment carried a stray backtick, and the next backtick was 18 lines later in a different
+bullet). Remedy is to move quoted fragments into a fenced block, where backticks are
+literal, rather than escaping them one by one. `hard-wrap`: GitHub renders single newlines
+in a review body as hard breaks, so a hard-wrapped prose paragraph reads ragged to the
+author; each prose paragraph must be ONE unbroken line with a blank line between (Michael
+flagged this directly on #11774). Lists, tables, quotes and fences are exempt.
+`bare-dunder` output is advisory and mirrors the backtick discipline in
+[post-hooks.md](post-hooks.md).
+
+Fixture test: `bash ~/.claude/scratch/scripts/test-check-review-markdown.sh` (7 cases,
+built from this session's real payloads plus the pre-fix #11386 draft; both positive
+controls must keep failing or the check has stopped biting).
 
 ## Step 2.6: Preview
 
@@ -338,6 +383,39 @@ filtered these OUT of the atomic POST so they do not double-post. Skip silently
 if none (the common case). For error handling and the report-line additions,
 see [reactions-and-replies.md](reactions-and-replies.md).
 
+## Step 3.7: Resolve your own answered threads (re-reviews only)
+
+On a re-review, your own prior-round threads that the author has since ANSWERED are the
+most common self-inflicted merge blocker. When the PR's base branch carries
+`required_review_thread_resolution: true`, a single unresolved thread suppresses
+`reviewDecision` entirely, so a PR reads as unapproved while carrying two approvals.
+Check the base's ruleset first (`gh api /repos/{o}/{r}/rules/branches/<base>`); a stacked
+PR based on a downstack branch usually has no ruleset, and then this step is optional
+hygiene rather than an unblock.
+
+After posting, list your unresolved threads and how many replies each has:
+
+```bash
+gh api graphql -f query='{ repository(owner:"<o>",name:"<r>"){ pullRequest(number:<n>){
+  reviewThreads(first:60){ nodes { id isResolved
+    comments(first:10){ nodes { author{login} } } } } } } }'
+```
+
+A thread whose root is yours and which has at least one reply from someone else is an
+answered-thread candidate. Present the list and the count, then resolve on accept:
+
+```bash
+gh api graphql -f query="mutation { resolveReviewThread(input:{threadId:\"<id>\"}) { thread { isResolved } } }"
+```
+
+Three rules. Resolve only threads whose ROOT comment is yours: resolving another
+reviewer's thread speaks for them. Do not resolve a thread you posted THIS round.
+And report the residual, since one unresolved thread from anyone keeps the PR blocked.
+
+(2026-08-17, #11020: 16 of 17 unresolved threads were mine, 11 already answered across
+three rounds, and they were the entire blocker on a docs-only PR that carried two
+approvals. Resolving them left one thread, another reviewer's, still suppressing the gate.)
+
 ## Step 4: Report
 
 On success:
@@ -460,6 +538,26 @@ AWS_PROFILE=dev AWS_DEFAULT_REGION=us-east-1 uv run --with boto3 --with 'pydanti
 "briefing_path", "comments": [{"id", "path", "line", "body"}]}` (omit `comments` for a
 body-only review). On write failure, log and continue; the GitHub post (Step 3) is
 authoritative and the beads memory (Step 5) is the durable record.
+
+**Two prerequisites Step 6 does not inherit from Steps 1-5.** Both cost a round-trip on
+2026-08-12 (PR #11556):
+
+- **`briefing_path` must point at a file that exists, and nothing upstream writes one.**
+  The briefing is rendered into the conversation, never to disk, so the script's
+  `pathlib.Path(params["briefing_path"]).read_text()` has nothing to open. Write the
+  rendered briefing to `/home/vscode/.claude/scratch/<pr>-briefing-<YYYY-MM-DD>.md` via
+  the Write tool first, matching the flat dated naming Step 3 uses for the payload. It
+  doubles as the only local record of what was reviewed.
+- **`comments[].id` is NOT in Step 3's response projection.** The atomic-review POST
+  returns the REVIEW id; the inline comment ids need their own fetch, sorted by `id`
+  descending, never by `created_at` (per `memory/github-api.md`, inlines created by the
+  atomic POST inherit the diff line's original commit date, so date sorting returns
+  stale rows):
+
+```bash
+gh api /repos/{owner}/{repo}/pulls/{n}/comments \
+  --jq '[.[] | {id, user: .user.login, path, line}] | sort_by(.id) | reverse | .[0:3]'
+```
 
 Hand-constructing `Review(...)` inline is the recurring failure mode here: the field
 names are not what an agent guesses (`pr`, not `pr_number`; `briefing_md` is REQUIRED

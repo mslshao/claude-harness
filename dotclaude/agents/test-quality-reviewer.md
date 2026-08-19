@@ -211,6 +211,27 @@ def test_routes_to_complaint_handler(self):
   assert result.handler_used == "complaint"  # Only the complaint branch sets this
 ```
 
+### Unfalsifiable Absence Assertion (🚨 CRITICAL)
+
+An assertion that nothing happened (`== []`, `count == 0`, `not in`, `is None`) is only evidence if the code under test could have made it happen. When a collaborator is left unconfigured, its error path short-circuits execution before the write, publish, or state change the assertion forbids, so the assertion holds no matter what the code under test does. Unlike Assertion-Free Tests this one has plenty of assertions, and unlike Mock Saturation the fixtures look clean, so it survives every line-level lens.
+
+```python
+# BAD: no folio_metadata_client injected, so _fetch_folio_page_count raises before the
+# first save. Both assertions pass with the guard deleted; they assert the unset client.
+processor = DocumentProcessor(settings)
+processor.handle(_folio_event(document_id))
+assert _job_rows_for_document(document_id) == []
+assert _received_message_count(queue) == 0
+
+# GOOD: stand up everything the success path needs, so the guard is the only thing
+# between the message and the forbidden outcome.
+mockito.when(folio_metadata_client).get_page_count(...).thenReturn(50)
+seed_doc_file_info(document_id=document_id, matter=_MATTER)
+processor = DocumentProcessor(settings, folio_metadata_client=folio_metadata_client)
+```
+
+**How to check it, not just suspect it**: delete the guard, strip the assertions that obviously fail (a metric count, a `"received" not in names`), and run what remains. If the absence assertions still pass, they were never load-bearing. Report the surviving assertions by name, because "add a test" is the wrong ask when the test already exists. Measured on PR #11606, 2026-08-13: two of four assertions in each of three tests.
+
 ### Shared Mutable State (🚨 CRITICAL)
 
 Tests that depend on side effects from previous tests, or modify module-level state without cleanup:

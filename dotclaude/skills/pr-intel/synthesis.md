@@ -20,7 +20,7 @@ After specialist results return, synthesize into the final briefing.
    on 2026-05-20, is canonical: 'TypeAdapter(Trigger) version-dependent on
    Pydantic' was reworded to 'Pydantic 2.4+ follows __value__ for
    TypeAdapter, worth a smoke check' and posted as a fresh top-level inline,
-   surfacing engineering-lead feedback 'you posted the same comment with different
+   surfacing the engineering lead's feedback 'you posted the same comment with different
    wording twice in 2 separate threads on the same line'). The rule:
    - If the new finding restates the prior comment with no new context: drop
      the finding entirely (do NOT post a second top-level inline on the same
@@ -69,7 +69,7 @@ After specialist results return, synthesize into the final briefing.
      the same code post-update: **keep it** as a fresh assessment.
 3. **Resolve disagreements** - surface both perspectives, don't silently pick sides
 4. **Categorize by GitHub surface** - specific file+function = inline comment; architectural = review summary
-4b. **CI-catchable filter** (the engineering lead, 2026-05-26 mx2-eng fortnightly: "find things that the linter's gonna catch anyway, or SonarCloud's gonna catch anyway, and then it's like, it's not really worth commenting on, necessarily"): for each finding heading to an inline comment, check whether merged-CI tooling will catch the same issue on the same diff lines. If yes, drop the inline emission entirely and demote to a single-bullet acknowledgment in the Draft Review Summary "Smaller notes" subsection (referencing the CI check by name). The author will see the CI failure with the canonical message; an inline comment that restates it is duplication.
+4b. **CI-catchable filter** (the engineering lead 2026-05-26 mx2-eng fortnightly: "find things that the linter's gonna catch anyway, or SonarCloud's gonna catch anyway, and then it's like, it's not really worth commenting on, necessarily"): for each finding heading to an inline comment, check whether merged-CI tooling will catch the same issue on the same diff lines. If yes, drop the inline emission entirely and demote to a single-bullet acknowledgment in the Draft Review Summary "Smaller notes" subsection (referencing the CI check by name). The author will see the CI failure with the canonical message; an inline comment that restates it is duplication.
 
    Catchable patterns (drop the inline, demote to summary if useful):
    - **Ruff**: any finding that maps to a Ruff rule code (E, F, W, I, N, UP, B, SIM, PL, etc.). Ruff runs in `pants tlc` and CI.
@@ -135,7 +135,7 @@ After specialist results return, synthesize into the final briefing.
       despite substantive local analysis.
 
     The compression target: design-judgment findings default to ≤ 25 words and
-    ≤ 2 sentences (calibrated 2026-05-13 against the engineering lead's corpus ceiling),
+    ≤ 2 sentences (calibrated 2026-05-13 against the engineering lead corpus ceiling),
     often a bare question. Defect-class BLOCKING and design-judgment findings
     that require a named alternative are the only legitimate paths to longer
     comments. When even those don't fit, the finding renders as a longer direct inline
@@ -297,9 +297,9 @@ provenance-classification.md):
     orthogonal: a type smell can be FRONT-DOOR + DISCUSSION (cheap to fix,
     but ripples), a security finding is NOT-FRONT-DOOR + BLOCKING (just
     fix inline). Boolean-param smells, pragma misuse, and exception-design
-    smells are NOT Front Door; they're iterate-inline findings. The
-    engineering lead explicitly puts the "send back quickly" framing on
-    description (#1) and types (#2); the rest are inline-iterate.
+    smells are NOT Front Door; they're iterate-inline findings. The engineering lead
+    explicitly puts the "send back quickly" framing on description (#1)
+    and types (#2); the rest are inline-iterate.
 
     Description-quality issues do not flow through this step because Phase 0
     short-circuits before specialist dispatch. If Phase 0 passed and Front
@@ -342,7 +342,7 @@ provenance-classification.md):
     PR #11 of the day) lets stupid findings ship under his name. If the output
     exceeds his own review-capacity at posting time, it cannot serve the trust
     signal it was built for. The 5-decision ceiling is calibrated against the
-    engineering lead's corpus pattern (median ~3 substantive comments per PR with headroom
+    the engineering lead corpus pattern (median ~3 substantive comments per PR with headroom
     for AC + design surfaces) and against working-memory limits.
 
     The gate fires AFTER provenance classification (step 5d) so compression
@@ -470,7 +470,7 @@ trust the diff.
    string literals matching base64 patterns (≥ 16 chars, `^[A-Za-z0-9+/]+=*$`),
    numeric constants without a named identifier, or unexplained env-var defaults,
    emit a "where does this come from?" finding with VERIFIED + DISCUSSION severity.
-   The engineering lead's two highest-leverage moves on PR #8931 were both provenance questions
+   the engineering lead's two highest-leverage moves on PR #8931 were both provenance questions
    on opaque base64 IDs (`arize_space_id = "U3BhY2U6..."`, prompt_ids in
    `prompt_client.py`). This is mechanical to detect and the highest-frequency
    missing question in pr-intel output today. The draft comment shape: "where does
@@ -743,9 +743,11 @@ been through an @claude fix round; the review's value was verifying still-live-a
 | DISCUSSION | High consequence | Comment (no approval stamp) |
 | DISCUSSION | Low consequence | Approve with Comments |
 | MINOR (any) | any | Approve with Comments |
+| PAPERWORK (any severity) | any | Approve (notify, never gate) |
 | No findings | - | Approve |
 
 When multiple findings exist, the most restrictive recommendation wins.
+Paperwork-class findings are excluded from that calculation.
 
 **Front Door rationale.** A FRONT-DOOR finding (type/model smell,
 large-refactor methodology gap, or capability duplication; see step 7b) is
@@ -758,6 +760,29 @@ recommendation lands at Comment with the Draft Review Summary opening
 "the priority for this round is X; let's iterate on that before deeper
 review." BLOCKING + FRONT-DOOR still resolves to Request Changes (BLOCKING
 is more restrictive). FRONT-DOOR + DISCUSSION/MINOR resolves to Comment.
+
+**Paperwork class never gates.** A finding whose remedy edits metadata AROUND
+the change rather than the change itself is paperwork class: a missing or wrong
+ticket link or ID, an unchecked checklist box, a title or commit-message format
+nit, a description accuracy nit on a PR whose description is otherwise adequate,
+or an untracked follow-up commitment for work both sides already agreed belongs
+in a later PR. State it once in the review body, approve, and trust the author to
+fix it on notification. Paperwork findings never move the recommendation off
+Approve and never enter the Blocking count. Two phrasings this forbids outright:
+"before I approve", and "once you X, this is ready" about a metadata edit.
+
+Paperwork is not Phase 0. Phase 0 fires when the description is absent or
+boilerplate and the reviewer cannot review at all; that is a genuine send-back.
+A PR with a thorough description and an empty template field is paperwork.
+
+**Repetition does not escalate.** An item raised in a prior round and left
+unanswered carries the same class in round N that it carried in round 1.
+Unanswered-ness is not a severity multiplier. Note the round count once
+("third round asking") and leave the recommendation where the finding class puts
+it. Recurrence: #9101 2026-05-27, #10143 2026-06-26, #11625 2026-08-14 (round 3,
+two paperwork findings, zero blocking, every technical finding already answered,
+recommendation was Comment). Mechanically enforced by the paperwork-gate check in
+`~/.claude/hooks/stop-validate-pr-intel.sh`.
 
 **Settled-type carve-out.** The Comment default assumes the smell is
 UNSETTLED and would ripple: the author re-shapes the type, surrounding code

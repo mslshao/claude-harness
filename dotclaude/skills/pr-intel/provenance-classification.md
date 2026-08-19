@@ -29,6 +29,20 @@ guaranteed no-op, so the dispatch is pure overhead. This is the ONLY case the
 dispatch may be skipped: any non-empty findings list still dispatches, regardless
 of size or specialist outcome.
 
+**Agent-dispatch-unavailable fallback.** When the session forbids Agent dispatch (a
+session-level directive, a permission mode that denies the Agent tool, or a harness
+without it), do NOT drop the phase and do NOT omit the header lines: classify inline
+against the same criteria the agent uses (`~/.claude/agents/provenance-classifier.md`
+stays the canonical table), populate the `Provenance:` and per-finding
+`Classification:` tokens exactly as if the agent had run, and state in the briefing
+that classification was inline rather than dispatched so the audit trail stays honest.
+This is NOT an exception to the ONLY-case rule above: the phase still runs and still
+renders, it just runs without a subagent. The observable contract is the rendered
+classification, not the dispatch (`stop-validate-pr-intel.sh` checks the header lines).
+Observed twice on 2026-08-10 (PR #11442 rounds 1 and 2, under a session directive
+barring Agent calls), where the absence of this clause meant improvising the call and
+flagging the deviation to the user both rounds.
+
 ## Inputs
 
 The agent receives a JSON array. One entry per surviving Draft Inline Comment

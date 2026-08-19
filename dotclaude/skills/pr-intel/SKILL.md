@@ -72,7 +72,41 @@ to 3 attempts. The author's observation is usually real even when their diagnosi
 wrong, and only execution distinguishes the two; the deliverable is a verified patch
 plus the actual root cause, which ends the loop in one round (PR #9725, 2026-07-16:
 three assertion-deletion rounds ended by one empirical run that found a repo-global
-moto fixture shadowing `responses.calls`).
+moto fixture shadowing `responses.calls`). The same move applies when the author says a
+test fix is DONE: the red-green-revert cycle in `.claude/rules/verification.md` is what
+proves a matcher actually bites, and only execution supplies it. For a TypeScript PR the
+`pants test` path does not apply and a fresh worktree has no `node_modules`; the
+symlink-plus-direct-binary recipe is `bd recall gotcha:worktree-typescript-vitest-run`
+(PR #11442, 2026-08-10: proved an expanded `Word.Alignment` stub made a previously-vacuous
+alignment matcher load-bearing, three runs under 4s total).
+
+**A dispatch authorized to mutate never shares a worktree with a reader.** This rule and
+the next one hand an agent permission to edit, run, and revert, and the reviewer roster's
+`Bash` grant makes that possible even though none of them hold `Edit`/`Write`, so the tool
+list cannot tell you which specialists mutate. Give the mutating agent its own worktree, or
+dispatch it in its own sequential batch after the readers return. Otherwise a sibling reader
+reads half-reverted code, and the harness's ordinary file-changed notice reaches it mid-run
+looking exactly like a prompt-injection attempt (PR #11386, 2026-08-17: a legitimate
+red-green-revert on `run_local.py:91` drove a reviewer to report a fabricated system-reminder,
+which the orchestrator relayed to the user as a security event and then had to retract).
+Full rule and teardown: [dispatch-mechanics.md](dispatch-mechanics.md).
+
+**When the diff's SUBJECT is tool semantics, execute every falsifiable claim in the
+changed prose.** The rule above fires on a disputed test; this one fires with no dispute
+at all, because a spec/docs diff about how a tool behaves carries assertions that read as
+self-evidently true and are checkable in seconds. Verifying one form and generalizing to
+an adjacent form is the specific failure: on PR #11539 (2026-08-12) round 1 confirmed
+three dots was right for `git diff origin/main...HEAD` (merge-base diff, correct for a
+changed-file list) and carried that to the neighbouring `git log origin/main...HEAD`
+without running it. Three-dot `git log` is the SYMMETRIC DIFFERENCE, so the fix still
+leaked other people's ticket IDs into the step that greps the log; measured later on that
+branch, three dots gave 32 commits against 10 and dragged in 8 foreign IDs. Two rounds
+passed it and the author found it. Same-flag-different-verb is the highest-risk case, so
+run each form in a throwaway worktree at the PR tip rather than reasoning about it, and
+pair every "returned nothing" result with a positive control proving the toolchain could
+have returned something (on that PR every changed file was `.md`, which yields zero pants
+targets either way, so the first zero was meaningless until a control base spanning 15
+`.py` files returned 16 targets). Full lesson: `memory/reviewer-discipline.md` lesson 18.
 
 ## Data Gathering
 
@@ -134,6 +168,14 @@ Skill-tool invocation must log itself or later posts to this PR get a false nudg
 echo "{\"ts\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"session_id\":\"${CLAUDE_CODE_SESSION_ID}\",\"pr\":\"<PR_NUMBER>\",\"prompt_preview\":\"skill-invoked /pr-intel <PR_NUMBER>\"}" >> ~/.claude/logs/pr-intel-contract-inject.jsonl
 ```
 
+**This applies per PR NUMBER, not per Skill invocation.** Extending pr-intel-grade
+analysis to an additional PR within the same conversation (e.g. the user says "also
+review #N") without a fresh `Skill("pr-intel", ...)` call still requires its own
+self-register line for N; the log is keyed by PR, and skipping it here is the same
+false-nudge failure mode, just one call removed from the one the log was built to catch
+(observed 2026-08-17: two PRs reviewed in one continued pass, both missed registration,
+both later blocked at `/post-review` time).
+
 ### Prior Reviews
 
 Before any other analysis, check if this PR has been reviewed in a prior session
@@ -160,7 +202,16 @@ in beads memory).
 
 ### Merge Base Freshness & Ghost Diffs
 
-After fetching the PR head ref, run two local git checks (always run):
+After fetching the PR head ref, run three local git checks (always run):
+
+**Resolve `baseRefName` FIRST; it is not always `main`.** All three checks below diff
+against the PR's BASE, and on a Graphite stack that base is a downstack branch. Diffing
+against `main` silently attributes the downstack PR's content to this one and produces
+numbers that look plausible and announce nothing: 2026-08-12 on #11386 (base
+`cfried/ruleseng-search`) the freshness check read 54 files / +3790 against the real 15
+files / +824, and the ghost-diff comparison returned `.claude/**` paths that only meant
+"the branch is 814 commits behind main." `freshness.md` writes `origin/main` throughout
+as shorthand for the resolved base.
 
 1. **Merge Base Freshness**: files in the PR's changeset whose content is
    identical to current main (already shipped via a sibling PR). Store
@@ -172,8 +223,14 @@ After fetching the PR head ref, run two local git checks (always run):
    usually a rebase conflict silently reverting a recently-merged change.
    **High-consequence: surface as BLOCKING** with the recently-merged PR
    reference. Cannot receive inline comments; report in the review body.
+3. **Concurrent Main Edits**: commits on main that touched the PR's OWN files after
+   its merge base (`git log <merge-base>..origin/main -- <PR's files>`). The diff you
+   are reviewing was written against an older version of those files. On a hit,
+   test-merge onto main and assert on merged CONTENT before calling it a concern:
+   additive edits to a shared structured container auto-merge clean while dropping
+   one side's entry. Report the verification even when it clears.
 
-If `git fetch` failed earlier, skip both and treat all files as net-new. For the
+If `git fetch` failed earlier, skip all three and treat all files as net-new. For the
 exact `git diff`/`git log` commands, the `merge_base_freshness` field shapes, and
 the downstream-effects list, see [freshness.md](freshness.md).
 
@@ -195,8 +252,16 @@ This returns a flat list. Treat each entry as an independent comment for dedup p
 The `is_outdated` flag is unavailable from this endpoint; treat all comments as current.
 Group by `in_reply_to_id` if thread structure is needed (root = null, replies = parent id).
 
-If `gh api` fails, note the failure explicitly and proceed with synthesis; flag in the
-output that bot dedup could not run.
+If `gh api` fails, do NOT proceed straight to "dedup could not run": that conclusion is
+about the READ, not the PR. Try the REVIEW-SCOPED endpoint first, which stayed up through
+a multi-hour window where the list endpoint returned 404 (2026-08-17, #11732, cost a
+posted pile-on that had to be deleted):
+`gh api /repos/<owner>/<repo>/pulls/<N>/reviews/<numeric_review_id>/comments`.
+`gh pr view --json reviews` exposes only the GraphQL node id (`PRR_...`), so derive the
+numeric id by base64url-decoding the part after `PRR_` and reading the third value of the
+msgpack 3-array (`0x93`, `0xce` u32 repo, `0xcf` u64 review). Full recipe:
+`bd recall github-inline-comments`. Only after that fallback also fails, note it explicitly
+and flag in the output that bot dedup could not run.
 
 ### Jira Ticket Hydration
 
@@ -281,6 +346,14 @@ Compute these booleans from the diff for specialist dispatch:
 - **has_try_except_raise**: added lines contain `try:`, `except `, or `raise `
 - **has_security_patterns**: added lines contain `SecretStr`, `logger.`, `.info(`, `.error(`, `.exception(`
 - **security_files**: changed file paths matching `auth|security|token|jwt|permission|rbac|document|upload|download|access|audit|secret|credential|patient`
+- **renders_model_output**: the diff renders model-produced content into a UI, or feeds it back into a subsequent prompt. True when ANY of:
+  - a changed path or filename matches `llm|prompt|chat|generative|completion|agent|copilot|rag|answer`
+  - added lines pass an API-response-derived value into markup: a `MarkdownRenderer`/`ReactMarkdown` prop, `dangerouslySetInnerHTML`, or JSX children, where the value came from a `fetch`/`authFetch`/`response.json()` in the same diff
+  - added lines interpolate an API-response field into a string handed to a submit, send, ask, or prompt function (model output becoming the next turn's input)
+
+  Drives `mx2-security-auditor` INDEPENDENT of `security_files`, because the path regex is a poor proxy for this class. PR #11355 (2026-08-17) rendered LLM output and round-tripped it into the next prompt across 32 files under `ai-doc-chat/`, matched none of `auth|document|access|patient`, and the security lens was skipped in the fan-out. Run later as a separate round it produced the sharpest finding of that review: LLM-authored text can reach a fixed client-side routing prefix, and the `{{...}}` citation discipline covered only one of the fields that feed prompt construction. On a legal platform, model output is attacker-influenced input whenever the source documents are adversarial, which for discovery material and opposing-expert reports is the normal case, not the edge case.
+
+  Calibration: expect this to fire on most `ai-doc-chat`, `bulk-chat`, `intake_agent`, and `llm` diffs. That is intended, and the auditor's explicit clean-result confirmation is cheap. If it proves noisy after ~10 firings, narrow the name half rather than deleting the two content halves, which are the part the path regex cannot reach.
 - **has_test_files**: changed files matching `*_test.py|test_*|conftest.py`
 - **has_terraform**: changed files matching `*.tf` or `*.hcl`
 - **has_new_tf_resource**: `has_terraform` is true AND an added line declares a new top-level Terraform block: `^\+(resource|module|data)\s+"`. Set by a MODIFIED `.tf` that appends a block, not only a net-new file. IaC blast radius (a new secret, a new plan-time `data` read against a shared multi-env stack) is decoupled from line count AND from whether the file is new, so this drives `mx2-devops-build-deploy` dispatch at any size, exactly like a net-new `.tf`. (PR #10554: a +18 modified `salesforce.tf` adding one `module` block gated a shared dev+prod secrets stack; the net-new-file trigger alone would have skipped the dispatch.)
@@ -352,7 +425,7 @@ After Phase 0 description quality, run three pre-dispatch checks:
    scoped to the PR. Three sub-tools today: SonarCloud (MCP available),
    Datadog code analysis (MCP via `search_pr_insights`), Sentry (no live
    bot on MX2 PRs; static patterns ride in `mx2-code-reviewer` instead).
-   The engineering lead's Code Review Guide #7 explicitly says review these findings
+   the engineering lead's Code Review Guide #7 explicitly says review these findings
    and call out anything that should be blocking.
 
 **Without compliance-checks.md, CI failures are reported without distinguishing
@@ -392,7 +465,8 @@ phrasing 2026-05-21, `config:sonarcloud-mcp` 2026-05-21), see
 
 ## Specialist Dispatch
 
-For worktree isolation (the one shared worktree per invocation, the `--mine`
+For worktree isolation (the one shared worktree per invocation, the own-worktree
+rule for a specialist whose prompt authorizes mutation, the `--mine`
 skip, setup/teardown bash, and the git-fetch-failed BRANCH WARNING fallback),
 Spot-Check Mode for large mechanical refactors (deterministic 3-file sample,
 the mandatory briefing-addition template, what stays full-diff, the
@@ -532,6 +606,28 @@ one body-folded item, costing an extra round. Do not emit an
 anchor the script rejected. This is the mechanical enforcement of grounding.md's
 anchor-grounding rule, which lives in a trigger-conditional sub-file that XS-S runs skip.
 
+**Attribution check before emitting (mandatory, every mode with inline comments).** Every
+drafted inline comment must open with a tool-attribution lede per output-formats.md's
+Tool-source attribution rule, and `block-unattributed-review-comment*.sh` blocks the post
+if one does not. Like the anchor check above, `/post-review` catches this only at Step 2.5,
+AFTER the briefing was rendered and the user read it, so a non-compliant draft means the
+comment text the user approved is not the text that gets posted (acute on the verb-named
+`/post-review <verb>` path, which posts without a second confirm). Validate the drafted
+bodies against the same `evaluate()` the hooks call, before emitting:
+
+```bash
+python3 ~/.claude/scratch/scripts/check-review-attribution.py <payload.json>
+```
+
+A bare `{"comments":[{"path","line","body"}]}` payload is enough (`body`/`event` are not
+required; verified 2026-08-07). Expect the block to arrive at WRITE time rather than from
+the script: `block-unattributed-review-comment-file.sh` is a PostToolUse(Write) hook that
+scans review-shaped JSON, so a non-compliant throwaway payload trips it before you get to
+run the checker. Either way the remedy is the same: rewrite the lede, do not defer to the
+post-time gate. output-formats.md:190 carries the first-token rule the checker enforces.
+Observed 2026-08-07 on #11307: an XS single-finding render drafted an unattributed lede
+that Step 2.5 caught, costing a rewrite after the user had already approved the briefing.
+
 ## Unverified-Assertion Containment (default mode)
 
 Default mode is a one-shot briefing; the multi-phase `@claude` verify loop is retired
@@ -562,8 +658,8 @@ even if clean: "Reviewed for: PII exposure, auth/authz, audit trails, encryption
 - **Review the why, not just the what.** A PR is a claim that a change achieves a goal; the review's first job is to test that claim, not only to check that the surface code is well-built. Anchor on the goal (the description's why, the ticket intent), then ask whether the implementation achieves it AND whether it is the simplest path given what the deployment platform, runtime, framework, and existing services already provide. A clean specialist fan-out that never asks "does this mechanism need to exist at all?" will approve code that should not exist. Operationalized by the Goal-Fit & Mechanism Necessity design-review surface (synthesis.md) and the `mx2-skeptic` necessity question (dispatch.md); do not let surface-level polish substitute for the goal-fit question.
 - **Depth by default, speed on request.** Specialist dispatch is default. `--quick` for triage.
 - **Don't duplicate existing tools.** No `pants` runs. Posting is delegated to `/post-review`, never reimplemented. The briefing itself is never auto-posted, and `/pr-intel` performs no posting of its own; all posting is `/post-review` after your explicit OK.
-- **The engineering lead's priority order is the human-reviewer standard.** The engineering lead's
-  Code Review Guide for Humans (an internal Confluence page)
+- **The engineering lead's priority order is the human-reviewer standard.** The engineering
+  lead's Code Review Guide for Humans (an internal Confluence page)
   (Mar 2026) defines the priority order: description, then types, then
   complexity / naming, then boolean / behavior-switching params, then tests,
   then correctness-via-tests (NOT in-head execution), then static analyzers,

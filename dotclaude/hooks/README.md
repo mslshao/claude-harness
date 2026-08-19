@@ -54,6 +54,16 @@ The discipline: when a correction recurs past umbrella-memory plus prompt-rule e
 
 **Portable**: yes: the entire hook is a static heredoc plus one opt-out token, with no project, tracker, or path dependency (no runnable copy in `examples/` yet).
 
+#### `stop-validate-slack-draft.sh`
+
+**Trigger**: Stop event, reading the final assistant text block from the transcript.
+
+**Behavior**: Scans the current turn's assistant chat output for a Slack/DM draft and checks it against the three rules a regex can judge without reading intent: a comma-run list of targets where a numbered list belongs, a volunteered-offer closer ("Happy to open the PR myself"), and a thread reply to a specific person with no lead @-mention. A hit blocks (exit 2) with the violated rule quoted so the assistant re-emits; a loop guard on `stop_hook_active` prevents an infinite retry, and the literal opt-out token `no-slack-check` anywhere in the turn suppresses the check.
+
+**Why subtle**: It is the output-side backstop to a companion UserPromptSubmit hook that injects the same checklist, but only when the user's own prompt signals an upcoming draft. A prompt that merely asks to read a thread carries no such signal, so a draft the assistant volunteers unprompted slips past the input-side hook entirely; this hook is the only thing that still sees it, because it reads the turn's actual output rather than the prompt that preceded it. Scope is deliberately narrow: everything on the full checklist that needs judgment (register, hedging, audience tier, recipient-cost framing) stays the assistant's job, and only the three mechanically-checkable rules are enforced here.
+
+**Portable**: shape-only. The specific checklist rules are this author's Slack conventions; the input-side-producer-plus-output-side-validator pairing for a chat-drafted artifact ports generally.
+
 ### Orchestration guardrails (mix)
 
 These hooks police the agent system itself: who is allowed to weaken enforcement, whether a subagent actually finished, and whether a multi-step skill emitted the contract it promised. They matter most in subagent-heavy and skill-driven workflows where the failure is invisible until a downstream step trusts a partial or non-conforming result.
@@ -148,6 +158,26 @@ These hooks police the agent system itself: who is allowed to weaken enforcement
 
 **Portable**: shape-only. The ticket-ID regex and `gh` are specific; "before creating an artifact, search the tracker across ALL states for one already referencing this ticket" ports.
 
+#### `block-raw-gh-pr-create.sh`
+
+**Trigger**: PreToolUse on Bash, matching an actual `gh pr create` invocation (stripped of quoted prose first, so a command that merely mentions the phrase does not fire).
+
+**Behavior**: Blocks a raw `gh pr create` and redirects to the author's `/pr` skill, which resolves the ticket id from the branch and commits, runs the language-appropriate checks, and creates as a draft by default. Two allowances keep the skill itself unaffected: the skill's own known temp-file signature for its PR-body flag, and an explicit `PR_SKILL_OK=1` prefix for any other legitimate raw call.
+
+**Why subtle**: The rule already existed in prose (a global instruction plus a prior recorded correction) and was violated again in the same session it was supposedly internalized in, which is what moved it from a memory to a mechanism. The escape hatch is deliberately easy to use rather than easy to forget: a guard with no bypass gets disabled instead of obeyed, so the goal is to redirect the default path, not to make PR creation hard.
+
+**Portable**: shape-only. The specific checks the skill runs are this setup's; "detect the raw form of a multi-step workflow and redirect to the skill that does the steps" ports generally.
+
+#### `block-state-plus-blockable.sh`
+
+**Trigger**: PreToolUse on Bash.
+
+**Behavior**: Blocks a single command that both creates state (a heredoc, an output redirect, or `mkdir`) and also runs something a sibling hook might block (`bd`, `gh`, `curl`, `terraform`, `pants`). Advises splitting the state-creating step into its own call.
+
+**Why subtle**: A PreToolUse block kills the WHOLE invocation, not just the half that tripped it, so if the blockable half fires, the state-creating half never ran. The sanctioned re-run then executes against state that silently does not exist, and can succeed while producing a corrupted result (a tracker item minted from an empty file) rather than failing loudly. The risk is invisible until measured: it looks like ordinary command-chaining, and only surfaces at the exact moment another guardrail's block turns a compound command into a partial one.
+
+**Portable**: yes: the shape (never bundle a state-creating step with anything a sibling hook might block) generalizes to any hook ecosystem where a PreToolUse block is all-or-nothing on the invocation.
+
 ### Destructive-op gates (portable)
 
 #### `block-destructive-commands.sh`
@@ -199,6 +229,26 @@ These hooks police the agent system itself: who is allowed to weaken enforcement
 **Why subtle**: Two parsing decisions carry the whole hook. The verb match runs on a QUOTE-STRIPPED view of the command (newlines flattened, then single- and double-quoted substrings deleted), so a branch-create verb fires only when it sits outside quotes; without that, a tracker write whose description quotes `git switch -c` as prose would block. And matching subdirectories is not defensive padding: `git switch -c` run from a subdirectory switches the ENTIRE checkout's branch, so a root-only match would miss most real invocations. The harm it prevents is not a lost commit but a hijacked workspace: the main checkout is the user's live window, and a branch create silently moves them off whatever they were on. Residuals are documented instead of papered over (a branch-create nested wholly inside quotes such as `bash -c "git switch -c"`, and non-leading or quoted `cd` paths, fall through to the payload cwd; tracked in docr-ufbkq).
 
 **Portable**: shape-only. The checkout path and worktree conventions are local, but the quote-stripped second view and the effective-directory resolution ladder are the transferable parts.
+
+#### `block-pkill-dolt-server.sh`
+
+**Trigger**: PreToolUse on Bash, matching a `pkill`/`killall` invocation naming the tracker's SQL server process at a command position (not merely quoted in prose).
+
+**Behavior**: Blocks a direct kill of the process backing the beads tracker and redirects to the tracker's own lifecycle subcommands (stop, start, killall, status), which keep its PID bookkeeping consistent.
+
+**Why subtle**: Killing the process out from under the tracker leaves its bookkeeping file empty and latches an internal circuit breaker open, which then short-circuits AHEAD of the tracker's own auto-start path, so the normal recovery setting does not save you. With many concurrent sessions sharing one store, every window's tracker commands fail until a human manually restarts the server, so the blast radius of one bad kill command is the whole fleet, not just the caller. The underlying `pkill` is separately blocked by the platform's own destructive-command classifier, so this hook's real job is turning an opaque permission denial into an actionable redirect to the correct subcommand.
+
+**Portable**: shape-only. The specific process and subcommands are this tracker's; "a shared backing process has its own lifecycle commands, so block a direct kill and redirect to them" ports to any tool with the same shape.
+
+#### `block-stale-force-push.sh`
+
+**Trigger**: PreToolUse on Bash, matching a `git push` invocation carrying a force flag.
+
+**Behavior**: Blocks a force-push whose HEAD commit did not exist yet when the user last authorized a force-push in that conversation. Resolves the current branch's HEAD commit time from git and the most recent human turn that named the force-push verb (within a length ceiling that excludes long pasted text merely discussing the topic, and excluding turns with an explicit negation) from the session transcript; if HEAD was committed after that authorization, the push is stale and blocks. A confirmed non-destructive case (the remote tip is still an ancestor of HEAD, meaning nothing would be lost) passes regardless. The block clears only when the user names the verb again in a new human turn, which necessarily postdates the current HEAD.
+
+**Why subtle**: The rule it enforces ("authorization is per-round, not standing") was already written down and was violated anyway: a user approved a force-push for one commit, the agent amended to a different commit, and force-pushed the new one under the old approval while an external reviewer was still reading the original SHA. The gate is intentionally self-clearing through a channel an agent cannot forge, since it compares commit timestamps rather than checking for a marker file or environment variable an agent could set on its own. It is scoped narrowly to STALE authorization (an approval that predates the current commit), never to ABSENT authorization, because measurement showed the common "rebase and update the PR" flow has no verb-naming human turn at all, and gating that case would cost a false block roughly once a day.
+
+**Portable**: shape-only. The transcript-parsing details are specific to this harness; "compare the mutation's timestamp against the authorizing human turn's timestamp, not just its presence" generalizes to any per-round destructive-op authorization.
 
 ### Compliance gates (mostly non-portable)
 
@@ -271,6 +321,36 @@ These hooks police the agent system itself: who is allowed to weaken enforcement
 **Why subtle**: The Bash sibling only ever sees a direct `gh api` command string. A payload written to a file and then posted through a path the Bash hook cannot inspect (a Python subprocess shelling out to `gh ... --input <file>`, for instance) bypasses it completely, so the rule needs a second capture point at the surface where the content is AUTHORED rather than where it is transmitted. That is the transferable idea: for any content rule, ask whether the write path and the send path are the same surface, and if not, hook both. The conservative payload-shape gate is what makes the second point affordable, since a broad "any JSON with a body field" match would fire on unrelated writes and train the author to ignore it. The residual is stated rather than hidden: a payload both built and posted entirely inside one subprocess is seen by neither hook, which is why the convention is to author review payloads with the Write tool.
 
 **Portable**: shape-only. The two-capture-point pattern ports; the review-payload heuristics and the attribution rules are this author's.
+
+#### `block-bare-monitor-id-alert-query.sh`
+
+**Trigger**: PreToolUse on the Datadog events/aggregation query tools, reading `tool_input.query`.
+
+**Behavior**: Blocks a Datadog event query that pairs a bare `monitor_id:` tag filter with `source:alert`. That combination is provably always zero rows, because monitor ALERT events carry the monitor id only as an ATTRIBUTE (`@monitor_id:`), never as a searchable TAG; only monitor AUDIT events (created/modified) carry it as a tag. A bare `monitor_id:` without `source:alert` is the correct form for reading audit history and gets an advisory note instead of a block.
+
+**Why subtle**: A query that always returns zero rows for a structural reason, rather than because the monitor is actually quiet, is a false clean: it reads as "nothing fired" when the real answer is "the query cannot see this event class at all." The underlying gotcha was already written down in a memory file and did not prevent a real investigation from reaching a wrong conclusion off the bare-tag form, which is why this became a mechanical gate rather than another memory. Every other memory-surfacing guard in this catalog matches on Bash or a skill invocation, so an MCP tool call carrying the same risky query shape was previously invisible to all of them; this hook closes that one gap at the point of use.
+
+**Portable**: shape-only. The specific Datadog tag-vs-attribute distinction is this author's; "a filter combination that is provably always empty for a structural reason, not a data reason, deserves a block rather than a silent zero" generalizes to any query surface with the same trap.
+
+#### `block-bead-id-in-repo-file.sh`
+
+**Trigger**: PreToolUse on Edit/Write, scoped to files under the shared team repo checkout.
+
+**Behavior**: Blocks an Edit or Write whose new content introduces a bead ID (the author's personal task-tracker identifier) into a committed repo file. The pattern is deliberately tight so real infrastructure identifiers that merely share the prefix do not false-positive. Removing a bead ID (the cleanup direction) is never blocked, only introducing one.
+
+**Why subtle**: A sibling hook already scans stakeholder-facing writes (Jira, Confluence, GitHub) for personal-tier vocabulary, but it models "stakeholder-facing" as those specific write calls and never sees an Edit into a source file. A bead ID landing in a committed repo file is more durable and more teammate-visible than a Jira comment (it survives in git history and is visible to every future reader of that file), so it belongs under the same audience-tier discipline even though the write mechanism is completely different. A real prior incident showed the class recurs and persists once it lands, since a repo file has no equivalent of a Jira comment's "just don't read the thread" escape.
+
+**Portable**: shape-only. The bead-ID pattern is this author's tracker; "a personal-tier identifier belongs behind an audience-tier filter regardless of which write mechanism introduces it" generalizes to any personal/shared split.
+
+#### `block-gh-api-raw-field-atfile.sh`
+
+**Trigger**: PreToolUse on Bash, matching a `gh api` invocation.
+
+**Behavior**: Blocks `gh api ... -f`/`--raw-field key=@file` invocations. `gh`'s raw-field flag treats its value as a literal string, so `@filename` is never expanded to the file's contents; the field silently becomes the short literal path text itself, with no error. Points to the typed `-F`/`--field` flag, which does read from file, as the fix.
+
+**Why subtle**: The failure produces a technically-successful API call with a payload that is quietly wrong (a PR body collapsing to a twenty-character path string instead of its intended content), and nothing in the response signals that anything went awry. The distinction between the two nearly-identical flags was already documented in a memory file before this hook existed and still got hit, which is the same escalation pattern behind several of this catalog's mechanical gates: a documented gotcha that keeps recurring becomes a hook rather than another memory entry.
+
+**Portable**: yes. The `-f`/`-F` distinction is a `gh` CLI behavior, not specific to this author's setup; the pattern generalizes to any CLI with a similarly-named pair of literal-vs-file-reading flags.
 
 ### Edit-time formatters and validators (portable)
 
@@ -375,6 +455,26 @@ These hooks police the agent system itself: who is allowed to weaken enforcement
 **Why subtle**: Two deliberate hedges. The multi-key path resolution plus the derive-from-agent-name fallback exists because schema drift between the create and remove payloads is plausible and a remove hook that silently no-ops on a renamed field leaks worktrees indefinitely, which is exactly the mess the `/audit-worktrees` skill later has to clean up. The `agent/*` prefix check is the safety floor on the one genuinely destructive line: `git branch -D` is a force delete, so it is scoped to the throwaway namespace the launcher owns and leaves anything else (a human's feature branch that happened to be checked out in that worktree) alone. Removing the worktree is `--force` and unconditional, but that is recoverable since the branch survives; deleting an unmerged non-agent branch would not be.
 
 **Portable**: no: it depends on the harness's WorktreeCreate/WorktreeRemove primitives, the `.launch-worktrees/` layout, and the `bd` tracker for the audit note.
+
+#### `warn-stale-checkout-read.sh`
+
+**Trigger**: PreToolUse on Bash, scoped to source-reading commands (`grep`, `git grep`, `sed`, `cat`, `head`, `tail`, `awk`) targeting a repo source path, unless the command already pins an explicit ref.
+
+**Behavior**: When the main checkout is behind `origin/main`, prints a one-time-per-session advisory naming how many commits behind it is and how to pin the read to a specific ref instead. Never blocks.
+
+**Why subtle**: A stale checkout produces a confidently WRONG answer rather than an obviously missing one: a grep against the pre-merge tree "proves" a function has one consumer when the merged tree has a different answer, and nothing about the read looks unusual. The tell in both real instances was indirect (line numbers disagreeing with a traceback, a grep result contradicting something already read), which is a hard signal to build a precise detector around; the hook instead accepts a lower-precision, always-available proxy (is the checkout behind at all) and trades detection precision for coverage.
+
+**Portable**: shape-only. The specific checkout path is this author's; "advise once per session when the working tree is behind the remote before a source-reading command runs" generalizes to any git-backed harness.
+
+#### `warn-worktree-main-checkout-path.sh`
+
+**Trigger**: PreToolUse on Bash, Edit, and Write, reading the payload's cwd alongside the command or file path.
+
+**Behavior**: Warns (non-blocking) on two mirror-image drifts. Case A: the session's cwd IS a worktree, but a target path is an ABSOLUTE path pointing at the main checkout instead of the worktree's own copy. Case B: the session's cwd has itself drifted to the main checkout while sitting on its default branch, so a RELATIVE path silently resolves against main; this case is gated on the checkout being on the default branch specifically, since legitimate mechanical edits happen on a checked-out feature branch and must never be flagged.
+
+**Why subtle**: Both roots typically share the same path prefix, so a wrong absolute path looks correct at a glance in Case A, and in Case B the drift has no visible trigger at all: a skill invocation resets the shell's working directory as a side effect, so an edit can land on the default branch and the verification command that follows it, run in the same now-drifted cwd, reports a clean pass for a branch it never touched. That silent double failure (wrong target, followed by a green check that appears to confirm the wrong target) is what makes Case B worse than Case A despite being the same underlying class of mistake.
+
+**Portable**: shape-only. The specific worktree directory layout is this author's; the two-case drift detection (absolute path pointing at the wrong root; cwd itself drifted onto the wrong root) generalizes to any harness that runs work in an ephemeral checkout alongside a persistent one.
 
 ### Observability (mostly CC-specific)
 
@@ -550,6 +650,46 @@ These hooks make the two-tier memory system (always-on `bd` flash-card memories 
 
 **Portable**: no (depends on the `bd` tracker and this author's AWS deploy topology), but the shape ports: when a rule keeps getting violated despite being written down, bind the retrieval to the tool call that needs it instead of to session start.
 
+#### `bd-health-check-daily.sh`
+
+**Trigger**: SessionStart, gated to run at most once per UTC calendar day via a state-file stamp.
+
+**Behavior**: Runs the tracker's own drift detector against the underlying database and prints the result only when it reports a problem; silent when the store is healthy. Fails open unconditionally: a missing detector script, a timeout, or any error is treated as nothing to report rather than as a reason to block session start.
+
+**Why subtle**: A prior real incident left a large fraction of the tracker's historical comments and events undecodable for the better part of an hour with every routine health signal (the tool's own doctor command, a basic list, a row count) reporting green the whole time; one read path was worse than silent, dropping an entire section rather than erroring, so the tracker simply looked like it had no history. With many concurrent sessions sharing one store, a silent read-path failure of that kind can run for a long time before anyone notices by accident. The daily cadence is a deliberate cost trade: the check itself takes several seconds and opens a database connection, and the failure mode it targets is triggered by version changes rather than by continuous drift, so checking more often would not catch it any sooner.
+
+**Portable**: no (depends on the specific tracker's internal drift-detection script). The shape ports: a periodic, fail-open, silent-when-healthy health check for a shared backing store whose ordinary health signals can all read green during a real failure.
+
+#### `block-bd-computed-field-write.sh`
+
+**Trigger**: PreToolUse on Bash, matching a tracker update command that writes a shell-expanded value (a command substitution) into a long-text content field (title, description, design, acceptance, or notes).
+
+**Behavior**: Blocks the write and points to two safer forms: a fetch-assert-write helper script that verifies the prior value before replacing it, or the tracker's own file-based flags, which reject an empty file outright. A literal inline value is never blocked, only a computed one.
+
+**Why subtle**: The tracker replaces the WHOLE field on a content write rather than patching it, so if the command that produced the substituted value silently failed or returned empty, the field becomes empty with no error and the prior content is gone. The near-miss that motivated this hook involved a JSON query that returned an empty string because the tracker's own show command returns a single-element array rather than a bare object, which is exactly the kind of shape surprise that produces an empty value while looking like ordinary plumbing. The underlying rule already existed in prose and had been violated multiple times in a single session before this became a mechanical gate.
+
+**Portable**: shape-only. The specific tracker and its flags are this author's; "block a whole-field-replacing write when the new value is computed rather than literal, since a silent empty result destroys the prior content" generalizes to any store with replace-not-patch write semantics.
+
+#### `verify-bd-content-field-write.sh`
+
+**Trigger**: PostToolUse on Bash, matching a tracker update command that targets a long-text content field (acceptance, design, or notes).
+
+**Behavior**: Re-reads the field immediately after the write and warns (advisory only, cannot undo the write) when the tracker reported success but the field is actually empty.
+
+**Why subtle**: A documented, supported flag on the tracker's own update command can report success and print a normal confirmation line while silently storing nothing, which was confirmed by writing the flag, observing the success message, and then reading the field back as empty. It is the write-side sibling of a companion PreToolUse hook that blocks a computed value going IN to a content field; this one catches the narrower and sneakier case where a plain, well-formed write still does not land, so the next turn at least knows to distrust the success message instead of building on a false completion claim.
+
+**Portable**: shape-only. The specific tracker and its flag set are this author's; "verify a content write actually landed rather than trusting the tool's own success signal" generalizes to any store where a documented write path can silently no-op.
+
+#### `nudge-supersede-description.sh`
+
+**Trigger**: PostToolUse on Bash, matching a tracker comment or a notes-appending update whose body reads like a correction (case-insensitive markers such as "corrected," "superseded," "stale," "no longer true").
+
+**Behavior**: Emits a one-shot-per-(session, item) advisory reminding the author to also patch the READ-FIRST surface (title, description, acceptance criteria), not only the append-only comment or notes trail. Never blocks; makes no additional tracker call to check whether the fix is already reflected there, to avoid the cost and risk of an extra database connection per comment.
+
+**Why subtle**: The tracker's own read order prints the description before the comments and its search indexes titles only, so a correction filed as a comment does not reach the surfaces a cold-start session actually reads first or searches by. The append-only instinct that produces this pattern is itself correct, since it preserves a record of what was believed and when; the gap is specifically that nobody also goes back and patches the now-stale claim sitting above it. A structured audit of a batch of recently-created items found this exact shape repeatedly, including on the very item that was tracking the failure mode itself, and one instance of it reached a PR review as a false finding because a reviewer read the superseded top-level text as current.
+
+**Portable**: shape-only. The specific tracker's read order and search behavior are this author's; "when a correction lands on an append-only surface, nudge the author to also patch the surface a reader sees first" generalizes to any tracker with the same read/write asymmetry.
+
 ### Session lifecycle (CC-specific)
 
 #### `check-cc-version-drift.sh`
@@ -637,6 +777,36 @@ These hooks make the two-tier memory system (always-on `bd` flash-card memories 
 **Why subtle**: The session scratchpad is age-reaped within about a day, so a file staged in one turn can be gone before the turn that consumes it, and the failure surfaces as a confusing missing-file error far from the write that caused it (it landed twice: once on a review re-cut, once on a PR body staged and reaped before the round-2 patch needed it). The narrow trigger is the entire design: most scratchpad writes are legitimately ephemeral, so blocking would be wrong and a broad advisory would be tuned out within a day. Restricting to document-shaped extensions plus the dual-home exemption keeps the nudge rare enough to still get read. One consequence is easy to miss: because reaping is time-based rather than session-based, the copy has to happen in the SAME turn, so "I will move it at session end" is already too late.
 
 **Portable**: shape-only. The `/tmp/claude-*` scratchpad layout is CC-specific; the ephemeral-vs-durable artifact split is universal.
+
+#### `stop-validate-stale-state-claim.sh`
+
+**Trigger**: Stop event, reading the final assistant text block from the transcript.
+
+**Behavior**: Flags a turn-ending claim that something is still pending or outstanding (a person's action, a deploy, a review) when the same turn made no live-state read at all to refresh that claim. Re-verifying the claim anywhere in the turn is the whole exemption; blocks (exit 2) only on the conjunction of an outstanding-state assertion AND zero refreshing reads that turn, which keeps the false-positive rate near zero.
+
+**Why subtle**: A rule already existed in prose naming the exact tell (words like "still," "has not," "no reply yet," "unsent" about someone else's action) and it fired anyway, twice: once calling a message unsent off a stale read, once telling the user two of three deployments still needed action after the user had already shipped all three. A rule stated precisely and still not firing is what moves the fix from another sharpening pass to a mechanical gate. The scope is deliberately narrow to a single failure shape (an outstanding-state claim with no same-turn refresh) rather than a general staleness detector, which is what keeps it usable without constant false blocks.
+
+**Portable**: shape-only. The specific trigger phrases are this author's; "block an end-of-turn claim of unresolved external state unless the same turn re-checked it live" generalizes to any agent that can act on stale reads.
+
+#### `stop-validate-unrecorded-nonactions.sh`
+
+**Trigger**: Stop event, reading the final assistant text block from the transcript.
+
+**Behavior**: Flags a turn-ending message that names something the assistant is deliberately NOT doing (a deferred fix, a known gap being left as-is) when the same turn made no durable write recording it anywhere. A non-action that is explicitly tied to an existing tracked item passes silently, since that is the correct and common case; only the unrecorded variant fires (exit 2).
+
+**Why subtle**: A deliberate non-action reads as commentary rather than as work, so it skips the recording reflex that an actual code change or file write naturally triggers, even though chat is the least durable surface available. A real session wound down declaring all durable state recorded, then listed several such items in chat only; the user had to ask whether they had been logged, and most of them turned out to need real follow-up. The conjunctive trigger (a non-action marker AND zero durable writes that turn) is deliberately narrow for the same reason the sibling stale-claim validator is: false positives on ordinary commentary would make the check worse than useless.
+
+**Portable**: shape-only. The specific marker language is this author's; "a stated intention to skip something is itself a claim that needs a durable record" generalizes to any agent whose chat output is not itself persisted.
+
+#### `userpromptsubmit-correction-contract.sh`
+
+**Trigger**: UserPromptSubmit, matched conjunctively: the first line is an explicit contradiction of prior output (e.g. "that is not what I asked," "I wanted X, not Y"), the prompt is not itself a slash-command invocation, and the session has not already fired this hook once.
+
+**Behavior**: Injects the retrieval-before-acting protocol (search prior corrections, consider whether the topic recurs) as additional context at the start of the turn, once per session, advisory only (never blocks).
+
+**Why subtle**: A controlled comparison ran an intentionally correction-shaped prompt against both an older and a trimmed version of the always-loaded instructions and found the retrieval protocol fired in neither: zero mentions of the search step, the reflection skill, or the correction-tracking convention across every run, even with the relevant tool explicitly allowed. That ruled out the trim itself as the cause and pointed at the mechanism instead: a prompt-only instruction for "search before acting on a correction" needs to be surfaced at the START of the turn to change anything, and by the time a Stop-event validator could check for it, the turn's approach is already set. Correction detection is inherently fuzzy and correction-shaped language is common in ordinary conversation, so the trigger is deliberately conjunctive (an explicit contradiction pattern, not a slash command, not already fired this session) to bound the false-positive cost to a single extra paragraph rather than a constant interruption.
+
+**Portable**: shape-only. The specific correction-detection patterns are tuned to this author's phrasing; "inject a protocol at prompt-submit time when the prompt looks like a correction of prior output, since a post-hoc validator is too late to change the turn's approach" generalizes to any harness with an equivalent always-loaded-but-inert instruction.
 
 ### Skill-contract validators (personal-tier)
 

@@ -89,6 +89,22 @@ Reach for this when a steer says "look at the prior review for #N", or when delt
    when the remaining items are non-blocking, i.e. approve-while-logging-dissent).
    Do not post a Comment assuming it lifts your prior block.
 
+**Author reply points at a sibling/stacked PR (verify before accepting or leaving open).**
+On a stacked-PR review, a reply claiming a fix "landed elsewhere in the stack" or naming
+another PR number is a cross-PR claim, not a code-presence claim in the PR being reviewed.
+Do not accept it on the author's word and do not leave it as an unresolved question either:
+read the named PR's diff and confirm the fix actually exists and actually covers the call
+site in question (a refactor in the sibling PR may replace the flagged code path entirely,
+which resolves the finding by a different mechanism than the one claimed). If confirmed,
+post a closing reply on the ORIGINAL PR's thread stating what was verified and where,
+rather than leaving the thread open once the answer is known; a stale open question reads
+as unresolved to the author and to any later reviewer, even after you privately confirmed
+it. If the sibling PR does not actually cover the call site, say so in the reply rather than
+silently upgrading the finding's severity. Observed 2026-08-18 (#11736/#11737,
+knowledge-graph stack): a threadpool-wrap claim on #11736 was unverifiable in that PR's own
+diff, held open pending #11737, confirmed there via a new `run_in_threadpool`-wrapped
+dispatcher, closing reply posted back on #11736.
+
 **Gate-state check before clearing blockers (mandatory, not size-gated).** Before
 reporting any prior-round blocker as resolved, confirm the PR's actual gate state:
 `gh pr checks <n>` plus `gh pr view <n> --json mergeStateStatus,statusCheckRollup`.

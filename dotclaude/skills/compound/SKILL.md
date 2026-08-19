@@ -95,6 +95,12 @@ Then dedup at every tier so we do not double-write or duplicate existing coverag
 KW_TEXT="<2-3 keywords as a space-separated phrase>"
 KW_GREP="<same keywords as a pipe-separated regex>"
 
+# Unrestricted keyword search FIRST: the two prefix searches below cover habit: and correction:
+# only, so alone they are blind to gotcha:, project:, design: and every other namespace. Run one
+# per keyword; bd memories does not fuzzy-match a joined phrase. A tool or field name IS the
+# keyword, so search it verbatim.
+bd memories "$KW_TEXT"
+for k in $KW_TEXT; do echo "--- $k ---"; bd memories "$k"; done
 bd memories habit:                                                                    # habit-tier
 bd memories correction:                                                                # correction-tier (recurring slips)
 bd list --label=memory --status=open --json -n 0 | jq -r '.[] | "\(.id) \(.title)"'   # forge memory beads
@@ -151,6 +157,7 @@ For each candidate that passed dedup, propose the concrete edit:
 **Destination**: <file path, hook name, or skill name>
 **Build size**: <S/M/L>
 **Dedup**: <novel | refines existing match at <path>>
+**Outward artifacts**: <none | OPENS A PR | FILES A JIRA TICKET | PUBLISHES A PAGE | SENDS A MESSAGE>
 
 ### Edit
 
@@ -160,6 +167,13 @@ For each candidate that passed dedup, propose the concrete edit:
 ```
 
 On `y`: apply. On `edit`: incorporate user wording, re-present. On `skip`: move to next candidate without writing. On `n`: stop the workflow.
+
+The Outward artifacts line is mandatory on every proposal and is never omitted as
+implied-none: a candidate whose build path creates anything outward-facing (PR, ticket,
+page, message) must name it in that line, in caps, so a batched accept cannot silently
+authorize it. On accept, report the created artifact as a standalone headline line with
+its ID, never mid-sentence. Source: correction:communication:outward-artifact-salience-batched-accept
+(2026-08-12, PR 11593 surprise); sibling pattern: correction:skill:post-review-verb-confirmation.
 
 When multiple candidates exist, present them sequentially (not bundled) so the user can accept some and skip others. The cost of presenting separately is small; the cost of an all-or-nothing decision is friction.
 

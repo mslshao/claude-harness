@@ -110,6 +110,17 @@ def main() -> int:
     check("sources.prs_reviewing_parser", parse is gather._reviewing_rows, parse)
     check("sources.prs_reviewing_reviewed_by", "--reviewed-by=@me" in argv, argv)
 
+    # Every gh search source pins its result window. The default is 30 rows sorted
+    # by RELEVANCE, which is unstable between calls: a still-open PR can drop out of
+    # one cycle's result with exit 0, and cycle.py reads absence as closed-or-merged
+    # (it prunes the key's watermark, and past the hold grace its pending alert).
+    for name in ("prs_authored", "review_requests", "prs_reviewing"):
+        sargv, _ = gather.SOURCES[name]
+        limited = "--limit" in sargv and sargv[sargv.index("--limit") + 1] == gather.GH_SEARCH_LIMIT
+        check(f"sources.{name}_pins_the_result_limit", limited, sargv)
+        check(f"sources.{name}_sorts_by_updated_not_relevance",
+              "--sort=updated" in sargv and "--order=desc" in sargv, sargv)
+
     # contract invariant across every record shape: ok XOR error, keys disjoint
     for label, rec in [
         ("ok", gather.classify(0, "[]", "", gather._bead_rows)),

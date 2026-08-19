@@ -40,8 +40,17 @@ arrive in the same report. All `/review` findings are advisory; PR creation
 proceeds regardless. The operator reads the report before flipping the PR from
 draft to ready and resolves CRITICAL/WARNING items before publishing.
 
-Invocation: from the worktree directory so `git diff origin/main..HEAD` is
-the natural scope, then:
+Invocation: from the worktree directory. Scope with the THREE-dot form,
+`git diff origin/main...HEAD`, or an explicit merge-base
+(`git merge-base origin/main HEAD`). Do NOT use two-dot `origin/main..HEAD`:
+it compares against wherever origin/main is right now, and on a launch that
+runs for an hour main moves, so main's own newer commits render as YOUR
+deletions. Observed 2026-08-12 on PR #11598: two-dot reported 18 files with
+7 unrelated TypeScript files, 241 phantom deletions and 8 phantom em-dashes;
+the real diff was 12 files. Three-dot IS the merge-base diff, which is what
+a changed-file list wants (see
+correction:verification:sibling-command-semantics-not-symmetric for why the
+dot count is not transferable between git subcommands). Then:
 
 ```
 Skill(skill="review")
@@ -105,21 +114,30 @@ and use its structural skeleton (H1 sections, `Jira issue link:` line,
 `# Checklist` items filled out, `Require-reviewers: all` line). Layer the personal
 style rules from `memory/pr-template.md` on top (H2 subsections within Summary,
 Jira link at the bottom, no hard line-wrapping, clickable markdown links).
-Skipping the repo template breaks Mergify's checklist-fill protection and produces
-a PR description that does not match the team's structural standard. See the
-recurrence note in `~/.claude/CLAUDE.md` PR descriptions rule for the 2026-04-29
-instance.
+Skipping the repo template fails the required `PR Description Check` workflow
+(`.github/workflows/pr-description-check.yml`) and produces a PR description that
+does not match the team's structural standard. That workflow has two jobs: one
+fails if any `<!--` template comment survives in the body, the other fails if the
+final checklist item is still unchecked. No other checklist item is gated, and the
+repo has no Mergify config, so Mergify is not the mechanism (verified 2026-08-11).
+See the recurrence note in `~/.claude/CLAUDE.md` PR descriptions rule for the
+2026-04-29 instance.
 
 **Step 3: Submit the PR (path depends on Step 1).**
 
-**Path A: Independent launch (`BASE_BRANCH == "main"`).** Raw `gh` is fine. The
-PR has no parent relationship to register, and Graphite tracking adds no value.
+**Path A: Independent launch (`BASE_BRANCH == "main"`).** No parent relationship
+to register, so Graphite adds no value; push, then create the PR **via the /pr
+skill**, not raw `gh pr create`. The project hook `block-raw-gh-pr-create.sh`
+blocks the raw call (measured 2026-08-14 on the MX2-XXXXX launch: one blocked
+call plus a mid-finalization re-route into /pr), and /pr owns Jira-id
+resolution, the template body, and the draft default. Inside /pr's own step 8,
+the `PR_SKILL_OK=1` prefix is the sanctioned escape for its `gh pr create`
+invocation; never use that prefix outside /pr.
 ```bash
 cd "$WORKTREE_DIR"
 git push -u origin HEAD
-gh pr create --draft \
-  --title "[MX2-XXXXX] <description>" \
-  --body-file /tmp/pr-body-<branch>.md
+# then invoke the /pr skill (Skill tool), passing the worktree path, Jira id,
+# already-run check evidence, and the staged body file
 ```
 
 **Path B: Dependent launch (`BASE_BRANCH != "main"`).** Use `gt` so the stack
@@ -154,13 +172,15 @@ PR_URL=$(gh pr view --json url --jq .url)
 ```
 
 **Step 5: Make the bead reachable from the PR and the ticket.** Put the Jira key
-and PR number in the bead TITLE, not only in a NOTES line or a comment. `bd search`
-covers title and description; it does NOT cover comments, and `bd list --json`
-exposes no comments field. A bead whose PR number lives only in
+and PR number in the bead TITLE, not in the description, not in a NOTES line, and
+not in a comment. `bd search` is TITLE-ONLY (verified 2026-08-07 on bd 1.1.2: a
+phrase present in exactly one description and zero titles returns "No issues
+found"). Descriptions, NOTES and comments are all unreachable by search, and
+`bd list --json` exposes no comments field. A bead whose PR number lives only in
 `[LAUNCH_EVENT type=PR_CREATED ...]` is unreachable from `gh pr list` or from the
 Jira key, which strands every cold-start session that starts at the PR instead of
 at the bead (2026-08-06, docr-t9o69 / PR #11392: `bd search 11392` and
-`bd search MX2-NNNNN` both missed the bead holding all the state).
+`bd search MX2-XXXXX` both missed the bead holding all the state).
 
 Separate Bash call from any `gh` command (CLAUDE.md: the personal-tier-vocab hook
 scans the whole command string, so a compounded `bd` + `gh` invocation gets the

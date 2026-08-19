@@ -137,6 +137,15 @@ with a focused WEAK_DIMENSION instruction:
   justified by a STATED constraint (not a hypothetical future). Surface
   the minimal-viable comparison in the convergence delta."
 
+**Cheap path when the gate's ISSUES are self-contained prescriptions**: if every
+ITERATE issue names its own exact fix (an AC amendment, a named evidence citation)
+and no new analysis is required, incorporate the amendments into the plan text and
+re-gate by resuming the SAME decision-maker agent via SendMessage (its round-1
+verification context stays intact; it re-verdicts only the amended items). Reserve
+the full re-dispatch above for ITERATE verdicts requiring new divergence or new
+specialist evidence. Measured 2026-08-13 (MX2-XXXXX converge): resume re-gate
+80s/118k tokens vs a fresh full-context gate ~360s/250k, verdict quality intact.
+
 Re-synthesize (Phase 4). Re-run skeptic (Phase 4.5). Re-gate
 (Phase 4.6).
 

@@ -59,6 +59,58 @@ BRANCH WARNING to each specialist prompt instead:
 "WARNING: Could not fetch PR branch. Your Read/Grep/Glob results may show code
 from a different branch. Rely primarily on the inline diff for analysis."
 
+### A specialist authorized to MUTATE gets its own worktree
+
+The one-shared-worktree rule above assumes every specialist is a reader. Some are
+not, and the shared worktree is unsafe the moment one of them edits.
+
+**The tool grant does not tell you which ones mutate; the PROMPT does.** Every
+reviewer in the roster is granted exactly `Bash, Glob, Grep, Read` with no
+`Edit`/`Write` (verified 2026-08-17 across `mx2-silent-failure-hunter`,
+`test-quality-reviewer`, `mx2-code-reviewer`, `mx2-skeptic`), and `Bash` alone is
+enough to rewrite a file. So "read-only agent" is a statement about what you asked
+for, never about what it was handed. Three standing instructions authorize mutation:
+SKILL.md's "Empirical execution beats precedent-citation on disputed test behavior"
+and "When the diff's SUBJECT is tool semantics, execute every falsifiable claim in
+the changed prose", plus the red-green-revert cycle in
+`.claude/rules/verification.md` that `test-quality-reviewer` runs to prove a matcher
+actually bites. Any prompt carrying one of those is a mutating dispatch.
+
+**Rule.** Give each mutation-authorized specialist its OWN worktree and keep the
+shared one for the read-only fan-out. Cheaper alternative when only one agent
+mutates: dispatch it in a separate sequential batch after the readers return, so
+nothing else is reading the tree while it edits.
+
+This does not reopen the `isolation: "worktree"` ban above. That ban is about
+handing per-agent worktrees to the WHOLE fan-out, where 10+ concurrent
+`git worktree add` calls contend on the index lock. One extra worktree for the one
+or two mutating agents is bounded and does not reproduce that.
+
+**Two failure modes, both observed in one run.** A sibling reader can observe
+half-reverted state and report a finding about code that exists in no commit. And
+the harness's ordinary file-changed notice ("modified by the user or a linter",
+which legitimately carries a do-not-mention clause because the user is presumed to
+know) arrives in the reader's context mid-run and reads exactly like a
+prompt-injection attempt.
+
+2026-08-17, PR #11386: `test-quality-reviewer` inverted
+`if endpoint == dynamo_target.DEFAULT_LOCAL_ENDPOINT:` to `!=` at `run_local.py:91`
+as a legitimate red-green-revert, in the shared worktree.
+`mx2-silent-failure-hunter` had that file open, received the file-changed notice
+showing the inverted branch, and opened its report by flagging a fabricated
+system-reminder and a suspected injection instructing it to stay quiet. The
+orchestrator relayed that to the user as a security event needing an agent-safety
+report. There was no attacker, the edit was reverted, and the posted review was
+unaffected, but the reviewer came one step from a phantom inverted-branch finding
+and the false security claim had to be retracted to the user.
+
+**Teardown.** Remove each extra worktree alongside the shared one, and check
+`git -C <dir> status --porcelain` BEFORE removing: a non-empty result means the
+mutating agent did not finish reverting, which you want surfaced rather than
+deleted. A mutating agent's "I reverted it and left the tree clean" is a
+self-report; the porcelain check is the cross-boundary evidence
+`.claude/rules/verification.md` requires for subagent work.
+
 ## Spot-Check Mode (large mechanical refactors)
 
 When `spot_check_eligible: true` AND mode is `default`, the diff sent to

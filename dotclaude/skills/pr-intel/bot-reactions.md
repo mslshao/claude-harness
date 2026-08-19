@@ -67,6 +67,20 @@ prevents: PR #10049 (2026-06-22), where Copilot's `commit_id`-missing comment
 was correct on commit 1, fixed on commit 2, and still drew an unplanned `+1`
 that had to be removed at post time.
 
+**Second precondition (already-signalled gate, re-reviews).** A bot that re-posts the
+same finding as a NEW comment object on a new head (Datadog does this on every push)
+does NOT earn a second reaction when a prior round already reacted to the equivalent
+comment. A reaction transmits finding accuracy once; re-transmitting it on the
+duplicate adds nothing for the bot's maintainers and nothing for the author, and it
+inflates `bot_reaction_count` without new signal. Check the prior round's
+`review:pr-<N>:<date>` memory for its reaction count and findings before building the
+list. This also resolves an apparent conflict in this file: the five-category table
+below covers EVERY fetched bot comment (so you always form a position), while the
+`Build the Reactions List` step below emits only the comments whose position is worth
+transmitting THIS round. Observed 2026-08-10 (PR #11442 round 2: Datadog re-posted both
+`no-unsafe-assignment` comments on the rebased head as ids 3752841594 / 3752841601
+after round 1 had already `+1`'d 3749849632 / 3749849644; correct call was no reaction).
+
 | # | Bot finding | Reviewer's position | Reaction | Comment |
 |---|---|---|---|---|
 | 1 | Correct, material, no further context | I agree, nothing to add | `+1` | None |
@@ -194,8 +208,8 @@ match this phase's name).
 
 ## Recurrence Context
 
-- `bd memories feedback:bot-comment-reaction-lead-2026-05-20`: the engineering
-  lead's original "thumbs-up instead of repeating" feedback
+- `bd memories feedback:bot-comment-reaction-2026-05-20`: the engineering lead's
+  original "thumbs-up instead of repeating" feedback
 - `bd memories calibration:mx2-decision-maker:ideation:pr-intel-cross-cutting`:
   the /ideate gate that ESCALATE-ROUTE'd to instrumentation-first
 - Transcript inspection on 2026-05-21 of PRs #9276 and #9146 R3 sessions

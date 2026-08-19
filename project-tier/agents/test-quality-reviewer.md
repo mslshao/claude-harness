@@ -277,6 +277,27 @@ The fix is to add at least one integration test per publish/send path that uses 
 
 When moto can't produce the specific boto3 error you need to test (throttling, validation failures, permission denied), use `botocore.stub.Stubber` to inject the exception directly. This is the established project pattern; reference `src/python/mx2/eventbridge/event_bridge_publisher_test.py` for an example.
 
+### Unfalsifiable Absence Assertion (🚨 CRITICAL)
+
+An assertion that nothing happened (`== []`, `count == 0`, `not in`, `is None`) is only evidence if the code under test could have made it happen. When a collaborator is left unconfigured, its error path short-circuits execution before the write, publish, or state change the assertion forbids, so the assertion holds no matter what the code under test does. Unlike Assertion-Free Tests this one has plenty of assertions, and unlike Mock Saturation the fixtures look clean, so it survives every line-level lens.
+
+```python
+# BAD: no folio_metadata_client injected, so _fetch_folio_page_count raises before the
+# first save. Both assertions pass with the guard deleted; they assert the unset client.
+processor = DocumentProcessor(settings)
+processor.handle(_folio_event(document_id))
+assert _job_rows_for_document(document_id) == []
+assert _received_message_count(queue) == 0
+
+# GOOD: stand up everything the success path needs, so the guard is the only thing
+# between the message and the forbidden outcome.
+mockito.when(folio_metadata_client).get_page_count(...).thenReturn(50)
+seed_doc_file_info(document_id=document_id, matter=_MATTER)
+processor = DocumentProcessor(settings, folio_metadata_client=folio_metadata_client)
+```
+
+How to check it, not just suspect it: delete the guard, strip the assertions that obviously fail (a metric count, a "received" not in names), and run what remains. If the absence assertions still pass, they were never load-bearing. Report the surviving assertions by name, because "add a test" is the wrong ask when the test already exists.
+
 ## Review Approach
 
 ### Obviously Correct Standard
@@ -302,7 +323,7 @@ Output is structured for consumption by orchestrating agents or direct human rev
 **Opening line**: Finding count by severity, overall verdict.
 
 ```
-test-quality-reviewer: 2 🚨, 1 ⚠️, 1 💡; tests exercise framework, not domain logic
+test-quality-reviewer: 3 🚨, 1 ⚠️, 1 💡; tests exercise framework, not domain logic
 ```
 
 **Findings in priority order**:
@@ -328,7 +349,7 @@ Happy path is covered. No test for duplicate document submission or oversized pa
 ```
 
 **Severity guide:**
-- 🚨 CRITICAL: Framework tests masquerading as domain tests, assertion-free tests, mock-saturated tests that test wiring not behavior, unnecessary mocking of auto-faked services (boto3/requests), missing routing-test branches for new code paths, shared mutable state between tests
+- 🚨 CRITICAL: Framework tests masquerading as domain tests, assertion-free tests, mock-saturated tests that test wiring not behavior, unnecessary mocking of auto-faked services (boto3/requests), missing routing-test branches for new code paths, shared mutable state between tests, unfalsifiable absence assertions (an unconfigured collaborator's error path makes the forbidden outcome impossible regardless of correctness)
 - ⚠️ WARNING: Name-assertion mismatches, shallow error testing, over-mocking of internal collaborators
 - 💡 SUGGESTION: Missing negative paths (reference only; generating them is test-generator's job), test organization improvements, fixture extraction opportunities
 

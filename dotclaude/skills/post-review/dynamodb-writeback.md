@@ -47,6 +47,17 @@ review. Reach for the inline form below only when a field the script does not ex
 needed; hand-writing the whole record per review is ~100 lines of throwaway Python and
 was done five times in one session before this note existed (2026-08-06).
 
+**`comments` carries atomic-review inlines ONLY, never Step 3.6 replies.** The counts in
+Step 5 already separate them (`posted_inline_count` vs `inline_replies_posted`), and a
+thread continuation is not a proposed comment on a line, so a reply does not belong in
+this record. There is also a mechanical reason to get it right the first time: a reply
+body legitimately has no attribution lede (the replies endpoint is exempt, SKILL.md
+Step 2.5), but `block-unattributed-review-comment-file.sh` scans any review-shaped JSON
+at Write time and cannot tell a telemetry params file from a postable payload, so
+including a reply BLOCKS the Write. When that fires, the fix is removing the reply from
+`comments`, NOT rewriting its lede to satisfy the hook. Observed 2026-08-12 on PR #11539
+round 2, one blocked Write plus a re-write.
+
 ```bash
 AWS_PROFILE=dev AWS_DEFAULT_REGION=us-east-1 uv run --with boto3 --with 'pydantic>=2' python3 - <<'PY'
 import sys

@@ -51,6 +51,16 @@ the MCP error in the ask so the user can debug their token. The legacy
    suggest it): its output is large enough to blow the tool-result token
    budget, and the key is already known.
 
+   **Silent-zero mode (observed 2026-08-17, three PRs).** This tool can return
+   `{"issues":[],"total":0}` with no error while the gate is genuinely red. That
+   zero is evidence about the READ, not the PR. Before reporting "no analyzer
+   findings", run the positive control: the same call with `branch="main"`. If
+   main also returns zero, the enumeration path is broken and the only
+   authoritative signal is `get_project_quality_gate_status`, which keeps working;
+   report the failing condition and its numbers and say explicitly that the
+   individual issues could not be enumerated. Do NOT report the PR as analyzer-clean
+   off an unverified zero.
+
 2. **Leak-period scope filter (mandatory; skipped in `--quick`).** For each
    returned issue, check `textRange.startLine` against the PR's actual
    diff hunks. SonarCloud's leak-period mode flags pre-existing violations

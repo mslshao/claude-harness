@@ -172,6 +172,30 @@ iteration. Your prior work is already committed to the branch.
 5. Do NOT create a new branch. Commit to the existing branch named in the block.
 6. Do NOT amend prior commits. Add new commits only.
 
+## Red-Green-Revert Scope (MANDATORY when tests follow the code)
+
+`.claude/rules/verification.md` requires the revert cycle for any test written
+after the code it guards. One constraint it does not spell out, and which
+silently produces false evidence:
+
+**The line you revert MUST be inside your own diff.** Check before reverting:
+`git diff <merge-base>..HEAD --name-only` must list the file.
+
+Reverting a line outside your diff still produces a red, so the cycle LOOKS
+satisfied. What it actually proves is that pre-existing production code works,
+not that your new test guards your new behaviour. Observed 2026-08-12 on
+MX2-XXXXX: a version-conflict test reverted `record_es_response` in a file the
+change never touched, reported a genuine `assert None == 1` failure, and was in
+fact routing-independent. Disabling the entire new branch left it green while 6
+of 7 sibling tests failed.
+
+The stronger check, when your tests guard a new branch: disable the branch
+itself (`if False and ...`) and confirm YOUR test fails. A test that survives
+its own feature being switched off is testing something else.
+
+State in VERIFICATION which file each reverted line lives in, so the scope is
+auditable without re-running.
+
 ## Final Result Block
 
 <!-- BEGIN SHARED-PROTOCOL:final-result-block -->

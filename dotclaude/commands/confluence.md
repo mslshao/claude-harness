@@ -59,8 +59,18 @@ After the push, re-fetch the page once and confirm your edit anchor is present i
 body (a distinctive phrase from the applied change). If absent, report the failure
 loudly with the page URL and current version; do not retry blindly.
 
+Same-session repeat pushes may satisfy Delta 3 from the push response instead of a
+fresh fetch: pass `includeBody: true` on `updateConfluencePage`; when the response
+shows `version.number == baseline + 1` AND the echoed body contains the edit anchor,
+that echo IS the server's stored content: record it as the new baseline. Delta 2
+(fresh fetch immediately before every push) is UNCHANGED and unconditional; this trims
+only the third leg, one full-body fetch per push. Large bodies overflow the echo to a
+tool-results file (see `memory/atlassian-mcp.md`); json-load that file rather than
+skipping the check. (Added 2026-08-12 after nine full-body round-trips in one day on
+the <service> cutover status/endgame page pair.)
+
 ## Multi-update sessions
 
-The baseline is per-push, not per-session. After each successful push, the re-fetch
-from Delta 3 becomes the new baseline. Never push from a body fetched before your own
-previous push.
+The baseline is per-push, not per-session. After each successful push, the verification
+body from Delta 3 (the post-push re-fetch, or the `includeBody` echo on repeat pushes)
+becomes the new baseline. Never push from a body fetched before your own previous push.

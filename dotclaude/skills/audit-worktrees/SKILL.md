@@ -97,7 +97,28 @@ git -C /workspaces/main grep -n "<distinctive-string-from-commit>" origin/main -
 
 If 4+ distinctive strings from the commit are on main, content is shipped.
 
-If `git diff <branch> origin/main -- <touched-files>` is empty, that alone confirms shipping; skip the per-commit grep.
+**Do NOT use `git diff <branch> origin/main` as the shipping test.** A branch sitting N
+commits behind main differs on every file main has touched since, so that diff reports
+main-side evolution as if it were unshipped branch work. Measured 2026-08-10: three
+merged branches 50 to 133 behind main showed 400-700 differing files, and one showed 45
+"branch-only" lines in a file whose net branch change was zero.
+
+Two tests that do work, cheapest first:
+
+1. **Branch's own net change** (definitive):
+   `git -C /workspaces/main diff --stat $(git merge-base <branch> origin/main) <branch> -- <touched-files>`
+   Empty means the branch made no net change to those files, so nothing can be lost.
+   This is what caught the cancelling 1-line commit pair.
+2. **Direction check** when test 1 is non-empty. Per differing file:
+   `git diff <branch> origin/main -- <file> | grep -c '^-[^-]'` counts lines present
+   ONLY on the branch, i.e. what deletion would lose. Zero means main is a superset and
+   the branch is merely stale. Non-zero is the only case needing the grep ladder above.
+
+Also confirm the PR's merge commit is an ancestor of main, which is authoritative and
+independent of branch staleness:
+`git merge-base --is-ancestor $(gh pr view <N> --json mergeCommit --jq .mergeCommit.oid) origin/main`
+Do NOT resolve a merge commit by `git log origin/main --grep="#<N>"`: that matched PR
+#11389's squash commit for PR #11425 this session, because 11389's message referenced it.
 
 ### Step 5: Build the audit report
 

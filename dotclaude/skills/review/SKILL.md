@@ -157,7 +157,7 @@ so FAIL LOUD per that guard instead.
    | `has_test_files` | Diff contains `*_test.py`, `test_*.py`, `*.test.ts(x)`, `*.spec.ts(x)`, `conftest.py` |
    | `has_observability_signal` | Exception-class declarations added/removed/renamed; metric-emission patterns (`add_metric`, `put_metric_data`, `MetricsCollector`, `MetricsContext`, `DatadogProvider`, `DogStatsDProvider`); `*.tf` files matching `aws_cloudwatch_metric_alarm\|datadog_monitor\|datadog_dashboard\|aws_cloudwatch_log_group\|aws_lambda_function\|aws_ecs_task_definition`; new value added to a class inheriting from `StrEnum`, `Enum`, `Literal[...]` |
    | `has_error_handling_signal` | Python: added/modified `try:`, `except `, `raise `, `JSONResponse`, `HTTPException`, FastAPI exception handler patterns. TypeScript: added/modified `apiRequest`, `isHttpError`, `console\.error`, `\.catch\(`, `\.then\(`, `await fetch`, `response\.json` patterns. OR commit messages mention error handling/retry/fallback. |
-   | `has_security_signal` | Changed file paths match `auth\|security\|token\|jwt\|permission\|rbac\|document\|upload\|download\|access\|audit\|secret\|credential\|patient` OR diff contains `SecretStr`, `logger\.`, `\.info\(`, `\.error\(`, `\.exception\(` on changed lines |
+   | `has_security_signal` | Changed file paths match `auth\|security\|token\|jwt\|permission\|rbac\|document\|upload\|download\|access\|audit\|secret\|credential\|patient` OR diff contains `SecretStr`, `logger\.`, `\.info\(`, `\.error\(`, `\.exception\(` on changed lines OR the diff renders model-produced content into a UI or feeds it back into a later prompt (`renders_model_output` in `pr-intel/SKILL.md` Dispatch Signals: a path matching `llm\|prompt\|chat\|generative\|completion\|agent\|copilot\|rag\|answer`, an API-response value reaching markup, or a response field interpolated into a string passed to a submit/ask/prompt call). The path half alone missed PR #11355 (2026-08-17), a 32-file LLM-output diff under `ai-doc-chat/`. |
    | `has_terraform_files` | `*.tf`, `*.hcl`, `terragrunt.hcl`, or paths under `infra/`, `module/` |
    | `has_typescript_files` | `*.ts`, `*.tsx`, `*.mts`, `*.cts` outside `src/gen-typescript/` |
    | `has_file_history` | At least one changed file has 3+ prior PRs in the last 180 days (use `git log --since=180.days --oneline -- <file>` and count merge commits or commits referencing PR numbers; threshold met when count >= 3 on any file) |
@@ -336,18 +336,38 @@ so FAIL LOUD per that guard instead.
 5. **SonarCloud pre-check (always; in parallel with the fan-out).** Sonar
    findings are tractable to self-remediate before pushing, so this skill
    surfaces them inline rather than waiting for the post-push gate
-   roundtrip. Direct-access discipline: query the MCP first, never ask
+   roundtrip. Direct-access discipline: query Sonar directly, never ask
    the user to paste from `sonarcloud.io` (see
    `correction:verification:sonarqube-access-pattern`,
    `config:sonarcloud-mcp`).
 
-   - **If the current branch has an open PR**: call
-     `mcp__sonarqube__search_sonar_issues_in_projects` with
-     `projects=["mx2_docr"]`, `pullRequestId="<N>"`,
-     `issueStatuses=["OPEN", "CONFIRMED"]`, AND
+   - **If the current branch has an open PR**: get the gate conditions from
      `mcp__sonarqube__get_project_quality_gate_status` with
-     `projectKey="mx2_docr"`, `pullRequest="<N>"`. Determine PR existence
-     via `gh pr view --json number,headRefName --jq '.number' 2>/dev/null`.
+     `projectKey="mx2_docr"`, `pullRequest="<N>"`. That call is reliable, and its
+     CONDITIONS array names the failing metric with actual-vs-threshold, which is
+     enough to decide fix-vs-justify on its own. Determine PR existence via
+     `gh pr view --json number,headRefName --jq '.number' 2>/dev/null`.
+   - **Enumerate the individual issues over REST, not the MCP.** The MCP issue
+     search returns `total: 0` for this project even against a known-positive
+     control, so a zero from it is evidence about the READ, not about the data
+     (measured on PRs 11606, 11598, and again on 11817, where the gate was red on
+     a MAJOR the MCP could not see):
+
+     ```bash
+     curl -s -u "$SONAR_MCP_TOKEN:" \
+       'https://sonarcloud.io/api/issues/search?componentKeys=mx2_docr&pullRequest=<N>&ps=100' \
+       | jq -r '.issues[] | "\(.rule) \(.severity) \(.component):\(.line)\n\(.message)"'
+     ```
+
+     Never report "no Sonar issues" off an MCP `total: 0`. If a gate condition is
+     red and REST is also unavailable, say the enumeration is unavailable and cite
+     the failing condition rather than implying a clean result. A stale green is
+     worse than a stale red: it clears a gate that was never evaluated. Full
+     context: `memory/sonarcloud-rules.md` "Enumeration gap".
+   - **Check the analysis is current before trusting either result.** Compare the
+     analysed commit against the PR head; a gate verdict against a superseded
+     commit says nothing about the code in the diff:
+     `curl -s -u "$SONAR_MCP_TOKEN:" 'https://sonarcloud.io/api/project_pull_requests/list?project=mx2_docr' | jq -r '.pullRequests[] | select(.key=="<N>") | "\(.commit.sha) \(.status.qualityGateStatus) \(.analysisDate)"'`
    - **Leak-period scope filter (mandatory).** Filter returned issues to
      those whose `textRange.startLine` falls within the diff scope's hunks.
      Sonar's leak-period mode flags pre-existing violations in touched
@@ -355,7 +375,7 @@ so FAIL LOUD per that guard instead.
      note "N leak-period findings dropped" so the author knows the count
      differs from the gate's raw view. See
      `feedback:pr-review:sonarqube-leak-period-scope`.
-   - **If no PR exists yet (pre-push) OR the MCP errors**: fall back to
+   - **If no PR exists yet (pre-push) OR both Sonar reads are unavailable**: fall back to
      walking the local rule catalog at
      [~/.claude/projects/-workspaces-main/memory/sonarcloud-rules.md](../../projects/-workspaces-main/memory/sonarcloud-rules.md).
      For each rule with a `**Detector**` block, run it against the diff.
@@ -364,10 +384,10 @@ so FAIL LOUD per that guard instead.
      issue would block the gate AND is in-diff). Include rule code,
      file:line, the Sonar message, and one-line author-actionable
      remediation.
-   - **Last-resort escape hatch**: only if the MCP errored AND the catalog
-     walk turned up nothing AND the gate is still failing (per
-     `gh pr checks <N>`), ask the user to paste the issue list. State the
-     MCP error in the ask. Do not preempt these checks.
+   - **Last-resort escape hatch**: only if the gate query AND the REST
+     enumeration both errored AND the catalog walk turned up nothing AND the gate
+     is still failing (per `gh pr checks <N>`), ask the user to paste the issue
+     list. State which call failed in the ask. Do not preempt these checks.
 
 6. **Synthesize.** When all dispatched agents and the Sonar pre-check return:
    - Dedup overlapping findings (same file + line + theme is one entry,
@@ -432,7 +452,8 @@ so FAIL LOUD per that guard instead.
      the negative on the `Agents:` line with its search terms. Never drop it
      as "no finding"; an omitted negative is how a lens silently stops
      running.
-   - Sonar findings get attribution `Source: SonarCloud (MCP)` or
+   - Sonar findings get attribution `Source: SonarCloud (REST)`,
+     `Source: SonarCloud (gate condition)`, or
      `Source: SonarCloud (catalog detector)` so the author can see which
      path produced the signal.
 
@@ -604,13 +625,13 @@ uninterrupted runs, pre-approve the read-only set in
 
 - **Read-only.** Does not modify code, does not post to GitHub.
 - **Local-first.** The diff and local git history are the entire context
-  the dispatched agents see. The skill itself queries the SonarSource MCP
-  when an open PR exists for the branch (see step 5); that is the one
-  remote read. Does not fetch Jira, Confluence, or PR review state.
+  the dispatched agents see. The skill itself queries the SonarCloud gate and
+  issue endpoints when an open PR exists for the branch (see step 5); those are
+  the one remote read. Does not fetch Jira, Confluence, or PR review state.
 - **Local self-review cache only.** The single state write is
   `~/.claude/scratch/review-cache/<branch>.json` (raw per-specialist findings,
   for `/pr-intel --mine` dedup per bead `docr-xvnr`). Does not write task
-  trackers, persistent memory, the repo, or GitHub. The Sonar MCP query is a read.
+  trackers, persistent memory, the repo, or GitHub. The Sonar queries are reads.
 - **Bounded fan-out.** Up to thirteen review agents with conditional dispatch.
   Maximum ten verdict-emitting specialists fire on a single diff (five of the
   six always-or-conditional agents from project /review, mx2-security-auditor

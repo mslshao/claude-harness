@@ -6,6 +6,28 @@ already on main (stale) and files reverted by a rebase conflict (ghost diffs).
 Both always run (local git operations). The SKILL.md Data Gathering section
 points here.
 
+## Resolve the base FIRST (every command below substitutes it)
+
+Every `origin/main` in this file is shorthand for the PR's ACTUAL base. Resolve once,
+substitute everywhere:
+
+```bash
+BASE_REF=$(gh pr view <number> --repo <company>/docr --json baseRefName --jq '.baseRefName')
+git fetch origin "$BASE_REF" --quiet
+# then use origin/$BASE_REF wherever this file says origin/main
+```
+
+On a Graphite stack the base is a downstack branch, so every check here reports the
+downstack PR's content as this PR's. Observed 2026-08-12 on #11386 (base
+`cfried/ruleseng-search`, itself the head of #11122): 54 files / +3790 against
+`origin/main` versus the real 15 / +824, and a ghost-diff list that was only the
+branch being 814 commits behind main. Both wrong, neither self-announcing.
+
+`gotcha:stale-local-main-diff-base` says to fetch and compare against `origin/main`.
+That fixes a STALE local main and is the WRONG instruction when the base is not main;
+check `baseRefName` before applying it. `verify-anchors.py --base` (whose help string
+already says "not a hardcoded main") and post-review Step 2 both carry this rule.
+
 ## Remote Head Freshness (run first)
 
 `gh pr view --json headRefOid` reads GitHub's cached PR metadata, which can lag the
@@ -100,6 +122,37 @@ conflict resolution accidentally reverts a recently-merged change.
 
 This check is the highest-value add for squashed PRs, where inter-revision visibility
 is lost and rebase conflict reverts become invisible.
+
+## Concurrent Main Edits (third case)
+
+Stale files and ghost diffs both ask about files the PR does NOT own. The third case asks
+about the files it DOES own: did main modify any of them after this branch's merge base?
+GitHub's three-dot diff hides this by construction, and it is the stale-review-basis risk:
+the diff you are reviewing was written against an older version of the file.
+
+```bash
+MB=$(git merge-base origin/main <headRefOid>)
+git log --oneline "$MB"..origin/main -- <each path in the PR's file list>
+```
+
+Empty output is the clean case, and it is the common one. On a hit:
+
+1. Test-merge before drawing any conclusion. A clean auto-merge is the usual outcome and
+   converts this from a finding into a verified non-issue, so do not surface it as a
+   concern without running it:
+   `git worktree add --detach <tmp> origin/main && git -C <tmp> merge --no-commit --no-ff <headRefOid>`
+2. Assert on the merged CONTENT, not just the exit code. Additive edits to the same
+   structured container (a JSON array of hooks, a Terraform locals block, an `__all__`
+   list, a lockfile section) auto-merge clean while silently dropping one side's entry.
+   Read the merged file and confirm BOTH changes are present.
+3. Clean up the worktree (`git worktree remove --force <tmp>`) before continuing.
+4. Report the verification in the briefing when it cleared, not only when it failed: it
+   is cheap reviewer-facing evidence that the concurrent edit was checked.
+
+Observed 2026-08-07 on #11307: an XS 2-file PR editing `.claude/settings.json` shared that
+file with #11310, merged two days after the branch's merge base. Test-merge was clean and
+both PreToolUse hooks survived, which is the fact worth reporting; the raw 2-dot diff was
+useless here (~200 main-ahead files) and the merge-base-scoped `git log` was the discriminator.
 
 If `git fetch` failed earlier, skip this check and treat all files as net-new.
 

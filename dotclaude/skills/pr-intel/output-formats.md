@@ -164,7 +164,7 @@ to paste on the PR. The reviewer can copy them verbatim or edit before posting.
 
 **Comment budget**: Scale to the number of real findings, not to a fixed cap. Zero is a legitimate count: a 2XL infra PR with nothing to flag should get an approval with no inline comments, not padded findings to meet a typical-range floor (empirical case: PR #9022, 696-line Redshift Serverless PR approved with zero inline comments by a high-trust reviewer). Typical range when findings exist: 2-3 for a clean PR with minor observations, 5-8 for one with real issues, 10-15 for a large PR with multiple discussion-class concerns. Beyond 15, consolidate related findings into the review summary or use cross-references to point multiple sites at the same canonical thread (P13 in reviewer-discipline.md). BLOCKING findings always get a comment regardless of count. When trimming, drop MINOR findings first. When in doubt, drop the comment: a PR with two precise questions is more useful than one with eight padded observations.
 
-**Structural variation**: Not every comment needs the same shape. Mix these forms (examples lifted from the engineering lead's corpus across PRs #8931, #8741, #8066):
+**Structural variation**: Not every comment needs the same shape. Mix these forms (examples lifted from the engineering lead corpus across PRs #8931, #8741, #8066):
 - Bare question: "where does this come from?", "why?", "intentional?", "must they be?"
 - Short observation: "this silently drops the error context from the original exception."
 - Suggestion with concrete anchor: "consider extracting a `create_worker` function in another module."
@@ -174,7 +174,7 @@ to paste on the PR. The reviewer can copy them verbatim or edit before posting.
 
 Avoid uniform [SEVERITY] / title / code quote / explanation structure on every comment. Use severity tags in the briefing context (for the reviewer) but omit them from the pasteable text (for the PR author). A human reviewer does not prefix comments with [BLOCKING].
 
-**Tool-source attribution rule** (the engineering lead, 2026-05-26 mx2-eng fortnightly: tool-discovered findings must be posted as the tool, not as Michael):
+**Tool-source attribution rule** (the engineering lead 2026-05-26 mx2-eng fortnightly: tool-discovered findings must be posted as the tool, not as Michael):
 
 Every finding emitted by pr-intel passed through a specialist agent or an orchestrator pattern check; none of them came from Michael's unaided reading. Treat ALL of them as bot-discovered for voice purposes. Open each draft inline comment with an explicit attribution prefix naming the source. Examples:
 
@@ -195,7 +195,7 @@ The speed-amplified vs bot-surfaced provenance classification (synthesis.md step
 
 The only voice exception: comments Michael personally writes during his editing pass (after pr-intel output is rendered but before /post-review consumes it). Those stay in Michael's voice with no attribution prefix, because they ARE Michael's unaided judgment. Pr-intel itself does not emit them.
 
-This is structural enforcement of `review-voice.md` "Attribute tooling findings to tooling" and reviewer-discipline.md T5 (Transparent Tooling). Replaces the prior speed-amplified-no-attribution rule (which let bot findings ride under Michael's voice when the classifier judged them reachable from diff reading); the 2026-05-26 feedback from the engineering lead surfaced that even those findings should be attributed because Michael didn't actually catch them himself, the tool did.
+This is structural enforcement of `review-voice.md` "Attribute tooling findings to tooling" and reviewer-discipline.md T5 (Transparent Tooling). Replaces the prior speed-amplified-no-attribution rule (which let bot findings ride under Michael's voice when the classifier judged them reachable from diff reading); the 2026-05-26 the engineering lead feedback surfaced that even those findings should be attributed because Michael didn't actually catch them himself, the tool did.
 
 Format: file heading, then numbered comments. Each comment has a target line, a fenced block with the ready-to-paste text, and a briefing-context section the reviewer can read but does not post.
 
@@ -508,7 +508,7 @@ Before emitting any draft comment, attempt to compress to its question core. If 
 - (b) the comment carries a concrete code anchor or file reference,
 - (c) the finding is a defect-class BLOCKING (rule violation, runtime crash, security boundary, data loss). In that case the directive tone overrides compression.
 
-The diff line is half the comment; do not restate it. The engineering lead's corpus on PR #8741 includes a 1-word inline comment ("why?"). The table below accepts that shape; the compression step makes it the default for design-judgment findings.
+The diff line is half the comment; do not restate it. The the engineering lead corpus on PR #8741 includes a 1-word inline comment ("why?"). The table below accepts that shape; the compression step makes it the default for design-judgment findings.
 
 Strip Michael's verbosity tells during synthesis (see reviewer-discipline.md). The verbosity tells appear in BOTH inline comments AND the Draft Review Summary body; scan both venues for them before emitting.
 
@@ -532,7 +532,7 @@ Maps evidence + severity + class to default shape. Compression is the discipline
 | DIFF-VISIBLE | MINOR | any | Single-sentence question | Never |
 | QUESTION | any | any | Interrogative, ≤ 15 words | Never. If more is needed, downgrade evidence and route to summary |
 
-**Ceiling calibration**: word counts above are post-hoc empirical, not aspirational. The engineering lead's corpus median for design-judgment DISCUSSION is ~12 words; the corpus ceiling (when concrete anchors are present) lands around 25-30 words. Hard 15-word ceilings produce false over-ceiling flags on legitimate scaffolded comments and lead to either trim-too-far compression or apparent rule violations on perfectly fine comments. Calibrated 2026-05-13.
+**Ceiling calibration**: word counts above are post-hoc empirical, not aspirational. The the engineering lead corpus median for design-judgment DISCUSSION is ~12 words; the corpus ceiling (when concrete anchors are present) lands around 25-30 words. Hard 15-word ceilings produce false over-ceiling flags on legitimate scaffolded comments and lead to either trim-too-far compression or apparent rule violations on perfectly fine comments. Calibrated 2026-05-13.
 
 **Severity override** (T2 exception): When a clear rule violation is detected, use directive tone regardless of evidence level. Ground the directive: "(per our error-handling standards)", "don't use `@patch` - use monkeypatch or mockito per python-testing.md", etc. The engineering lead's only directive across 34 comments in 3 sample PRs was this exact shape.
 
