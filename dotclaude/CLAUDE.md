@@ -261,6 +261,6 @@ Do not rationalize skipping this: "too minor to reflect on" (you cannot judge si
 
 ## Confluence
 
-- Personal space ID: 4792942607
+- Personal space ID: `<confluence-personal-space-id>`
 - Personal space key: ~<confluence-space-id>
 

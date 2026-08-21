@@ -30,6 +30,7 @@ These are prose decisions, not substitutions. A re-sync that takes the upstream 
 | Confluence citation | `[Title](https://<host>/wiki/.../pages/<id>)` or `Confluence <id>` | `Title (an internal Confluence page)`; page IDs are removed per SCRUB-SPEC Tier 3 |
 | Gendered pronoun about a real person | `She had the fix queued` | `They had the fix queued` |
 | Em-dashes | team-authored project files use U+2014 | replaced, because the repo bans U+2014 on every surface |
+| Confluence page and space IDs | `hub <id> + children, <SPACE> space`; `Personal space ID: <id>` | `the hub page + its children, in an internal Confluence space`; `` `<confluence-personal-space-id>` `` |
 
 ## Re-sync checklist
 
@@ -45,3 +46,9 @@ A mechanical merge is fine as the first pass; it is not sufficient on its own. A
 7. Re-read every line the merge rewrote in the table above.
 
 Steps 2 through 4 are the ones with no automated equivalent. They are the reason this file exists.
+
+Step 5 now has a detector behind it: `scrub-check.sh` Tier 3 carries a context-anchored Confluence-ID pattern (a page/space/hub/wiki/Confluence noun within 20 characters of a 7-to-11 digit number). It was added on 2026-08-21 after two page IDs survived a clean scan, and it is anchored rather than bare because GitHub comment IDs are the same width and are legitimate content here. Keep running the step anyway: the pattern covers the shape it was written for, not every shape.
+
+## The revert failure mode
+
+A hand fix does not survive the next mechanical sync unless the sync tool knows about it. On 2026-08-21 the personal-space-ID placeholder was applied by hand, then reverted hours later by a scrub-aware re-sync whose substitution map had never been told about it, and the reverted line was pushed. When you fix a leak by hand, do all three: fix the file, add the substitution to whatever tool performs the sync, and add a row to the table above. Two of the three leaves a regression scheduled for the next sync.

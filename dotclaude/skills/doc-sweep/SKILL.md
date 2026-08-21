@@ -1,6 +1,6 @@
 ---
 name: doc-sweep
-description: "Consistency-and-freshness sweep for the AI Coding Tools Confluence series (hub 5640257537 + children, PPET space). Verify-then-fix in two workflows: parallel per-page verify agents check open findings and staleness classes against LIVE pages, external fact-check agents verify third-party product claims, then per-page fix agents apply exact-substring edits with publish and re-fetch verification. Use monthly, after major harness changes (new project agents/skills/rules), or when a review left unapplied findings. Trigger: 'doc sweep', 'sweep the AI docs', 'AI tooling docs drift', '/doc-sweep'. Personal-tier only."
+description: "Consistency-and-freshness sweep for the AI Coding Tools Confluence series (the hub page + its children, in an internal Confluence space). Verify-then-fix in two workflows: parallel per-page verify agents check open findings and staleness classes against LIVE pages, external fact-check agents verify third-party product claims, then per-page fix agents apply exact-substring edits with publish and re-fetch verification. Use monthly, after major harness changes (new project agents/skills/rules), or when a review left unapplied findings. Trigger: 'doc sweep', 'sweep the AI docs', 'AI tooling docs drift', '/doc-sweep'. Personal-tier only."
 argument-hint: "[optional focus: inventory | external-claims | schema | path to a findings file]"
 ---
 

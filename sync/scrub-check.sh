@@ -79,7 +79,18 @@ TIER3_PATTERNS=(
   '712020e7620f9a43fa4ea69b7a38bc2ee47ff5'               # confluence space ID
   'f6ec428e-c64c-40d8-983b-9ac03ead43f5'                 # atlassian cloud ID
   '\bMX2-[0-9]+\b'                                       # specific Jira ticket numbers (placeholder forms MX2-XXXXX/NNNNN do not match)
+  '(page|space|hub|wiki|Confluence)[^0-9]{0,20}[0-9]{7,11}'  # context-anchored Confluence page/space IDs (see below)
 )
+
+# Note on the Confluence-ID pattern above. A bare 10-digit number is ambiguous:
+# GitHub comment IDs are the same width and are legitimate content here. The
+# pattern is therefore anchored on a nearby noun (page/space/hub/wiki/Confluence)
+# within 20 characters. Verified 2026-08-21 against the repo's full inventory of
+# 18 distinct 7-to-11 digit tokens: it matches the 2 real Confluence identifiers
+# and none of the 14 GitHub comment IDs or 2 epoch timestamps. Both leaks it was
+# written for had survived a clean scrub-check, one of them reintroduced by a
+# mechanical re-sync that reverted an earlier hand fix. Placeholder forms
+# (<page-id>, <confluence-personal-space-id>) carry no digits and do not match.
 
 # Tier 4: infrastructure detail patterns (cautious; many of these will be
 # legitimate examples in unscrubbed contexts; this list is starter-shaped).
