@@ -9,7 +9,7 @@ Each file is a self-contained pattern with:
 3. How it compounds with use
 4. Where it has limits
 
-All 12 docs are written, and each one has a WORLDMAP entry. What is not established is the claim at the top of this file: no port to another tool has been run, so "survives the boundary" is a design intent rather than a measured result. The Perplexity Spaces experiment that would test it is still planned.
+All 13 docs are written, and each one has a WORLDMAP entry. What is not established is the claim at the top of this file: no port to another tool has been run, so "survives the boundary" is a design intent rather than a measured result. The Perplexity Spaces experiment that would test it is still planned.
 
 ## Contents
 
@@ -25,3 +25,4 @@ All 12 docs are written, and each one has a WORLDMAP entry. What is not establis
 - `decision-making-rules.md` (verification before assertion, skeptic lens)
 - `response-behavior.md` (destructive-op discipline, no auto-reconfirm)
 - `context-loading-protocol.md` (what to load before substantive work)
+- `multi-session-orchestration.md` (several concurrent sessions on one identity: state externalization, rotation, gate ownership, collision detection)

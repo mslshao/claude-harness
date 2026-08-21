@@ -44,7 +44,7 @@ The Perplexity Spaces port (planned, tracked) is the validation experiment for t
 A few entry points depending on intent:
 
 - **"What did the author actually do?"**: read `dotclaude/CLAUDE.md` for the global instructions, then sample a few agents in `dotclaude/agents/` (mx2-tech-lead, mx2-decision-maker, mx2-skeptic, bot-review, prompt-refiner cover the interesting design space).
-- **"What is the meta-game?"**: read this file, then `patterns/` (reflection-trigger, lab-to-production, self-review-protocol, multi-window-discipline are the load-bearing pieces).
+- **"What is the meta-game?"**: read this file, then `patterns/` (reflection-trigger, lab-to-production, self-review-protocol, multi-window-discipline are the load-bearing pieces; multi-session-orchestration is the newest and the least settled).
 - **"How do I adopt this?"**: read `sync/README.md` for the install script; the install handles symlinking `dotclaude/` into `~/.claude/`.
 - **"What got deleted along the way?"**: read `graveyard/` for the Keymaker principle and the components that lost their purpose.
 
@@ -58,7 +58,7 @@ The honesty mechanism matters because the author's claim is that the harness com
 
 Specific limits worth naming, in approximate order of severity:
 
-1. **The empirical claim ("lower turnaround") is uninstrumented.** The author asserts the harness has reduced back-and-forth significantly. `evidence/` now holds seven own-loop entries alongside the third-party one, so the earlier version of this limit ("no own-loop evidence exists yet") no longer holds. What has not changed is the kind of evidence: every entry is a qualitative before-after narrative of a single instance, selected because it was notable. There is no baseline, no counterfactual, and no controlled comparison against working without the harness, so the entries establish that specific compressions happened, not the rate or the magnitude. Selection bias runs in the flattering direction, since a session where the harness added friction is less likely to get written up. Treat the corpus as existence proofs, not measurement.
+1. **The empirical claim ("lower turnaround") is uninstrumented.** The author asserts the harness has reduced back-and-forth significantly. `evidence/` now holds eight own-loop entries alongside the third-party one, so the earlier version of this limit ("no own-loop evidence exists yet") no longer holds. What has not changed is the kind of evidence: every entry is a qualitative before-after narrative of a single instance, selected because it was notable. There is no baseline, no counterfactual, and no controlled comparison against working without the harness, so the entries establish that specific compressions happened, not the rate or the magnitude. Selection bias runs in the flattering direction, since a session where the harness added friction is less likely to get written up. Treat the corpus as existence proofs, not measurement.
 
 2. **The harness is highly personalized.** Many rules encode the author's specific preferences (multi-window operational reality, terse-input handling, calibrated language). Adopters with different working styles will need to tune. The portable parts (`patterns/`, `dispatch/`, `scaffolding/`) are the highest-leverage pieces for adopters; the `dotclaude/` mirror is the author's specific configuration, not a recipe.
 
@@ -72,16 +72,16 @@ Specific limits worth naming, in approximate order of severity:
 
 | Directory | V3 contents | Pending |
 |---|---|---|
-| `patterns/` | 12 philosophy docs; WORLDMAP pointer-shaped commentary complete | None; expand on adoption |
-| `dispatch/` | 4 routing docs; WORLDMAP pointer-shaped commentary complete | None |
+| `patterns/` | 13 philosophy docs; WORLDMAP pointer-shaped commentary complete | None; expand on adoption |
+| `dispatch/` | 5 routing docs; WORLDMAP pointer-shaped commentary complete | None |
 | `scaffolding/` | 7 memory architecture docs; WORLDMAP pointer-shaped commentary complete | None |
 | `learnings/` | 11 of 12 corpus pages lifted from Confluence with editorial scrubbing; PM-focused 12th page deferred | When/if the deferred PM-focused page returns, it returns as a fresh audience-broad write |
-| `evidence/` | 8 entries (1 third-party, 7 own-loop) | More own-loop entries as instances surface |
+| `evidence/` | 9 entries (1 third-party, 8 own-loop) | More own-loop entries as instances surface |
 | `dotclaude/agents/` | 22 agent files + calibration + shared; 20 WORLDMAP entries cover them (the launch flex/implementer/tester trio shares one combined entry) | None; review for accuracy on agent rev |
-| `dotclaude/skills/` | 32 skill directories (90 files); 32 WORLDMAP per-skill entries, campaign and cold-review included | None; review for accuracy on skill rev |
-| `dotclaude/hooks/` | 89 hooks, all 89 described in the description-first README, plus 8 portable runnable examples in `examples/`; WORLDMAP category-shaped commentary in 10 catalog sections plus a shared-library entry | None |
-| `dotclaude/commands/` | 2 commands (jira, confluence); WORLDMAP per-command commentary complete | None; both commands are personal-tier shadows of project commands, so the set grows only when a new project command needs a local delta |
-| `dotclaude/CLAUDE.md` | scrubbed personal global instructions | None |
+| `dotclaude/skills/` | 32 skill directories (90 files); 32 WORLDMAP per-skill entries, campaign and cold-review included | 6 skill files (handoff, post-review, review, and three launch files) changed live after the 2026-08-19 sync and have not been re-mirrored |
+| `dotclaude/hooks/` | 95 hooks, all 95 described in the description-first README, plus 8 portable runnable examples in `examples/`; WORLDMAP category-shaped commentary in 10 catalog sections plus a shared-library entry | None |
+| `dotclaude/commands/` | 2 commands (jira, confluence); WORLDMAP per-command commentary complete | Both files changed live after the 2026-08-19 sync and have not been re-mirrored; the set itself grows only when a new project command needs a local delta |
+| `dotclaude/CLAUDE.md` | scrubbed personal global instructions, ported forward to 2026-08-21 (multi-session authority model, shared-account attribution, governing-source citation, one-verb-one-scope, local-plus-UTC rendering) | None |
 | `project-tier/` | 20 promoted artifacts, all re-synced against the live project tier on 2026-08-19: 6 agents (module-cohesion-reviewer, mx2-security-auditor, mx2-skeptic, observability-reviewer, silent-failure-hunter, test-quality-reviewer), 7 skills (enrich, ideate, investigate, review, refine, synthesize, test-forge; the last three new this pass), 7 rules (debugging, exemplars, pr-size-discipline, python-testing, tenets, typescript-exploration, verification). Membership fixed by first-commit authorship; README documents the lift and the scrubbing applied | Re-sync is manual and unenforced. A mirrored snapshot of a living artifact goes stale silently, and a stale copy states something false about the codebase rather than merely being out of date (one did, before this pass) |
 | `graveyard/` | Keymaker principle in the README + 5 entries | None named; the graveyard stays incomplete by construction (see limit 5) |
 | `sync/` | install.sh + uninstall.sh + scrub-check.sh + SCRUB-SPEC.md, plus the gitignored `scrub-names.local` holding the Tier 1 real-name patterns | None |

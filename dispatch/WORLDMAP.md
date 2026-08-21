@@ -1,7 +1,7 @@
 ---
 component: dispatch
 type: directory-map
-status: V0 complete (all 4 dispatch docs have entries)
+status: V1 complete (all 5 dispatch docs have entries)
 authored_by: Claude Opus 5
 ---
 
@@ -9,7 +9,7 @@ authored_by: Claude Opus 5
 
 AI-authored commentary on each routing doc in `dispatch/`. The dispatch directory captures the IF-THEN rules that drive specialist selection, model selection, and PR review routing. Entries below are pointer-shaped: each one names when the routing doc applies and the failure mode it prevents. Read the doc for the actual rule table.
 
-The four docs together answer "who runs this work and on what model." Dispatch heuristic answers "which agent." Agent tiers answers "which copy of that agent and at what trust level." Model selection answers "Opus or Sonnet, and where does the supervision happen." PR review routing answers the special case where the work is itself review-shaped and the surface is GitHub.
+The first four docs together answer "who runs this work and on what model." Dispatch heuristic answers "which agent." Agent tiers answers "which copy of that agent and at what trust level." Model selection answers "Opus or Sonnet, and where does the supervision happen." PR review routing answers the special case where the work is itself review-shaped and the surface is GitHub. The fifth, dispatch prompt contract, answers a question the other four do not touch: given the right target, what must the prompt actually say. Routing and prompting fail independently, and a correctly routed dispatch with an underspecified prompt is the more common of the two.
 
 ---
 
@@ -93,3 +93,28 @@ related: [agent-dispatch-heuristic, multi-window-discipline]
 When this fires: any PR review surface. The doc is a trigger-to-tool table: reviewing someone else → /pr-intel; own PR pre-publish → /pr-intel --mine; quick triage → /pr-intel --quick; pre-commit on own code → mx2-code-reviewer; comprehensive multi-agent on own PR → pr-review-toolkit:review-pr; hands-off post-publish iteration → /babysit-pr.
 
 The split is precisely shaped: each tool produces a different output format optimized for its audience (reviewer vs author vs CI debugger). The routing prevents the friction of using the wrong tool for the case.
+
+---
+
+```yaml
+---
+component: dispatch-prompt-contract
+type: dispatch-rule
+status: active
+ref: dispatch-prompt-contract.md
+fires_when: "writing the prompt for any dispatch: subagent, workflow stage, or peer session"
+prevents:
+  - "state summaries sourced from an item's description while its comments carry the actual state"
+  - "cross-boundary verification silently scoped to code because the rule says 'check the diff'"
+  - "sweep briefs that specify a filter and no value bar, returning a triage problem"
+  - "destructive operations performed on an earlier round's conditional permission"
+  - "an agent told its own approval gate is unnecessary because the dispatcher already has approval"
+related: [agent-dispatch-heuristic, multi-session-orchestration, self-review-protocol]
+---
+```
+
+When this fires: after routing is settled and before the dispatch is sent. Seven clauses, each traced to a measured defect rather than a style preference.
+
+The load-bearing one is clause 1. An agent asked for the current state of a tracked item reads the description and skips the comments unless told otherwise, and a description records the state at the moment it was written. A 26-item handoff sweep produced five wrong state paragraphs, all understating progress, the worst of them telling an inheritor that no fix existed on a ticket whose fix had merged six days earlier and was recorded in four comments directly above it. The dispatching session had hit the same trap itself hours earlier and written it up, which did not prevent the sweep: the clause has to be in the prompt, not in a memory file, which is why the harness also backs it with a pre-dispatch hook.
+
+Clause 5 (approval gates belong to the acting agent) is the subagent-facing half of the peer-session rule in `patterns/multi-session-orchestration.md`. Both say the same thing: the dispatcher's approval is not the acting party's approval, because the gate belongs to whoever holds the specific mutation.

@@ -15,6 +15,7 @@ Each entry describes a specific instance where the harness compressed previously
 - `2026-06-04-agent-tier-eval.md` (an empirical Haiku-vs-Sonnet probe converts a model-tier prediction into evidence)
 - `2026-06-10-guardrail-self-protection.md` (a subagent reached for its own enforcement hook; answered with a deny-tier keyed on a verified subagent discriminator, after falsifying the "subagents are sandboxed" assumption)
 - `2026-06-11-rules-as-executable-specs.md` (a principle nested inside a conditional reads as a license to a literal model; fixed by authoring principles unconditionally)
+- `2026-08-21-multi-session-fleet.md` (a nine-session fleet with one AI orchestrator: four coordination defects, two caught by luck, and the seams they point at)
 
 The first entry is third-party anecdata. The second is the author's own loop: the harness chained parallel specialist dispatch with production-state verification to produce a calibrated review comment that human-only review would not have produced on its own.
 

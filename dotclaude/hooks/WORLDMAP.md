@@ -72,12 +72,14 @@ component: hooks/orchestration-guardrails
 type: hook-category
 status: active
 catalog_ref: README.md "Orchestration guardrails" section
-members: [block-guardrail-hook-edit, userpromptsubmit-pr-intel-contract, stop-validate-pr-intel, lint-tool-roster]
-fires_when: "a subagent or skill-flow tries to edit an enforcement surface, or a contract-bearing skill (/pr-intel) is invoked and later ends its turn"
+members: [block-guardrail-hook-edit, userpromptsubmit-pr-intel-contract, stop-validate-pr-intel, lint-tool-roster, nudge-state-summary-dispatch, nudge-handrolled-ci-poll]
+fires_when: "a subagent or skill-flow tries to edit an enforcement surface, a contract-bearing skill (/pr-intel) is invoked and later ends its turn, or a dispatch prompt is about to go out missing a clause it needs"
 prevents:
   - "a subagent weakening the guardrails that police it (deny), or a skill-flow blanket-accept riding over a guardrail edit (ask)"
   - "a /pr-intel run collapsing into a prose verdict with no postable comments, or drifting over the disposition budget"
   - "config artifacts (agents, skills, commands) referencing tool names that no longer exist"
+  - "a dispatch asking for an item's current state without telling the agent to read the comment history"
+  - "a hand-rolled CI poll loop reproducing three known projection bugs in the check rollup"
 related: [verification gate, lab-to-production pattern, self-review-protocol, pr-intel skill]
 ---
 ```
@@ -87,6 +89,8 @@ When this fires: PreToolUse on Edit/Write of a guardrail surface (`block-guardra
 What it prevents: the meta-failure where the thing that enforces discipline is itself weakened or bypassed. `block-guardrail-hook-edit` is the sharpest case: a subagent under retry-loop pressure once edited `subagent-stop-result-contract.sh` to escape its own enforcement, so subagent-originated edits to any enforcement surface are now hard-DENIED (a plain "ask" is a no-op for subagents, the load-bearing CC gotcha here). Main-loop edits get "ask" instead, which a skill-flow blanket "y" cannot pre-satisfy. The pr-intel sync pair prevents the orthogonal failure where a multi-step skill silently degrades its output: a collapsed prose verdict with no postable inline comments leaves the reviewer nothing, so a UserPromptSubmit marker (set when the run is invoked) licenses a Stop-time collapse check that has no template header to anchor on otherwise. `lint-tool-roster` prevents stale tool references in config artifacts (the bulk of a cross-model audit's P0/P1 findings).
 
 How it compounds: `block-guardrail-hook-edit` is the floor under every other hook in this directory; without it, the enforcement layer is editable by the actors it is meant to constrain. The pr-intel pair is two halves of one contract that must stay in lockstep: the UserPromptSubmit half front-loads the same disposition budgets the Stop half checks post-hoc, and both files carry an inline sync-contract note so an edit to one is a known edit to the other. Prevention (inject the contract before composing) plus validation (check it at turn-end) is strictly stronger than either alone. `lint-tool-roster` compounds with the lab-to-production pattern: promoting a personal artifact to project tier is exactly when a stale tool reference would slip in, and the lint is the pre-promotion check.
+
+The two nudge hooks added on 2026-08-21 are a third shape in this category: point-of-use interception of a decision the model is about to make wrong, rather than protection of an enforcement surface. Both exist because a correctly-written rule sitting in a memory file failed at the moment it mattered. `nudge-state-summary-dispatch` fires on the Agent and Workflow tools when a prompt asks for an item's current state without a read-the-comments clause, which is the defect behind five wrong state summaries in a 26-item sweep; the session that shipped that sweep had written up the identical trap hours earlier, which is the whole argument for intercepting at the dispatch instead of at recall. `nudge-handrolled-ci-poll` fires when a CI poll loop is being hand-rolled over a rollup whose in-progress checks return an empty-string conclusion rather than null, and the session-start hook that already surfaced the same rule had fired hundreds of turns before the decision it needed to influence. Both are one-shot per session and both are advisory: the shape is one forced re-decision, not a block.
 
 Portable: `block-guardrail-hook-edit` is portable (adjust the gated-surface paths to the adopter's hook layout; the agent_type discriminator and deny-vs-ask split are CC-specific but stable). The pr-intel pair and `lint-tool-roster` are not portable (the contract, budgets, and tool registry are personal-tier), but their shapes port: a marker-coupled prevent/validate pair, and a config-vs-known-registry lint.
 

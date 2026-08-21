@@ -1,7 +1,7 @@
 ---
 component: patterns
 type: directory-map
-status: V0 complete (all 12 pattern docs have entries)
+status: V1 complete (all 13 pattern docs have entries)
 authored_by: Claude Opus 5
 ---
 
@@ -11,7 +11,7 @@ AI-authored commentary on each pattern doc in `patterns/`. These docs are the to
 
 Entries below are pointer-shaped, not full-explanation. Each pattern doc is itself the explanation; this WORLDMAP names when the pattern fires, the failure mode it prevents, and which other patterns it composes with. Read the doc for depth.
 
-The patterns split loosely into three layers: process discipline (context loading, self-review, reflection trigger), output discipline (writing style, code discipline, response behavior), and meta-rules (decision-making, lab-to-production promotion, cost-via-delegation, multi-window discipline). Multi-window discipline is the load-bearing one because it grounds the others; the rest exist because attention is fragmented and the harness has to survive that.
+The patterns split loosely into three layers: process discipline (context loading, self-review, reflection trigger), output discipline (writing style, code discipline, response behavior), and meta-rules (decision-making, lab-to-production promotion, cost-via-delegation, multi-window discipline, multi-session orchestration). Multi-window discipline is the load-bearing one because it grounds the others; the rest exist because attention is fragmented and the harness has to survive that. Multi-session orchestration is its mirror image and the newest of the set: multi-window discipline governs output shape for a human sampling many windows, while multi-session orchestration governs coordination between the model instances filling them.
 
 ---
 
@@ -260,3 +260,29 @@ related: [reflection-trigger, two-tier-doctrine, agent-dispatch-heuristic]
 When this fires: every session start, every dispatch to a specialist, every implementation kickoff. Run `bd list --status=in_progress`, `bd ready`, and `bd show <id>` on relevant beads. Pass relevant bead context into specialist prompts; otherwise the specialist starts cold.
 
 The doc's "epic-first check for domain-familiar work" rule is the sharpest: in active migration domains (a doc-indexing pipeline, Folio, doc_v3, classifier rewrite), `bd show <epic-id>` plus its children is the prerequisite to convergence or PR review. Skipping costs one re-planning cycle. The cost of one `bd show` is near-zero.
+
+---
+
+```yaml
+---
+component: multi-session-orchestration
+type: pattern
+status: active (first draft, single-day observation)
+ref: multi-session-orchestration.md
+fires_when: "more than a few Claude sessions run concurrently on one identity against the same live state"
+prevents:
+  - "a peer relay of the human's words being treated as the receiving session's approval"
+  - "an action denied in one session being routed around through another"
+  - "live-state disagreements resolved by counting agreeing readers instead of finding the mutation"
+  - "briefs and assignments written from a board capture rather than a live read"
+  - "collisions on work classes (review, investigation, documentation) that leave no local artifact"
+  - "a session filling its window mid-item and losing everything it knew"
+related: [multi-window-discipline, context-loading-protocol, decision-making-rules, dispatch-prompt-contract]
+---
+```
+
+When this fires: the moment a second session starts working the same live state. Most of the harness assumes one session at a time; this doc covers what changes when that stops being true. The distinction it opens with is the one that matters, because it is easy to elide: a subagent is a child that shares its parent's approval context and dies with its task, while a peer session has its own window, its own gates, and its own view of live state. The disciplines that make fan-out work do not transfer.
+
+Three parts are load-bearing. The authority model (the human is the sole approver, the gate lives in the window that holds the mutation, relays are context and never consent, and a denial in one session is never routed through another) is the one with real blast radius. State externalization (a board file plus the durable trackers, so every session including the orchestrator is rotatable) is what makes the fleet survive its own turnover. Measured-context rotation (read the usage block, not the spend meter; calibrate the instrument; rotate at an atomic boundary in the 80-90% band) is what turns a session filling up from a loss into a scheduled event.
+
+The doc is honest about its evidence base: one operator, one deadline-shaped day, nine sessions, four rotations, four caught defects of which two were caught by luck. Treat it as a first draft that the next fleet-shaped day gets to falsify. The worked instance is written up in `../evidence/2026-08-21-multi-session-fleet.md`.

@@ -36,6 +36,10 @@ The most concrete enforcement of multi-window discipline lives in the end-of-tur
 
 Adopted as a default across all agents in a harness, the discipline produces predictable output shape. The user learns to scan in fixed patterns: top of message for the headline, end for the next step, fenced blocks for IDs to copy. The harness becomes more usable under fragmented attention than it was under focused attention previously, because the structure is consistent across agents and skills.
 
+## The sibling pattern
+
+This doc governs output shape for one human sampling many windows. `multi-session-orchestration.md` governs the other side of the same situation: coordination between the model instances filling those windows. They were written eight months apart and the second one exists because the first turned out to cover only half the problem. When several sessions run concurrently, output shape stops being the binding constraint and coordination (who owns the approval gate, whose read of live state is newer, what a brief was built from) becomes it.
+
 ## Where it has limits
 
 - Some content genuinely requires long-form prose (design discussions, multi-source synthesis, complex investigations). The discipline applies to the wrapper (the headline, the summary, the close), not necessarily to the body.

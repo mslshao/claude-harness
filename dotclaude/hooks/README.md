@@ -178,6 +178,26 @@ These hooks police the agent system itself: who is allowed to weaken enforcement
 
 **Portable**: yes: the shape (never bundle a state-creating step with anything a sibling hook might block) generalizes to any hook ecosystem where a PreToolUse block is all-or-nothing on the invocation.
 
+#### `nudge-state-summary-dispatch.sh`
+
+**Trigger**: PreToolUse on Agent and Workflow, main-loop dispatches only (subagent-originated calls are exempt, since subagents cannot fork and so are not the orchestration surface this guards).
+
+**Behavior**: Fires when a dispatch prompt asks an agent to describe the CURRENT STATE of a tracked item without instructing it to read the comment history. Three conditions must all hold: a state-intent phrase, a tracked-item reference, and the absence of a read-the-comments guard. Advisory one-shot per session: it exits 2 with the missing prompt clause, stamps a marker, and passes on an identical re-run. Markers age out after 24 hours.
+
+**Why subtle**: An agent asked for the current state of an item reads the description and skips the comments, every time, unless told otherwise. A description records the state at the moment it was written; the comments carry what happened since. A 26-item handoff sweep produced five wrong state paragraphs on that default, all understating progress, the worst of them telling an inheritor that no fix existed on an item whose fix had merged six days earlier and was recorded in four comments directly above it. It was caught by luck, not by design. The reason this is a hook and not a memory is the compounding failure underneath it: the dispatching session had hit the identical trap itself hours earlier, written it up, and then shipped the sweep that repeated it 26 times. A retrieval-tier memory only helps if something recalls it, so this fires at the dispatch instead.
+
+**Portable**: shape yes, implementation nearly. The tracked-item regex is local; the state-intent and guard-phrase matching are not. The clause it injects is documented as clause 1 of `../../dispatch/dispatch-prompt-contract.md`.
+
+#### `nudge-handrolled-ci-poll.sh`
+
+**Trigger**: PreToolUse on Bash, when a CI poll loop over the check rollup is being hand-rolled instead of calling the SHA-pinned gate script that already exists. Advisory, exits 0 always, once per session.
+
+**Behavior**: Prints the three projection bugs a hand-rolled loop hits, plus the path to the script that handles them, and gets out of the way. It never blocks, because a genuinely custom condition is a legitimate reason to write the loop.
+
+**Why subtle**: The three bugs are all real and all silent. An in-progress check returns an empty-string conclusion rather than null, so the usual null-coalescing fallback never fires and the loop exits on its first poll treating running checks as settled (this produced a false "CI is done" read). A superseded run stays in the rollup as cancelled next to the real result, so a naive not-equal-to-success filter reports phantom failures. Bare commit statuses have a different shape from check runs and project as nulls. The placement is the point: the rule was already written in a memory file and a session-start hook already surfaced that file, and both fired on the day two loops were hand-rolled anyway. A nudge delivered hundreds of turns before the decision is not an enforcement layer for that decision.
+
+**Portable**: shape yes. The specific projection bugs are properties of the platform's check-rollup API and would transfer to any consumer of it; the script path is local.
+
 ### Destructive-op gates (portable)
 
 #### `block-destructive-commands.sh`
@@ -249,6 +269,16 @@ These hooks police the agent system itself: who is allowed to weaken enforcement
 **Why subtle**: The rule it enforces ("authorization is per-round, not standing") was already written down and was violated anyway: a user approved a force-push for one commit, the agent amended to a different commit, and force-pushed the new one under the old approval while an external reviewer was still reading the original SHA. The gate is intentionally self-clearing through a channel an agent cannot forge, since it compares commit timestamps rather than checking for a marker file or environment variable an agent could set on its own. It is scoped narrowly to STALE authorization (an approval that predates the current commit), never to ABSENT authorization, because measurement showed the common "rebase and update the PR" flow has no verb-naming human turn at all, and gating that case would cost a false block roughly once a day.
 
 **Portable**: shape-only. The transcript-parsing details are specific to this harness; "compare the mutation's timestamp against the authorizing human turn's timestamp, not just its presence" generalizes to any per-round destructive-op authorization.
+
+#### `block-mcp-shell-substitution.sh`
+
+**Trigger**: PreToolUse on MCP write tools only (wiki page updates, tracker writes, chat sends).
+
+**Behavior**: Blocks any top-level string argument whose entire trimmed value is a single-line shell substitution expression (`$( ... )` or a backtick command). Content that merely contains a substitution is allowed, and so is any multiline body, even one that opens with `$(`. The discriminator is substitution intent: one line, one expression, nothing else. Fails open with a loud warning when `jq` is missing.
+
+**Why subtle**: MCP arguments are JSON, not shell, so `$(cat FILE)` is never expanded; it ships as a literal string. The failure is silent and destructive rather than noisy: a page-update call whose body argument was a `$(cat ...)` expression published that literal string as the entire page body, wiping a runbook until another session restored it from the staged file. Nothing errors, the tool returns success, and the damage is only visible to a human looking at the rendered page. The known accepted false positive is a chat message that is exactly one inline code span; the fix is to add a word outside the backticks.
+
+**Portable**: yes in shape, and nearly so in implementation: the check is on argument shape, not on which MCP server is being called. The tool-name list is the only local part.
 
 ### Compliance gates (mostly non-portable)
 
@@ -351,6 +381,26 @@ These hooks police the agent system itself: who is allowed to weaken enforcement
 **Why subtle**: The failure produces a technically-successful API call with a payload that is quietly wrong (a PR body collapsing to a twenty-character path string instead of its intended content), and nothing in the response signals that anything went awry. The distinction between the two nearly-identical flags was already documented in a memory file before this hook existed and still got hit, which is the same escalation pattern behind several of this catalog's mechanical gates: a documented gotcha that keeps recurring becomes a hook rather than another memory entry.
 
 **Portable**: yes. The `-f`/`-F` distinction is a `gh` CLI behavior, not specific to this author's setup; the pattern generalizes to any CLI with a similarly-named pair of literal-vs-file-reading flags.
+
+#### `block-hard-wrapped-pr-body.sh`
+
+**Trigger**: PreToolUse on Bash, on the commands that publish a PR body, PR comment, or review body, resolving the body file the command reads from disk rather than enumerating flags.
+
+**Behavior**: Blocks a body that has been hard-wrapped to a column width. One paragraph must be one unwrapped line, however long it runs. Fails open on any internal error.
+
+**Why subtle**: GitHub and the tracker both render a single literal newline as a visible line break, so a body reflowed to 80 or 100 columns arrives as a ragged wall of short lines with mid-sentence breaks, and the author gets asked to redo it. The interesting part is the enforcement history: the rule was already written in six memory files and four skill files, and one earlier recurrence had been declared resolved by adding prose to a skill. It shipped hard-wrapped again anyway. This hook is the ladder's next rung after prose failed twice, which is exactly the escalation the reflection-trigger convergence rule prescribes.
+
+**Portable**: shape yes, implementation mostly. The rendering behavior it guards is a property of GitHub and the tracker, not of this setup; the body-file resolution is shared with the personal-tier vocabulary guard and would need porting alongside it.
+
+#### `block-bad-require-reviewers.sh`
+
+**Trigger**: PreToolUse on Bash, narrowed to PR-body writes only (never comment or review posts, whose bodies legitimately carry no directive). Same surface and body resolution as the hard-wrap guard; the two are kept in sync.
+
+**Behavior**: Blocks a PR body whose reviewer-requirement directive cannot be satisfied on this repo, including the case where the directive is absent and the checker therefore defaults to requiring everyone.
+
+**Why subtle**: This is the clearest case in the catalog of a hook existing because two artifacts disagree. The rule is written in a memory file with its mechanism explained on the next line, and the project-tier PR command says the opposite in two places. Prose lost three times in one week against a command file that authors the body. The underlying mechanic is unforgiving: the repo's reviewer checker expands a requested team to every member and drops nobody for authorship, and the platform forbids self-approval, so requiring all of a team that contains the author can never pass. An absent directive parses as "require all, reviewers empty" and waits on every still-requested reviewer. Both shapes leave a red check the author has to notice, diagnose, and re-push. The hook is explicitly a holding layer until the project-tier default is flipped by PR.
+
+**Portable**: no. It encodes one repo's reviewer-checker semantics. The transferable idea is narrower and worth naming: when a generated artifact keeps coming out wrong, check whether the generator disagrees with the rule before writing more prose at the rule.
 
 ### Edit-time formatters and validators (portable)
 
@@ -689,6 +739,16 @@ These hooks make the two-tier memory system (always-on `bd` flash-card memories 
 **Why subtle**: The tracker's own read order prints the description before the comments and its search indexes titles only, so a correction filed as a comment does not reach the surfaces a cold-start session actually reads first or searches by. The append-only instinct that produces this pattern is itself correct, since it preserves a record of what was believed and when; the gap is specifically that nobody also goes back and patches the now-stale claim sitting above it. A structured audit of a batch of recently-created items found this exact shape repeatedly, including on the very item that was tracking the failure mode itself, and one instance of it reached a PR review as a false finding because a reviewer read the superseded top-level text as current.
 
 **Portable**: shape-only. The specific tracker's read order and search behavior are this author's; "when a correction lands on an append-only surface, nudge the author to also patch the surface a reader sees first" generalizes to any tracker with the same read/write asymmetry.
+
+#### `lint-memory-after-bash.sh`
+
+**Trigger**: PostToolUse on Bash, gated to commands that look like they wrote something under the memory tree.
+
+**Behavior**: Runs the memory linter against memory files rewritten through Bash and surfaces its error lines. Advisory by construction: PostToolUse cannot block, so the edit has already landed. Exits 0 when clean, when `jq` is missing, or when nothing memory-shaped was touched.
+
+**Why subtle**: This closes a matcher gap rather than a behavior gap. The memory linter was wired PostToolUse on Edit and Write only, so a memory file rewritten through Bash (a Python heredoc, `sed -i`, `tee`, a redirect) skipped it entirely. That is how one memory file reached roughly 30KB and silently truncated its own tail past the load cap: every edit to it that day went through Python-in-Bash, and the overflow was found only by running the linter by hand. The general lesson is worth more than the hook: a validator wired to a tool matcher is only as complete as the set of tools that can perform the write.
+
+**Portable**: shape yes, implementation no (it invokes this setup's memory linter against this setup's memory path).
 
 ### Session lifecycle (CC-specific)
 
