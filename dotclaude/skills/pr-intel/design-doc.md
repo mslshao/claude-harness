@@ -36,7 +36,7 @@ Extract and store:
 - **Unresolved comment count**: total open inline + footer comments from non-author users
 
 **Page ID extraction**: Confluence URLs contain the page ID as a numeric path segment
-(e.g., `.../pages/5799772177/...`). Short links (`/wiki/x/<encoded>`) can be passed
+(e.g., `.../pages/<page-id>/...`). Short links (`/wiki/x/<encoded>`) can be passed
 directly as `pageId` to the MCP.
 
 If no Confluence link is found in the PR body, skip silently. If the MCP call fails,
