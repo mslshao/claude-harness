@@ -106,6 +106,18 @@ Read the key files (entry points, models, settings) to understand the existing
 code structure. Do not read exhaustively - focus on the public interfaces and
 patterns the implementation will need to follow.
 
+**When searching for existing test/e2e infrastructure, a file-name grep returning
+nothing is not evidence of absence.** Also check README.md/docs in the candidate
+service directories for an explicit coverage or deferral statement (e.g. "X is
+deferred to v2", "Y is not yet exercised by this harness"): a documented
+extension path is a real option the plan must evaluate, not an absence to design
+around. Recurrence: 2026-08-19, docr-nuie8's Phase 1 concluded no automated e2e
+existed for a docket-hydration flow after grepping for test-file names; five
+separate search passes (enrichment, prompt-refiner, and 3 of 4 Phase 3
+specialists) all missed that `<service>/canary/README.md`'s own coverage table
+named the exact gap as "Deferred to v2." The Phase 3.6 gate caught it, forcing
+an ITERATE that a doc read at enrichment time would have avoided.
+
 ### 4. Check beads memories for domain gotchas
 
 ```bash

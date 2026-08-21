@@ -184,7 +184,7 @@ silently produces false evidence:
 Reverting a line outside your diff still produces a red, so the cycle LOOKS
 satisfied. What it actually proves is that pre-existing production code works,
 not that your new test guards your new behaviour. Observed 2026-08-12 on
-MX2-XXXXX: a version-conflict test reverted `record_es_response` in a file the
+MX2-NNNNN: a version-conflict test reverted `record_es_response` in a file the
 change never touched, reported a genuine `assert None == 1` failure, and was in
 fact routing-independent. Disabling the entire new branch left it green while 6
 of 7 sibling tests failed.

@@ -122,11 +122,11 @@ Request:
 
 - **mx2-code-reviewer**: structural review, SOLID, naming, code smells. Name the
   files you changed and the work item context. The orchestrator's dispatch
-  carries the engineering lead's priority-order preamble (description, types,
-  complexity / naming, boolean params, tests, correctness-via-tests, static
-  analyzers, pragmas, exception design, large-refactor methodology; front_door
-  tagging), mirroring /pr-intel and /review (the engineering lead's Code Review
-  Guide for Humans, internal Confluence).
+  carries the engineering lead's priority-order preamble (description, types, complexity /
+  naming, boolean params, tests, correctness-via-tests, static analyzers,
+  pragmas, exception design, large-refactor methodology; front_door tagging),
+  mirroring /pr-intel and /review (the engineering lead's Code Review Guide for Humans,
+  an internal Confluence page).
 - **mx2-silent-failure-hunter**: if you wrote error handling (try/except, raise).
   Name the error handling code and the call chain context.
 

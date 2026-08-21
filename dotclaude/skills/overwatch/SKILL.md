@@ -552,7 +552,7 @@ guessing. Reduction rules:
    verified on #11539 the real logins are `sonarqubecloud[bot]` and
    `graphite-app[bot]`, so an earlier literal-login denylist (`sonarqubecloud`,
    `graphite-app`) matched neither. For a `committed` event there is no actor, only
-   `committer.name` (verified: a real name, not a login, for a teammate's git commit); check that against the
+   `committer.name` (verified: `"Jordan Byrne"`, a git name); check that against the
    bot names and otherwise attribute it to the PR author.
 
    **`committer.name: "GitHub"` (and `"web-flow"`) is a synthetic name GitHub itself
@@ -587,7 +587,7 @@ guessing. Reduction rules:
    - a `review_requested` event naming the user that is NOT within 300s of a push or
      force-push on the same PR. The adjacency test replaces an actor-identity test,
      which does not work: verified on #11539 that all three `review_requested` events
-     naming mslshao have the HUMAN actor (the PR author's own login, not the bot's) and land 38s to 4m39s after a
+     naming mslshao have the HUMAN actor `jbyrne` and land 38s to 4m39s after a
      commit, because `gt submit` re-requests reviewers under the author's own token.
      `graphite-app[bot]` appears as actor only on the stack-wide fan-out to OTHER
      reviewers. Without the adjacency test every Graphite push fires Path A and Path B
@@ -890,7 +890,7 @@ cycle:
                                                          "author_events": 11, "fired": false, "fired_at": null, "fired_via": null,
                                                          "noted_kinds": [], "pr": {"repository": "mslshao/docr", "number": 10601, "title": "...", "url": "..."}}},
                         "last_success_at": "2026-07-09T21:15:00Z", "error_detail": null},
-    "jira":            {"status": "ok", "known_items": ["MX2-XXXXX"],              "last_success_at": "2026-07-09T21:15:00Z", "error_detail": null}
+    "jira":            {"status": "ok", "known_items": ["MX2-NNNNN"],              "last_success_at": "2026-07-09T21:15:00Z", "error_detail": null}
   }
 }
 ```

@@ -164,7 +164,7 @@ to paste on the PR. The reviewer can copy them verbatim or edit before posting.
 
 **Comment budget**: Scale to the number of real findings, not to a fixed cap. Zero is a legitimate count: a 2XL infra PR with nothing to flag should get an approval with no inline comments, not padded findings to meet a typical-range floor (empirical case: PR #9022, 696-line Redshift Serverless PR approved with zero inline comments by a high-trust reviewer). Typical range when findings exist: 2-3 for a clean PR with minor observations, 5-8 for one with real issues, 10-15 for a large PR with multiple discussion-class concerns. Beyond 15, consolidate related findings into the review summary or use cross-references to point multiple sites at the same canonical thread (P13 in reviewer-discipline.md). BLOCKING findings always get a comment regardless of count. When trimming, drop MINOR findings first. When in doubt, drop the comment: a PR with two precise questions is more useful than one with eight padded observations.
 
-**Structural variation**: Not every comment needs the same shape. Mix these forms (examples lifted from the engineering lead corpus across PRs #8931, #8741, #8066):
+**Structural variation**: Not every comment needs the same shape. Mix these forms (examples lifted from the engineering lead's corpus across PRs #8931, #8741, #8066):
 - Bare question: "where does this come from?", "why?", "intentional?", "must they be?"
 - Short observation: "this silently drops the error context from the original exception."
 - Suggestion with concrete anchor: "consider extracting a `create_worker` function in another module."
@@ -195,7 +195,7 @@ The speed-amplified vs bot-surfaced provenance classification (synthesis.md step
 
 The only voice exception: comments Michael personally writes during his editing pass (after pr-intel output is rendered but before /post-review consumes it). Those stay in Michael's voice with no attribution prefix, because they ARE Michael's unaided judgment. Pr-intel itself does not emit them.
 
-This is structural enforcement of `review-voice.md` "Attribute tooling findings to tooling" and reviewer-discipline.md T5 (Transparent Tooling). Replaces the prior speed-amplified-no-attribution rule (which let bot findings ride under Michael's voice when the classifier judged them reachable from diff reading); the 2026-05-26 feedback from the engineering lead surfaced that even those findings should be attributed because Michael didn't actually catch them himself, the tool did.
+This is structural enforcement of `review-voice.md` "Attribute tooling findings to tooling" and reviewer-discipline.md T5 (Transparent Tooling). Replaces the prior speed-amplified-no-attribution rule (which let bot findings ride under Michael's voice when the classifier judged them reachable from diff reading); the 2026-05-26 the engineering lead's feedback surfaced that even those findings should be attributed because Michael didn't actually catch them himself, the tool did.
 
 Format: file heading, then numbered comments. Each comment has a target line, a fenced block with the ready-to-paste text, and a briefing-context section the reviewer can read but does not post.
 

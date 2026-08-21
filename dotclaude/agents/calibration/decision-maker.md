@@ -1,6 +1,6 @@
 # Decision-Maker Calibration
 
-Last reviewed by Michael: 2026-06-10 (/calibrate merge: 4 merged, 1 rejected; see lookback log)
+Last reviewed by Michael: 2026-08-19 (/calibrate merge: 11 merged, 0 rejected; see lookback log)
 
 This file is read by the mx2-decision-maker agent before every decision.
 The agent emits calibration drift via `bd remember` (key prefix
@@ -123,6 +123,18 @@ from the unconfirmed-mechanism rule above: this is an unverified-but-checkable
 DATA PARAMETER, not a mechanism hypothesis. Source: 2026-06-09 ideation gate;
 merged 2026-06-10.
 
+**Refinement (2026-07-25 ideation gate round 2):** this rule covers unverified
+parameters, but an ORCHESTRATOR-ASSERTED-VERIFIED claim needs the same
+re-running, not a pass. Treat "I verified this live this session" from the
+orchestrator as a pointer, not evidence, when it is load-bearing for the
+gate's decision, the same way a stale handoff status claim is treated
+elsewhere. Instance: a gate packet asserted a personal-tier agent's frontmatter
+had an empty `tools:` field versus the project copy declaring four; re-running
+the check showed the personal copy declares the same four tools in a different
+YAML form, no divergence existed. The claim read as a fresh live finding
+alongside a genuinely correct falsification of an unrelated point, which is
+what made it easy to wave through unchecked.
+
 ### Fail-closed semantics: plan must name concrete exception classes
 
 When a plan describes fail-closed handling around an external library call
@@ -174,6 +186,120 @@ ITERATE-re-diverge. Re-scoring cannot manufacture a constraint the user never
 stated, a second fit ITERATE nears the stuck-loop condition, and precedent shows
 re-diverge repairs the candidate pool but re-flags the same fit gap unresolved.
 Source: 2026-07-17 autopilot ideation gate round-2; merged 2026-07-21.
+
+### Deterministic enforcement precedes a probabilistic lens
+
+Before approving any probabilistic-lens capability (a reviewer agent scoring
+diffs, a heuristic detector), apply a simple-thing check as a hard PROCEED
+criterion: is the target a deterministically enumerable property (a Terraform
+field, a config key, an import, a naming rule)? If one grep/awk/tflint pass can
+enumerate the full population repo-wide with no false negatives, the lens
+capability is the wrong mechanism and the plan must justify why the
+deterministic gate is insufficient. Instance: a plan taught
+observability-reviewer to spot missing `require_full_window` per-diff; one awk
+pass found 17 unset blocks across 6 files repo-wide, none of which any per-diff
+lens would ever see. Source: 2026-08-06 review-efficacy converge gate.
+
+### Gating query positive control for zero/clean-result gates
+
+When a plan gates execution on a live-state query returning nothing (a
+zero-result search, a clean scan), the plan must name a positive control (the
+same query against a case known to return non-zero) and the
+credential/field-visibility assertion, before the zero may be read as evidence.
+A role-scoped or field-filtered credential, or a non-aggregatable field, returns
+the same clean zero as a genuinely clean population. Extends CLAUDE.md "prove
+the search can return something" to the gate itself, distinct from the
+unratified-decision absence-claim rule below (that one covers decision-corpus
+absence, this one covers live-state absence). Source: 2026-08-13 MX2-NNNNN
+convergence gate.
+
+### Ideation: a burned precedent promotes verifiability to the dominant ranking term
+
+When a BURNED PRECEDENT exists on the same surface (a prior shipped lens whose
+unmeasured false-positive rate produced a defect a third party found), a
+candidate's Verifiability score stops being one column among several and
+becomes dominant: do not rank a MED-verifiability/coverage-unmeasured candidate
+above the only HIGH-verifiability candidate with a mechanical replay against a
+live defect. A hard-constraint pass/fail correctly removes a violator from
+ranking but must not delete it from the candidate set when it is the only one
+with an empirical catch; its role becomes the control arm the structural
+mechanism is measured against. Source: 2026-07-24 review-efficacy ideation
+gate.
+
+### Ideation/converge: verify an absence-of-ratified-decision claim before trusting it
+
+When a candidate's deliverable is a NEW ratification ("no ratified decision
+exists on X; making one is part of this work"), grep the decision corpus
+(`bd memories <domain>`, memory/ topic files) for a prior lead statement on the
+same axis BEFORE rating. An unverified absence claim is grounds for a
+condition, not a silent PROCEED: a claimed absence can turn out to be a prior
+ratified decision the artifact simply didn't search for. Extends CLAUDE.md
+"Exhaust the right search before claiming absence" to the gate. Source:
+2026-08-13 <service> chunk-id ideation gate.
+
+### Launch: an absence claim that eliminates an option class needs gate-time re-verification
+
+When a plan substitutes a different deliverable for what the bead's own
+DESIGN/ACCEPTANCE CRITERIA describe, on the strength of an absence claim ("no
+X exists anywhere, confirmed by N search passes"), the gate must independently
+re-verify that specific claim against the governing source before accepting
+the substitution, especially when the bead BLOCKS a Consequence=high sibling.
+Challenge and consult specialists reviewing the MECHANISM are not a substitute
+for this: none of four independent reviewers checked the plan against the
+bead's own written ACs, and none re-ran the absence claim itself. Add two
+PROCEED criteria: (1) INTENT-FIDELITY, diff the plan's work items against the
+bead's own ACCEPTANCE CRITERIA text, and treat an unmatched AC as ITERATE, not
+a paperwork nit; (2) any absence claim that eliminates an option class gets
+re-verified at the gate against the governing source (CLAUDE.md
+governing-source-not-silent-source). Instance: a plan concluded no automated
+e2e test existed for a docket-hydration flow after grepping test-file names;
+the sibling service's own README.md coverage table named the exact gap as
+"Deferred to v2", a documented extension path, not an absence. Source:
+2026-08-19 docr-nuie8 launch gate.
+
+### Launch: shared-infrastructure-module edits are PROCEED-eligible under a named carve-out
+
+The ESCALATE example "Shared infrastructure module modification" below reads
+as unconditional on any shared-module edit, but its own stated concern is three
+questions: is the default safe for all consumers, do teams need notification,
+should this be opt-in vs default-on. A shared-module edit is PROCEED-eligible,
+not auto-ESCALATE, when ALL of: the change is additive with a no-op default,
+every call-site value shape is enumerated with a construction-level identity
+argument (not just described), and one zero-diff plan is named per shape
+family. The residual concern (notifying consuming teams) becomes a
+PR-description item, not a gate blocker. Instance: an additive
+`optional(string, null)` attribute plus a shape-discriminating transform on a
+module with 83 call sites answered all three ESCALATE questions with a full
+call-site audit, independently re-verified (every value shape repo-wide is a
+list or a dynamic ref resolving to one, so the discriminator is false
+everywhere and rendering is byte-identical by construction). An unconditional
+reading would have blocked a correct P1 cutover-gating fix. Source: 2026-08-06
+launch gate.
+
+### Proceed-gate: verifiability evidence for a detector or lens must be blind, not retrospective
+
+When demanding verifiability evidence for a detector/lens candidate at an
+ideation gate, specify that the evidence artifact must be held out: not drawn
+from the incident that motivated the mechanism, and its prompt authored
+without having read the answer. A retrospective replay on a known-answer
+artifact proves REPRODUCTION, not DISCRIMINATION, and is satisfiable even when
+a documented false-positive-rate objection is still live and unresolved by
+more replay. Source: 2026-07-24 review-efficacy ideation gate round 2.
+
+### Proceed-gate: multi-population consuming paths need per-population drop semantics
+
+When a plan gates or drops traffic on a path that carries more than one event
+population (live / replay / backfill / re-ingest / sweep-requeue), the plan
+must assign semantics PER POPULATION and name any population whose semantics
+depend on an unratified question, with the dependency edge to that question's
+bead. A uniform drop plus a producer-identifying metric dimension is NOT
+population-level reasoning. Instance: a plan extended a per-matter drop to an
+operator direct-invoke path plus two API bulk endpoints plus a sweep re-queue,
+while the ratified decision on record states the drop is NOT safe for the
+never-indexed replay/backfill population and leaves that question explicitly
+open both ways. Same shape as the fail-safe-per-traffic-class correction
+already in `.claude/rules/`, which no calibration rule previously covered.
+Source: 2026-08-12 MX2-NNNNN plan-approval gate.
 
 ---
 
@@ -285,6 +411,35 @@ a decision-class change. Instance: a ~10-amendment delta framed as "MINOR,
 mostly added guards" was actually MAJOR (two pin reversals incl. an
 arithmetically invalidated batch size, plus one reopened structural conflict).
 Source: 2026-06-10 MX2-NNNNN confirmation-mode gate; merged 2026-06-10.
+
+**Refinement (2026-08-06 launch gate):** this rule false-positives when the
+reversal is BOTH (a) evidence-backed against verified code and (b) explicitly
+surfaced as an Open Assumption for user adjudication. In that case the delta
+stays MINOR but caps confidence at MEDIUM, rather than forcing MAJOR and
+adding a gate round with no new information. Instance: a plan deviated from a
+bead's pinned mechanism (continue an index sequence) to a separate namespace;
+the pinned mechanism was verifiably buggy (a counter increments before an
+empty-item skip, so continuation collides with a gap id) and nothing parses
+the field downstream. The rule's protective purpose, the user sees the
+decision-class change, was already satisfied via the Open Assumption.
+
+### Promotion same-name config shadowing
+
+When promoting a personal-tier artifact to project tier, the convention "keep
+`name:` identical so personal shadows project" is correct for agents but
+silently DEFEATS any promotion whose value is a lockdown (an MCP server entry
+carrying a read-only header, a narrowed toolset, a deny surface): the
+shadowing personal-tier definition, lacking the lockdown, wins at runtime and
+the promoted restriction never takes effect. Instance: a plan promoted an MCP
+server entry with read-only env vars and a narrowed toolset, while the user's
+existing root-scope config already declared the same server name and URL with
+neither restriction; the promoter's own post-rebuild verification check would
+have tested the shadowing (unrestricted) definition and returned a false
+"it works" result on the plan's primary control. At any personal-to-project
+promotion gate, require the plan to enumerate same-named existing user-scope
+definitions, resolve scope precedence explicitly, and carry an onboarding step
+deleting stale personal entries (the trial-then-promote pattern guarantees
+they exist). Source: 2026-08-07 MX2-NNNNN launch gate.
 
 ---
 

@@ -8,10 +8,8 @@ allowed-tools: ["Bash", "Glob", "Grep", "Read", "Agent", "Write", "Edit"]
 # Test Forge
 
 Generate high-quality behavioral tests for MX2 modules by running the `test-generator`
-agent (a team-authored project-tier agent, not included in this public mirror; adopters
-need an equivalent test-generation agent of their own) and then feeding its output through
-the `test-quality-reviewer` agent in a feedback loop. Stop when the reviewer is satisfied
-or after 3 iteration cycles.
+agent and then feeding its output through the `test-quality-reviewer` agent in a feedback
+loop. Stop when the reviewer is satisfied or after 3 iteration cycles.
 
 HARNESS CONSTRAINT (verified 2026-06-09): this skill must run in the main
 conversation, never as a `context: fork` execution; forked skill executions are
@@ -48,8 +46,8 @@ Invoke the `test-generator` agent via the Agent tool. Your prompt MUST include:
 1. The source file path(s)
 2. Your behavioral inventory from Phase 1
 3. The constraints from [test-constraints.md](test-constraints.md) (copy verbatim)
-4. The engineering lead's 4 test review questions as the generation lens (Code Review
-   Guide for Humans, internal Confluence). Tell the generator the tests it
+4. The engineering lead's 4 test review questions as the generation lens (Code Review Guide
+   for Humans, Confluence 5684789249). Tell the generator the tests it
    produces will be evaluated against these criteria at Phase 3, so write to
    the bar:
 

@@ -239,6 +239,19 @@ Fixture test: `bash ~/.claude/scratch/scripts/test-check-review-markdown.sh` (7 
 built from this session's real payloads plus the pre-fix #11386 draft; both positive
 controls must keep failing or the check has stopped biting).
 
+**Dump the payload COMPACT, never pretty-printed.** `block-hard-wrapped-pr-body.sh` is a
+PreToolUse hook that scans the file named by `--input` for mid-sentence line breaks, and it
+does not distinguish prose from JSON structure. A payload written with `json.dump(...,
+indent=N)` puts every `"path": "src/python/.../foo.py",` on its own line, which the hook reads
+as hard-wrapped prose and blocks the post. Use `separators=(",", ":")` (or `jq -c`) so the
+whole payload is one physical line; the bodies inside it are unaffected, and
+`check-review-markdown.py` still catches real hard-wrapping in the prose fields.
+
+2026-08-20, posting a ten-PR round: nine payloads written at `indent=1` blocked on #11864 with
+"5 mid-sentence line breaks", every cited line a JSON key. One PR had already posted because
+its shorter paths fell under the heuristic, so the failure is order-dependent and will not
+reproduce on a small payload.
+
 ## Step 2.6: Preview
 
 Present the verified data for confirmation before any API call. Render as regular markdown (do NOT wrap in a fenced code block):
@@ -318,6 +331,23 @@ Get the repo owner/name:
 gh repo view --json nameWithOwner --jq '.nameWithOwner'
 ```
 
+**Sibling-review check, IMMEDIATELY before the POST.** Up to ~15 sessions run concurrently on
+this one `mslshao` identity, so another one can review the same PR while this briefing is being
+rendered. Re-query right here, not during Step 1 data-gathering, where the answer goes stale:
+
+```bash
+gh api repos/{owner}/{repo}/pulls/{n}/reviews \
+  --jq '[.[] | select(.user.login=="mslshao")] | length'
+```
+
+A non-zero count you did not create means a peer is mid-post. Stop and surface it rather than
+adding a second review from the same account. 2026-08-20, #11870: a peer session posted 11
+seconds after this one, duplicating two inline anchors on a colleague's PR; it noticed and
+deleted my copies. My own pre-flight HAD fetched reviews, an hour earlier, which is exactly when
+it could not help. Do not attribute the peer writes to a named session
+(`correction:verification:session-attribution-by-name`); all sessions share this identity, so
+`authorId` proves nothing. Full rule: `correction:workflow:sibling-review-check-before-posting`.
+
 Post the atomic review using the mechanism from `github-review-api.md`, as a
 TWO-STEP sequence (never a stdin heredoc; heredocs trip the destructive-command
 and vocab scans and bypass the attribution hook's payload validation):
@@ -366,7 +396,7 @@ identical.
 
 After the main review post succeeds, apply `+1`/`-1` reactions to the bot
 comments pr-intel classified in its Bot Reactions phase (the upgraded form of
-the engineering lead's 2026-05-20 "thumbs-up instead of repeat" feedback). The `bot_reactions`
+The engineering lead's 2026-05-20 "thumbs-up instead of repeat" feedback). The `bot_reactions`
 list (extracted in Step 1) carries `{comment_id, endpoint, reaction, bot_name,
 finding_summary}`; POST each to the `pulls/comments/{id}/reactions` (inline) or
 `issues/comments/{id}/reactions` (issue-level) endpoint. Skip silently if empty.
@@ -423,7 +453,7 @@ say that the author may be mid-fix and that resolving forecloses their amend, th
 do it if they confirm.
 
 (2026-08-19, #11832: an offered resolve on a comment-only wording nit closed the thread
-about 40 seconds before the author merged. The author had the fix queued, had to carry it in
+about 40 seconds before the author merged. They had the fix queued, had to carry it in
 follow-up #11837, and named the resolve in a team channel: "Claude resolved the comment
 before pushing the change to update the comment, enabling it to merge without the changed
 comment." The rule above already barred doing it; nothing barred offering it.)

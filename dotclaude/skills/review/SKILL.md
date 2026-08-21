@@ -49,9 +49,10 @@ verifies build, type, and test correctness. Run both.
 
 ## Reviewer standard
 
-The human-reviewer authoritative source is the engineering lead's Code Review Guide
-for Humans (an internal Confluence page, Mar 2026). The priority order codified
-there is the order this skill surfaces findings:
+The human-reviewer authoritative source is the engineering lead's [Code Review Guide
+for Humans](an internal Confluence page)
+(Mar 2026). The priority order codified there is the order this skill
+surfaces findings:
 
 1. Description / intent (sent-back-quickly class)
 2. Data models / types (sent-back-quickly class; downstream depends)
@@ -69,8 +70,8 @@ bucket above Critical. The framing is "send back to author" rather than
 "iterate line-by-line": fixing these typically invalidates the downstream
 review effort, so we surface them first. Pragma misuse (#8), boolean
 parameters (#4), and exception design (#9) are inline-iterate findings,
-not Front Door; the engineering lead's explicit "send back quickly" framing
-applies to description and types specifically.
+not Front Door; the engineering lead's explicit "send back quickly" framing applies to
+description and types specifically.
 
 This skill adds ONE Front Door class that is not from the engineering lead's guide:
 **capability duplication** (step 2a), sourced from `architecture.md` Reuse
@@ -123,8 +124,8 @@ so FAIL LOUD per that guard instead.
 1a. **Commit-message intent pre-check (Front Door).** Walk the captured
     commit log. The branch's commit messages are the analog of the PR
     description before the PR exists: if they fail to convey intent, the
-    PR description that gets written from them will also fail the engineering
-    lead's #1 gate.
+    PR description that gets written from them will also fail the engineering lead's #1
+    gate.
 
     Flag as a Front Door finding when ANY of:
     - Subject lines are boilerplate-only (`WIP`, `fix`, `update`, `wip
@@ -148,7 +149,7 @@ so FAIL LOUD per that guard instead.
     the methodology (the script, command, or rule applied). If absent,
     flag as a Front Door finding: large mechanical changes need a
     methodology statement so reviewers can spot-check rather than read
-    every line. (The engineering lead's guide, #11.)
+    every line. (the engineering lead's guide #11.)
 
 2. **Pre-evaluate dispatch signals** (once, before fan-out):
 
@@ -247,6 +248,37 @@ so FAIL LOUD per that guard instead.
     this step exists to make sure the question is asked BEFORE the diff
     gets refined into a better version of the wrong thing.
 
+2b. **Swap-blind fixture pre-check (deterministic, run it yourself).** Fires when the
+    diff touches any `conftest.py`, `*_test.py`, or `test_*.py`. Like step 2a, this is
+    the orchestrator's job, not the fan-out's: the fan-out already had this and missed
+    it (2026-08-21, PR 11908, five lenses plus two decision-maker gates).
+
+    `.claude/rules/testing.md` already carries the routing test for CONTROL FLOW ("if I
+    swapped which branch this routes to, would the test still pass?"). This is the
+    DATA-SELECTION version, which is worse because it reads as covered: the tests do
+    exercise both paths, so nothing looks missing. Measured instance: `conftest.py` set
+    `document_queue_max_receive_count` and `page_processor_queue_max_receive_count` both
+    to `3`, each handler reads its own field, and swapping the two references left every
+    assertion green. A test docstring asserted the swap WOULD be caught, and the review
+    signed off on that claim rather than on the code.
+
+    ```bash
+    python3 ~/.claude/scratch/scripts/check-fixture-value-collisions.py \
+      $(git diff --name-only <base> | grep -E 'conftest\.py$|_test\.py$|/test_[^/]*\.py$')
+    ```
+
+    Flags only kwargs sharing a >= 2-token suffix with equal literal values, so the
+    false-positive rate is low (measured: 6 advisory hits across 60 <service> test files,
+    all genuine swap-blind pairs). Render each hit in **Important**, naming the swap it
+    fails to detect. A hit is not automatically a defect: equal values can be correct.
+    The finding is that the test suite cannot tell, so the author must give them distinct
+    values or say why the collision is safe.
+
+    **Render the negative too**, on the `Agents:` line:
+    `fixture-collision: N files scanned, no swap-blind pairs`, or
+    `fixture-collision: skipped (no test files in diff)`. A lens that only speaks on a
+    hit is indistinguishable from a lens that stopped running.
+
 3. **Fan out in parallel.** Single message with up to thirteen Agent tool calls.
    Build each prompt with these elements, in order:
 
@@ -278,10 +310,10 @@ so FAIL LOUD per that guard instead.
       pilot had a resumed reviewer apply its own findings unattributed.)
    e. **Commit log for intent context**: the captured `git log` output.
    f. **Citation requirement**: file:line on every finding.
-   g. **Engineering lead's priority order (mx2-code-reviewer only)**: append a
-      one-line preamble naming the order so the agent surfaces findings in the
-      reviewer-priority sequence: "Surface findings in the engineering lead's
-      priority order: description, types, complexity / naming, boolean params,
+   g. **The engineering lead's priority order (mx2-code-reviewer only)**: append a one-line
+      preamble naming the order so the agent surfaces findings in the
+      reviewer-priority sequence: "Surface findings in the engineering lead's priority
+      order: description, types, complexity / naming, boolean params,
       tests, correctness-via-tests (not in-head exec), static analyzers,
       pragmas, exception design, large-refactor methodology. Tag findings
       as front_door=true when they match types (Type System Subversion
@@ -375,6 +407,16 @@ so FAIL LOUD per that guard instead.
      note "N leak-period findings dropped" so the author knows the count
      differs from the gate's raw view. See
      `feedback:pr-review:sonarqube-leak-period-scope`.
+   - **Hunk overlap does not decide whether a finding gates.** Sonar's new-code
+     attribution is its own computation, not your diff, so an issue can sit outside
+     every hunk, be present at an identical count on the target branch, and still
+     fail a gate condition. Measured 2026-08-19 on PR 11860: `python:S1192` at
+     `metadata_updater/processor.py:339` was 3-on-main and 3-on-branch and nowhere
+     near either hunk, and it failed `new_code_smells_severity` at 20 against a
+     threshold of 14. The leak-period filter above governs what you REPORT as this
+     branch's responsibility; it does not license calling a finding non-gating. Read
+     the CONDITIONS array separately, and when a condition is ERROR the finding is
+     yours to clear whatever the blame math says.
    - **If no PR exists yet (pre-push) OR both Sonar reads are unavailable**: fall back to
      walking the local rule catalog at
      [~/.claude/projects/-workspaces-main/memory/sonarcloud-rules.md](../../projects/-workspaces-main/memory/sonarcloud-rules.md).
@@ -392,8 +434,8 @@ so FAIL LOUD per that guard instead.
 6. **Synthesize.** When all dispatched agents and the Sonar pre-check return:
    - Dedup overlapping findings (same file + line + theme is one entry,
      attributed to all sources that flagged it).
-   - **Promote to Front Door** any finding that matches the engineering
-     lead's sent-back-quickly classes: description/intent gate failure (from
+   - **Promote to Front Door** any finding that matches the engineering lead's
+     sent-back-quickly classes: description/intent gate failure (from
      step 1a), large-refactor methodology gap (from step 1b), and
      type/model smells (untyped dicts, `dict[str, Any]`, Literal-key
      dicts, `| None` on collections, `bool | None`, same model
@@ -404,8 +446,8 @@ so FAIL LOUD per that guard instead.
      what an existing endpoint or shared symbol already provides is the
      strongest send-back class there is, because refining it wastes the
      entire downstream review. This one class is sourced from
-     `architecture.md` Reuse Across Boundaries, not from the engineering
-     lead's guide. Pragma misuse,
+     `architecture.md` Reuse Across Boundaries, not from the engineering lead's guide.
+     Pragma misuse,
      boolean-parameter smells, and exception-design findings stay in
      their severity buckets; the engineering lead's "send back" framing applies to
      description and types specifically, not all design judgment

@@ -676,14 +676,14 @@ def main() -> int:
             {"id": "docr-fresh", "updated_at": "2026-07-13T11:00:00Z"}]},
         "prs_authored": {"status": "ok", "items": [{"repository": "o/r", "number": 5}]},
         "review_requests": {"status": "error", "error_detail": "boom"},
-        "jira": {"status": "ok", "items": [{"key": "MX2-AAAAA"}]},
+        "jira": {"status": "ok", "items": [{"key": "MX2-NNNNN"}]},
     }
     base = cycle.seed_baseline(sources, NOW, age_days=7)
     check("baseline.beads_full", set(base["beads_ready"]["known_items"]) == {"docr-a", "docr-b"})
     check("baseline.in_progress_aged_only", base["in_progress"]["known_items"] == ["docr-old"])
     check("baseline.pr_key", base["prs_authored"]["known_items"] == ["o/r#5"])
     check("baseline.errored_skipped", "review_requests" not in base)
-    check("baseline.jira_key", base["jira"]["known_items"] == ["MX2-AAAAA"])
+    check("baseline.jira_key", base["jira"]["known_items"] == ["MX2-NNNNN"])
 
     # diff: new membership item surfaces; known one does not; known := current
     prev = {
@@ -691,7 +691,7 @@ def main() -> int:
         "in_progress": {"known_items": ["docr-old"]},
         "prs_authored": {"known_items": ["o/r#5"]},
         "review_requests": {"known_items": ["o/r#9"]},
-        "jira": {"known_items": ["MX2-AAAAA"]},
+        "jira": {"known_items": ["MX2-NNNNN"]},
     }
     cur = {
         "beads_ready": {"status": "ok", "items": [
@@ -702,7 +702,7 @@ def main() -> int:
             {"id": "docr-newaged", "title": "NA", "updated_at": old}]},
         "prs_authored": {"status": "ok", "items": [{"repository": "o/r", "number": 5}]},
         "review_requests": {"status": "ok", "items": []},
-        "jira": {"status": "ok", "items": [{"key": "MX2-AAAAA"}, {"key": "MX2-BBBBB", "summary": "s"}]},
+        "jira": {"status": "ok", "items": [{"key": "MX2-NNNNN"}, {"key": "MX2-NNNNN", "summary": "s"}]},
     }
     deltas, new_ps = cycle.diff_and_update(cur, prev, NOW, age_days=7)
     check("diff.beads_new_only", [r["id"] for r in deltas["beads_ready"]] == ["docr-new"])
@@ -712,7 +712,7 @@ def main() -> int:
           set(new_ps["in_progress"]["known_items"]) == {"docr-old", "docr-newaged"})
     check("diff.review_gone_no_alert", deltas["review_requests"] == [])
     check("diff.review_known_emptied", new_ps["review_requests"]["known_items"] == [])
-    check("diff.jira_new", [r["key"] for r in deltas["jira"]] == ["MX2-BBBBB"])
+    check("diff.jira_new", [r["key"] for r in deltas["jira"]] == ["MX2-NNNNN"])
 
     # errored source: carried forward, no delta, marked error
     cur_err = dict(cur)
@@ -726,7 +726,7 @@ def main() -> int:
     prev_partial = {"beads_ready": {"known_items": ["docr-a"]}}  # others never succeeded
     d3, ps3 = cycle.diff_and_update(cur, prev_partial, NOW, age_days=7)
     check("diff.rebaseline_silent", d3.get("jira") == [])
-    check("diff.rebaseline_known_set", set(ps3["jira"]["known_items"]) == {"MX2-AAAAA", "MX2-BBBBB"})
+    check("diff.rebaseline_known_set", set(ps3["jira"]["known_items"]) == {"MX2-NNNNN", "MX2-NNNNN"})
 
     # compose: quiet -> None; deltas -> lines; error -> warn line; catch-up prefix
     check("compose.quiet_none", cycle.compose({}, {"beads_ready": {"status": "ok"}}, 7, False) is None)

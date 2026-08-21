@@ -36,7 +36,7 @@ Decision record: `docr-1vqfg`. Plan lineage: ideate `docr-9bp1b` -> converge
 | `/launch <ticket>` | One ticket, or you will be present to approve. |
 | `/converge` | The epic is not decomposed into pre-converged node beads yet. |
 | `/ideate` | You do not know which mechanism to pursue at all. |
-| A teammate's recipe (internal Confluence page) | You want the human-in-the-loop variant: same shape, human clicks per node. |
+| A teammate's recipe (an internal Confluence page) | You want the human-in-the-loop variant: same shape, human clicks per node. |
 
 ## Input contract (hard preconditions)
 

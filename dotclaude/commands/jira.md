@@ -181,7 +181,11 @@ When you only need 1 or 2 tickets, single-ticket mode is faster.
 
 ## Editing existing tickets
 
-Before any `editJiraIssue` call, load `memory/jira.md` and follow the "Editing tickets: fields to preserve" table. Missing fields are nulled by the MCP, not preserved.
+Before any `editJiraIssue` call, load `memory/jira.md` and follow the "Editing tickets: pass only what you are changing" section.
+
+`editJiraIssue` uses standard Jira PUT semantics: omitted fields ARE preserved (measured 2026-05-29 on MX2-NNNNN). Pass ONLY the fields you are changing, plus `customfield_11220` for the hook. Do NOT pad the payload with unchanged values "to be safe": padding is what gets blocked by the auto-mode classifier as overreach.
+
+The one exception is `assignee`, which is NOT reliably preserved across an edit and can flip to the acting user. Set it explicitly when it matters, or verify-and-fix immediately after.
 
 Pre-check edited bodies through `check-stakeholder-text.sh` the same way as creates.
 

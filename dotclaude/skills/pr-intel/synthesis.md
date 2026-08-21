@@ -135,7 +135,7 @@ After specialist results return, synthesize into the final briefing.
       despite substantive local analysis.
 
     The compression target: design-judgment findings default to ≤ 25 words and
-    ≤ 2 sentences (calibrated 2026-05-13 against the engineering lead corpus ceiling),
+    ≤ 2 sentences (calibrated 2026-05-13 against the engineering lead's corpus ceiling),
     often a bare question. Defect-class BLOCKING and design-judgment findings
     that require a named alternative are the only legitimate paths to longer
     comments. When even those don't fit, the finding renders as a longer direct inline

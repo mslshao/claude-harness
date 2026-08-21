@@ -7,7 +7,8 @@ description: >
   quality, observability-reviewer for instrumentation gaps,
   silent-failure-hunter for error propagation gaps, mx2-security-auditor
   for PII/PHI exposure and HIPAA audit-trail field completeness,
-  module-cohesion-reviewer for cross-file module cohesion and coupling),
+  module-cohesion-reviewer for cross-file module cohesion and coupling,
+  intake-agent-reviewer for recorded intake-agent defect classes),
   deduplicates overlapping findings, and presents a grouped severity
   report. Read-only and local-only; does not post to GitHub or fetch
   external context. Use before opening or pushing a PR. Trigger on:
@@ -179,7 +180,7 @@ or not."
     Skip note when the signal is absent:
     `reuse-search: skipped (no new capability in diff)`.
 
-2. **Fan out in parallel.** Single message with up to six Agent tool
+2. **Fan out in parallel.** Single message with up to seven Agent tool
    calls. Build each agent's prompt with these elements, in order:
 
    a. **Code root** path (the worktree or repo root the agent operates on).
@@ -279,6 +280,18 @@ or not."
      cleaner local structure for the new code; extracting it into a tidier
      module is not an answer to whether it should exist." Without that last
      clause the agent reliably answers the module-local question instead.
+   - **`intake-agent-reviewer`** for the recorded intake-agent defect taxonomy:
+     read-back integrity, prompt-guardrail surface coverage, KB and extraction
+     regressions, eval-evidence discipline, the service's architecture and
+     scaling invariants, and LLM-usage hygiene: 116 classes, each citing the
+     past ticket/PR that created it (checklists in
+     `.claude/skills/intake-agent-review/theme-*.md`). Dispatch only when the
+     diff touches `src/python/mx2/intake_agent/` or that service's Terraform.
+     If skipped, note "intake-agent-reviewer: skipped (no intake_agent
+     changes)" in the output header. For reviewing a teammate's PR by number
+     (evidence gates over the PR body, CI-dispatch check), point the user at
+     the `intake-agent-review` skill, which adds the PR-mode plumbing this
+     local-only fan-out deliberately lacks.
 
 3. **Synthesize.** When all dispatched agents return:
    - Dedup overlapping findings (same file + line + theme is one entry,
@@ -327,7 +340,7 @@ sections. The author decides what to fix; this skill does not draft replies.
 ## Self-review: {scope description}
 
 {N} findings across {M} files.
-Agents: code-reviewer, test-quality-reviewer, observability-reviewer, silent-failure-hunter, mx2-security-auditor, module-cohesion-reviewer.
+Agents: code-reviewer, test-quality-reviewer, observability-reviewer, silent-failure-hunter, mx2-security-auditor, module-cohesion-reviewer, intake-agent-reviewer.
 
 ### Critical
 - {file}:{line} - {one-line summary}
@@ -358,7 +371,9 @@ diff: `observability-reviewer (skipped: no observability signals)`. Similarly fo
 `mx2-security-auditor` when no security-relevant signals are in the diff:
 `mx2-security-auditor (skipped: no security signals)`. Similarly for
 `module-cohesion-reviewer` when no Python module changes are in the diff:
-`module-cohesion-reviewer (skipped: no Python module changes)`. List
+`module-cohesion-reviewer (skipped: no Python module changes)`. Similarly for
+`intake-agent-reviewer` when the diff does not touch `src/python/mx2/intake_agent/`:
+`intake-agent-reviewer (skipped: no intake_agent changes)`. List
 only the agents that actually ran (or ran-and-skipped) with their state.
 
 The `Agents:` line also carries the step-1a reuse-search state, which is not
@@ -439,8 +454,8 @@ mutations, network calls) still prompts.
 - **Local-only.** Does not fetch Jira, Confluence, or remote PR state. The
   diff is the entire context the agents see.
 - **No external state.** Does not read or write task trackers, persistent memory, or DynamoDB.
-- **Bounded fan-out.** Up to six project-tier review agents
+- **Bounded fan-out.** Up to seven project-tier review agents
   (`code-reviewer`, `test-quality-reviewer`, `observability-reviewer`,
-  `silent-failure-hunter`, `mx2-security-auditor`, `module-cohesion-reviewer`),
-  with conditional dispatch on the latter five. No general specialist routing
-  matrix, no cascade.
+  `silent-failure-hunter`, `mx2-security-auditor`, `module-cohesion-reviewer`,
+  `intake-agent-reviewer`), with conditional dispatch on the latter six. No
+  general specialist routing matrix, no cascade.

@@ -71,6 +71,38 @@ Phase 4 output and proceed. Do not block on advisory tooling. The
 Phase 3.6 gate receives the unavailable-reason as input and factors
 it into the verdict (a missing skeptic pass lowers gate confidence).
 
+### Relaying a finding: trace the consequence, not just the mechanism
+
+A reviewer hands you a MECHANISM ("this call can raise") and usually asserts a
+CONSEQUENCE ("so the record is lost"). Those are separate claims and the second
+is the one that carries severity. Before you restate a finding to the user in
+severity language (live bug, data loss, production impact, silently drops), trace
+the mechanism through the ACTUAL call path to the asserted consequence, and relay
+only what the trace supports. An intervening layer very often already absorbs it.
+
+This is not the self-recheck `verification.md` tells you to skip. It is a
+cross-boundary check: the reviewer reasoned from the lines in front of it, and
+whether the consequence survives the call path is evidence that lives outside
+those lines.
+
+Two tells that you are amplifying rather than relaying:
+- You are about to add a severity word the reviewer did not use.
+- The mechanism is local (one function) but the consequence you are stating is
+  global (a record, a queue, a monitor). That jump is exactly what needs tracing.
+
+When the trace does not settle it, relay the mechanism as verified and the
+consequence as unverified, in those words. Do not average them into a confident
+middle.
+
+Recurrence context, 2026-08-20 on docr-nuie8: a round-2 skeptic correctly found
+an unguarded `str(e)` inside a terminal exception handler and inferred the job's
+terminal-FAILED record would be lost. The orchestrator relayed that to the user
+twice as a live production bug losing audit records. Tracing the path afterward
+showed OpenTelemetry's `use_span` converts an unrenderable exception at an
+upstream RECORDING span, so the handler only ever sees a safely-renderable
+`TypeError` and the record was never lost. The mechanism was real; the
+consequence was not. Two user-facing messages had to be corrected.
+
 ### Stage Event Write
 
 After skeptic returns (or fails), write a `[LAUNCH_STAGE stage=skeptic ...]`

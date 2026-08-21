@@ -14,5 +14,5 @@ append-only audit trail is in `module-cohesion-reviewer.lookback.md`.
   them as duplication to consolidate into one shared model; the coupling that
   consolidation would create is the actual anti-pattern. Also informs bot-review: a
   change to one contract does not automatically ripple to the other, precisely
-  because they are separate contracts. (Source: the engineering lead's reply on
-  PR #10714, 2026-07-20.)
+  because they are separate contracts. (Source: the engineering lead's reply on PR #10714,
+  2026-07-20.)

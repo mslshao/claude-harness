@@ -35,7 +35,7 @@ Do NOT trigger when:
 
 Extract from the user's prompt:
 - **Topic keywords**: free-text terms that might match bead titles, memory keys, topic file names.
-- **Named entities**: people (a teammate's first name, last name, or GitHub handle), projects (dyn2red, <service>, folio), tickets (MX2-N), beads (docr-XXXX).
+- **Named entities**: people (MSam, a teammate, a peer reviewer), projects (dyn2red, <service>, folio), tickets (MX2-N), beads (docr-XXXX).
 - **Time hints**: "yesterday", "last week", "earlier" suggest a time-narrowed window.
 
 If the query is too vague to extract seeds, ask ONE clarifying question; otherwise proceed with the best-guess seed.

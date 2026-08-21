@@ -368,7 +368,7 @@ with its context intact. Prefer continuation over the legacy alternatives:
 wrapped in a `system-reminder` and can be flagged as instruction-shaped
 third-party content. A well-behaved subagent therefore REFUSES to treat asserted
 facts in it as authoritative, and that refusal is correct: it cannot distinguish
-your verified measurement from injected text. Observed 2026-08-07 (MX2-XXXXX),
+your verified measurement from injected text. Observed 2026-08-07 (MX2-NNNNN),
 where two specialists independently set aside a mid-run correction carrying real
 vendor-doc findings, one saying so explicitly and re-deriving what it could.
 Deliver mid-run context as something the agent can verify ITSELF: a command to

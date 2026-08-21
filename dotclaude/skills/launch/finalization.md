@@ -128,7 +128,7 @@ See the recurrence note in `~/.claude/CLAUDE.md` PR descriptions rule for the
 **Path A: Independent launch (`BASE_BRANCH == "main"`).** No parent relationship
 to register, so Graphite adds no value; push, then create the PR **via the /pr
 skill**, not raw `gh pr create`. The project hook `block-raw-gh-pr-create.sh`
-blocks the raw call (measured 2026-08-14 on the MX2-XXXXX launch: one blocked
+blocks the raw call (measured 2026-08-14 on the MX2-NNNNN launch: one blocked
 call plus a mid-finalization re-route into /pr), and /pr owns Jira-id
 resolution, the template body, and the draft default. Inside /pr's own step 8,
 the `PR_SKILL_OK=1` prefix is the sanctioned escape for its `gh pr create`
@@ -180,7 +180,7 @@ found"). Descriptions, NOTES and comments are all unreachable by search, and
 `[LAUNCH_EVENT type=PR_CREATED ...]` is unreachable from `gh pr list` or from the
 Jira key, which strands every cold-start session that starts at the PR instead of
 at the bead (2026-08-06, docr-t9o69 / PR #11392: `bd search 11392` and
-`bd search MX2-XXXXX` both missed the bead holding all the state).
+`bd search MX2-NNNNN` both missed the bead holding all the state).
 
 Separate Bash call from any `gh` command (CLAUDE.md: the personal-tier-vocab hook
 scans the whole command string, so a compounded `bd` + `gh` invocation gets the

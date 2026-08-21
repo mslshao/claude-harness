@@ -9,7 +9,7 @@ Produces a copy-paste-ready COLD REVIEW REQUEST: a prompt engineered so a review
 
 It targets TWO distinct failure modes that both cause automated review to miss what human reviewers catch. Keeping them separate matters, because only the first is about who reviews and only the second is about how.
 
-**1. Framing correlation.** Same-session review, including the multi-agent `/review` and `/pr-intel --mine` fan-outs, inherits the author's framing: the subagents have fresh context windows, but the implementing session writes their prompts and presents the diff the way it already sees it, so errors stay correlated with the author's blind spots. Evidence: `memory/reviewer-discipline.md` (2026-07-24) recorded a 7-lens same-session Workflow missing or killing 8 findings that a human peer reviewer and the Graphite bot caught. A reviewer given only the requirement and the raw diff has decorrelated priors. The fix is WHO reviews, which is what this skill's handoff shape provides.
+**1. Framing correlation.** Same-session review, including the multi-agent `/review` and `/pr-intel --mine` fan-outs, inherits the author's framing: the subagents have fresh context windows, but the implementing session writes their prompts and presents the diff the way it already sees it, so errors stay correlated with the author's blind spots. Evidence: `memory/reviewer-discipline.md` (2026-07-24) recorded a 7-lens same-session Workflow missing or killing 8 findings that a human reviewer (the peer reviewer) and the Graphite bot caught. A reviewer given only the requirement and the raw diff has decorrelated priors. The fix is WHO reviews, which is what this skill's handoff shape provides.
 
 **2. Diff-anchoring.** Three independent 2026-07-24 retros found this to be the larger cause, and it is NOT fixed by changing reviewers: `correction:review:context-reach-not-isolation` ("our review read the diff in isolation while the peer reviewer read it in context; gap = contextual reach, not line-reading") and `correction:review:sibling-path-parity-lens` (5-6 of 9 substantive human findings on PR #10769 were sibling-path parity divergences, "a class NO automated lens owns: all 13 `/review` agents + pr-intel are diff-anchored and the sibling code is unchanged/other-package"). A cold reviewer told only to "read the diff" inherits this blind spot exactly. The fix is HOW the reviewer reads, which is why the artifact carries the four contextual reaches as fixed template rather than optional advice. Do not trim them to shorten the prompt: they are the half of this skill that addresses the dominant observed failure mode. Whether the decorrelation in (1) pays off independently is under evaluation at bd `docr-qc87r`.
 
@@ -50,7 +50,7 @@ Resolve, in order: an explicit PR number; else the current branch to its PR (`gh
    main` first, then diff against `origin/main...<sha>`, and cross-check the file count against
    `gh pr view <n> --json files`. Observed 2026-08-06 on PR #11388 round 3: a three-dot diff
    against stale local `main` reported 33 files and 3,216 insertions for a 3-file, 129-insertion
-   PR, because the branch had been rebased onto three merged MX2-XXXXX PRs. This is
+   PR, because the branch had been rebased onto three merged MX2-NNNNN PRs. This is
    `gotcha:stale-local-main-diff-base` (2026-06-15) reaching a consumer that postdates it.
 
 2. **Resolve the requirement from an author-independent source**, in priority order:
@@ -361,7 +361,7 @@ round on the claim itself; do not wait to be told to check.
    someone implements from. Before closing a corrected-claim finding, grep its distinctive
    phrase across the diff, `gh pr view <n> --json body`, and every ticket the change links.
    Observed twice on PR #11411: the "no push-to-main trigger" cause was corrected in the doc
-   while MX2-XXXXX kept it (round 3), and the "org is over its plan limit" framing was
+   while MX2-NNNNN kept it (round 3), and the "org is over its plan limit" framing was
    corrected in the doc and the ticket while the PR body kept it for three more rounds
    (round 6).
 

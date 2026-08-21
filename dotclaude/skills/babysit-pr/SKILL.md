@@ -73,13 +73,14 @@ Wait for explicit confirmation. Do not silently drift between modes.
 
 ### 4. Worktree staging
 
-Use a dedicated worktree at the PR's HEAD so amends do not touch the operator's main checkout. Two reuse cases come first; create a new worktree only as a last resort.
+Use a dedicated worktree at the PR's HEAD so amends do not touch the operator's main checkout. Three reuse cases come first, checked in order; create a new worktree only as a last resort.
 
 **Reuse priority:**
 
 1. **Agent-spawned worktree** under `.launch-worktrees/` for the same branch. When babysit follows /autopilot OR /launch, a worktree (`autopilot-<bead-id>`, `launch-<bead-id>-<ts>`, or `launch-<ts>`) already exists on the PR's head branch. Reuse it. Adding a second worktree for the same branch fails with `fatal: '<branch>' is already used by worktree at '<path>'`. Resolve via `git worktree list` and match by branch.
 2. **Prior babysit worktree** at `/tmp/babysit-pr-<number>` from an earlier session on the same branch. Reuse after confirming the branch matches.
-3. **Fresh worktree** at `/tmp/babysit-pr-<number>` if neither (1) nor (2) exists:
+3. **Any other existing worktree already on the target branch**, regardless of where it lives (e.g. a `/pr`-authored worktree at `.claude/worktrees/<name>` from earlier in the same session, or a manually created one). Run `git worktree list` and match by branch BEFORE assuming case (4) applies; skipping this check is what produces the `fatal: '<branch>' is already used by worktree` error case (1) warns about. Reuse whatever path it resolves to.
+4. **Fresh worktree** at `/tmp/babysit-pr-<number>` if none of (1)-(3) exist:
 
 ```bash
 WORKTREE_DIR=/tmp/babysit-pr-<number>

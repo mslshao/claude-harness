@@ -1,44 +1,107 @@
 #!/usr/bin/env bash
-# Pre/PostToolUse hook: block em-dashes in written files and API writes.
+# Pre/PostToolUse hook: enforce the no-em-dash rule on outbound artifacts.
 #
-# Surfaces:
-#   PostToolUse (Edit|Write): scans the file for em-dashes after write
-#   PreToolUse (addCommentToJiraIssue): scans comment body before posting
-#   PreToolUse (mcp__github__*): scans tool_input before posting to GitHub
-#   PreToolUse (Bash): scans 'gh api' write commands and 'gh (pr|issue)
-#                      (create|comment|review|edit)' subcommands for em-dashes
-#                      in heredoc, --input/--body-file paths, or inline --body/-f body= values
+# Two enforcement modes, split by surface:
+#
+#   AUTO-REPLACE (silent, via PreToolUse updatedInput): prose/comms surfaces where a
+#     generic " <U+2014> " -> " - " / "<U+2014>" -> "-" substitution is always safe.
+#       - .md file writes (Edit/Write content / new_string)
+#       - Jira comment bodies (addCommentToJiraIssue.commentBody)
+#       - GitHub MCP write payloads (PR/issue/review bodies, titles, etc.). DORMANT:
+#         no github MCP server is configured (evaluated + rejected 2026-04-14, gh CLI
+#         adopted; see memory/github-api.md); the case arm + settings matchers stay so
+#         coverage activates automatically if a github server ever appears.
+#       - gh/git commit writers on the Bash tool (inline command + referenced payload files)
+#     The hook emits {hookSpecificOutput:{...,permissionDecision:"allow",updatedInput:<full
+#     tool_input>}} and exits 0; the tool runs with the sanitized input, no retry prompt.
+#
+#   BLOCK (exit 2): source/config file writes (.py/.ts/.tf/.json/.sh/... anything that is
+#     not .md). A U+2014 there could be an intentional string literal or test fixture, and a
+#     silent rewrite would corrupt it, so the author fixes it by hand (use a unicode
+#     escape such as \u2014 for an intentional literal).
+#
+# Chat-output em-dashes are handled separately by stop-validate-emdash.sh; Stop hooks cannot
+# rewrite chat text, so that surface stays block-and-retry (the ceiling, not a regression).
 #
 # Em-dashes are banned in ALL output per CLAUDE.md Writing Style section.
-# Use hyphens (-), commas, or parentheses instead.
 set -euo pipefail
 
 source "${HOME}/.claude/hooks/lib/log-event.sh"
 hook_instrument "$(basename "$0")"
 
-# Em-dash character via hex escape to avoid the literal appearing in this file
+# Em-dash character via hex escape to avoid the literal appearing in this file.
 EMDASH=$'\xe2\x80\x94'
 
 INPUT=$(cat)
 TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // empty')
+HOOK_EVENT=$(echo "$INPUT" | jq -r '.hook_event_name // empty')
+
+# Emit a PreToolUse allow decision carrying the full rewritten tool_input on stdout.
+# $1 must be the COMPLETE tool_input object (compact JSON), not a partial.
+emit_allow_with_input() {
+  jq -nc --argjson ti "$1" \
+    '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "allow", updatedInput: $ti}}'
+}
 
 case "$TOOL_NAME" in
   Edit|Write)
     FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // .tool_result.file_path // empty')
-    if [[ -z "$FILE_PATH" || ! -f "$FILE_PATH" ]]; then
-      exit 0
-    fi
-    if grep -n "$EMDASH" "$FILE_PATH" > /tmp/emdash_hits 2>/dev/null && [[ -s /tmp/emdash_hits ]]; then
-      HITS=$(head -5 /tmp/emdash_hits)
-      rm -f /tmp/emdash_hits
+    [[ -z "$FILE_PATH" ]] && exit 0
+
+    if [[ "$HOOK_EVENT" == "PreToolUse" ]]; then
+      # Combine the writable text fields: content (Write) and new_string (Edit).
+      COMBINED=$(echo "$INPUT" | jq -r '(.tool_input.content // "") + "\n" + (.tool_input.new_string // "")')
+      if ! printf '%s' "$COMBINED" | grep -q "$EMDASH"; then
+        exit 0
+      fi
+
+      if [[ "$FILE_PATH" == *.md ]]; then
+        # Prose surface: silently rewrite content and/or new_string before the write.
+        UPDATED=$(echo "$INPUT" | jq -c --arg em "$EMDASH" '
+          .tool_input
+          | (if (.content?     // null | type) == "string" then .content     |= (gsub(" "+$em+" "; " - ") | gsub($em; "-")) else . end)
+          | (if (.new_string?  // null | type) == "string" then .new_string  |= (gsub(" "+$em+" "; " - ") | gsub($em; "-")) else . end)
+        ')
+        emit_allow_with_input "$UPDATED"
+        exit 0
+      fi
+
+      # Source/config file: block before write (carve-out from auto-replace).
       cat >&2 <<EOF
 Em-dash detected in $FILE_PATH. Replace with hyphens, commas, or parentheses.
+Auto-replace is intentionally disabled for non-.md files: a U+2014 here may be an
+intentional string literal or test fixture. Fix it by hand. If the literal is genuinely
+required (a dash counter, a lint check, a test fixture), the "\\u2014" escape does NOT
+work: it normalizes to a real dash before this hook sees it. Build the character instead,
+e.g. chr(0x2014) in Python or \\x{2014} in Perl.
+EOF
+      exit 2
+    fi
+
+    # PostToolUse safety net: the file is already written, so updatedInput is not
+    # available. Advisory block if an em-dash slipped through a surface with no
+    # PreToolUse coverage. (For .md the PreToolUse pass already cleaned it; for
+    # non-.md the PreToolUse pass blocked the write, so this rarely fires.)
+    # SCOPE TO WHAT THIS WRITE INTRODUCED, never the whole file. A whole-file grep
+    # reports PRE-EXISTING em-dashes the author never touched, which is pure noise on
+    # any file carrying legacy ones: measured ~20 consecutive fires on
+    # .claude/commands/pr.md (2026-08-12) with ZERO true positives, every added line
+    # clean. It also trains the reader to ignore the hook, which costs the real
+    # positives too. Same unscoped-check defect stop-validate-emdash.sh had before
+    # correction:hooks:stop-emdash-last-not-fulljoin-2026-06-04 narrowed it to the
+    # final assistant block. Reading the written text also removes the need for the
+    # per-invocation mktemp scratch this arm used to require.
+    WRITTEN=$(echo "$INPUT" | jq -r '(.tool_input.content // "") + "\n" + (.tool_input.new_string // "")')
+    if printf '%s' "$WRITTEN" | grep -q "$EMDASH"; then
+      HITS=$(printf '%s' "$WRITTEN" | grep -n "$EMDASH" | head -5)
+      cat >&2 <<EOF
+Em-dash detected in content written to $FILE_PATH. Replace with hyphens, commas, or parentheses.
+Line numbers below are relative to the written block, not to the file.
 
 $HITS
 EOF
       exit 2
     fi
-    rm -f /tmp/emdash_hits
     ;;
 
   mcp__atlassian__addCommentToJiraIssue)
@@ -47,13 +110,16 @@ EOF
       exit 0
     fi
     if echo "$BODY" | grep -q "$EMDASH"; then
-      cat >&2 <<EOF
-BLOCKED: Em-dash detected in Jira comment body. Replace with hyphens, commas, or parentheses before posting.
-EOF
-      exit 2
+      UPDATED=$(echo "$INPUT" | jq -c --arg em "$EMDASH" \
+        '.tool_input | .commentBody |= (gsub(" "+$em+" "; " - ") | gsub($em; "-"))')
+      emit_allow_with_input "$UPDATED"
     fi
+    exit 0
     ;;
 
+  mcp__atlassian__createConfluencePage|\
+  mcp__atlassian__createJiraIssue|\
+  mcp__atlassian__editJiraIssue|\
   mcp__github__add_issue_comment|\
   mcp__github__add_comment_to_pending_review|\
   mcp__github__add_reply_to_pull_request_comment|\
@@ -61,13 +127,19 @@ EOF
   mcp__github__update_pull_request|\
   mcp__github__pull_request_review_write|\
   mcp__github__issue_write)
-    PAYLOAD=$(echo "$INPUT" | jq -r '.tool_input | tostring')
-    if echo "$PAYLOAD" | grep -q "$EMDASH"; then
-      cat >&2 <<EOF
-BLOCKED: Em-dash detected in GitHub MCP call. Replace with hyphens, commas, or parentheses before posting.
-EOF
-      exit 2
+    # NOTE: mcp__atlassian__updateConfluencePage is deliberately ABSENT from
+    # this group: page updates re-emit full bodies that may carry COLLEAGUES'
+    # em-dashes, and mass-rewriting their prose is a ratified non-goal
+    # (memory/atlassian-mcp.md). Creates and Jira issue writes are
+    # self-authored prose, so the walk is safe.
+    if echo "$INPUT" | jq -r '.tool_input | tostring' | grep -q "$EMDASH"; then
+      # Rewrite every string value in the payload. Non-prose fields (owner, repo,
+      # branch refs, numbers) never carry em-dashes, so the walk is a no-op on them.
+      UPDATED=$(echo "$INPUT" | jq -c --arg em "$EMDASH" \
+        '.tool_input | walk(if type == "string" then (gsub(" "+$em+" "; " - ") | gsub($em; "-")) else . end)')
+      emit_allow_with_input "$UPDATED"
     fi
+    exit 0
     ;;
 
   Bash)
@@ -89,48 +161,62 @@ EOF
         IS_TARGETED=true
       fi
     fi
-    if echo "$COMMAND" | grep -qP '(?<![\x22\x27\x60])gh\s+(pr|issue)\s+(create|comment|review|edit)\b'; then
+    if echo "$COMMAND" | grep -qP '(?<![\x22\x27\x60])gh\s+(--repo\s+\S+\s+|-R\s+\S+\s+)?(pr|issue)\s+(create|comment|review|edit)\b'; then
       IS_TARGETED=true
+    fi
+    # git commit with a message source: -m, --message, -F, --file. Plain `git commit`
+    # (no flags) opens $EDITOR and is not Claude's surface; --amend --no-edit reuses the
+    # prior message and supplies no new text.
+    # Tolerate intervening path/flag args: `git -C /workspaces/main commit -m ...`
+    # is the actively-used (and allow-listed) form; adjacency-only matching let
+    # it bypass the auto-replace (2026-06-09 audit).
+    if echo "$COMMAND" | grep -qP '(?<![\x22\x27\x60])git\s+((-C|--git-dir(=|\s+)|--work-tree(=|\s+))\S*\s+\S*\s*)*commit\b' \
+       || echo "$COMMAND" | grep -qP '(?<![\x22\x27\x60])git\s+-C\s+\S+\s+commit\b'; then
+      if echo "$COMMAND" | grep -qP '(\s-m\s|\s--message[=\s]|\s-F\s|\s--file[=\s])'; then
+        IS_TARGETED=true
+      fi
     fi
     if [[ "$IS_TARGETED" != "true" ]]; then
       exit 0
     fi
 
-    BLOCKED_FROM=""
-    SOURCE_TEXT="$COMMAND"
-
-    # Raw-grep the command string. Catches heredoc bodies, -f body=..., --body "...", inline args.
-    if echo "$COMMAND" | grep -q "$EMDASH"; then
-      BLOCKED_FROM="command"
-    fi
-
-    # If command references a payload file via --input or --body-file, scan that file too.
-    # Common patterns:
-    #   cat > /tmp/foo.json <<EOF ... EOF; gh api --input /tmp/foo.json
-    #   Write /tmp/pr-body.md (via Edit tool); gh pr create --body-file /tmp/pr-body.md
-    if [[ -z "$BLOCKED_FROM" ]]; then
-      for FLAG in '--input' '--body-file'; do
-        FILE_PATH=$(echo "$COMMAND" | grep -oP -- "${FLAG}\s+\K[^\s]+" 2>/dev/null | head -1 || true)
-        if [[ -n "$FILE_PATH" && "$FILE_PATH" != "-" && -f "$FILE_PATH" && -r "$FILE_PATH" ]]; then
-          if grep -q "$EMDASH" "$FILE_PATH" 2>/dev/null; then
-            BLOCKED_FROM="${FLAG} file $FILE_PATH"
-            SOURCE_TEXT=$(cat "$FILE_PATH")
-            break
-          fi
+    # Fix any referenced payload files in place. A file passed via --input/--body-file/-F/
+    # --file in these commands is a commit message, PR body, or JSON API body (prose/JSON,
+    # never source code), so the generic substitution is safe and honors auto-replace
+    # end-to-end even when the body lives in a file rather than the command string.
+    # Stays FLAG-ANCHORED on purpose, and is deliberately NOT widened to every
+    # token that resolves to a file (2026-08-13). The sibling
+    # block-personal-tier-vocab.sh WAS widened that way, correctly: it is a
+    # read-only gate, so inspecting an extra file costs nothing. This hook
+    # MUTATES with `sed -i`, and the safety argument above (a body file, prose or
+    # JSON, never source code) holds only for a file named by one of these flags.
+    # Scanning every mentioned path would silently rewrite any file a targeted
+    # command happens to reference.
+    #
+    # Two real gaps this DOES close:
+    #   `head -1` handled only the FIRST occurrence of each flag, so a repeated
+    #   --input left the actual payload untouched.
+    #   The `key=@FILE` form (gh -F body=@file) captured "body=@file", which
+    #   fails the -f test, so -F was in the list but never actually resolved.
+    # Same defect class as the vocab hook's, found the same day:
+    # `bd memories gotcha:vocab-hook-scans-referenced-files-2026-08-13`.
+    while IFS= read -r REF_RAW; do
+      REF_FILE="${REF_RAW#*=}"   # key=VALUE -> VALUE   (gh -F body=@file)
+      REF_FILE="${REF_FILE#@}"   # @FILE     -> FILE
+      if [[ -n "$REF_FILE" && "$REF_FILE" != "-" && -f "$REF_FILE" && -w "$REF_FILE" ]]; then
+        if grep -q "$EMDASH" "$REF_FILE" 2>/dev/null; then
+          sed -i "s/ ${EMDASH} / - /g; s/${EMDASH}/-/g" "$REF_FILE"
         fi
-      done
-    fi
+      fi
+    done < <(grep -oP -- '(--input|--body-file|-F|--file)(=|\s+)\K[^\s]+' <<< "$COMMAND" 2>/dev/null || true)
 
-    if [[ -n "$BLOCKED_FROM" ]]; then
-      # Show ~20 chars of context on each side of the match; never leak the full payload (PII guard).
-      CONTEXT=$(echo "$SOURCE_TEXT" | grep -oP ".{0,20}${EMDASH}.{0,20}" 2>/dev/null | head -1 || true)
-      cat >&2 <<EOF
-BLOCKED: Em-dash detected in gh command (${BLOCKED_FROM}). Replace with hyphens, commas, or parentheses before posting.
-
-Context: ...${CONTEXT}...
-EOF
-      exit 2
+    # Rewrite the inline command string (heredoc bodies, -m/--message, --body, -f body=).
+    if echo "$COMMAND" | grep -q "$EMDASH"; then
+      UPDATED=$(echo "$INPUT" | jq -c --arg em "$EMDASH" \
+        '.tool_input | .command |= (gsub(" "+$em+" "; " - ") | gsub($em; "-"))')
+      emit_allow_with_input "$UPDATED"
     fi
+    exit 0
     ;;
 esac
 

@@ -143,7 +143,7 @@ and no new analysis is required, incorporate the amendments into the plan text a
 re-gate by resuming the SAME decision-maker agent via SendMessage (its round-1
 verification context stays intact; it re-verdicts only the amended items). Reserve
 the full re-dispatch above for ITERATE verdicts requiring new divergence or new
-specialist evidence. Measured 2026-08-13 (MX2-XXXXX converge): resume re-gate
+specialist evidence. Measured 2026-08-13 (MX2-NNNNN converge): resume re-gate
 80s/118k tokens vs a fresh full-context gate ~360s/250k, verdict quality intact.
 
 Re-synthesize (Phase 4). Re-run skeptic (Phase 4.5). Re-gate

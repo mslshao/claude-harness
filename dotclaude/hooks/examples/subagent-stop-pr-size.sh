@@ -19,15 +19,16 @@
 #
 # Input contract: SubagentStop event, JSON on stdin with:
 #   - transcript_path: path to subagent's transcript
-#   - agent_type: should be launch-implementer or mx2-executor (matcher filters)
+#   - agent_type: one of launch-implementer|launch-tester|launch-flex|mx2-executor
+#     (settings.json matcher and the in-body gate below carry the same list)
 #   - cwd: subagent's working directory (may be the worktree)
 #
 # Registered in settings.json under SubagentStop with matcher
-# "launch-implementer|mx2-executor".
+# "launch-implementer|launch-tester|launch-flex|mx2-executor".
 #
-# Test scenario: ~/.claude/scratch/subagent-stop-pr-size-test/README.md
-# covers the four cases (over-threshold, wrong agent_type, no worktree,
-# under-threshold) with a stub transcript and reproducible test worktree.
+# Regression test: test_subagent_stop_pr_size.sh (hermetic; covers the agent
+# gate incl. tester/flex, thresholds, loop guard, marker suppression and
+# material-growth re-fire, and the cwd fallback).
 #
 # Evidence: Faros AI Engineering Report 2026 pp 13-14 (PR size +51.3%, files/PR
 # +59.7%); pp 18-19 (review tax: +441% median PR review, +480% lead time);
@@ -41,12 +42,21 @@ hook_instrument "$(basename "$0")"
 THRESHOLD=250
 
 INPUT=$(cat)
+
+# Structural loop bound: if the harness re-invoked after a prior block, stand
+# down regardless of marker state (the marker is the primary guard, but it
+# depends on a writable worktree; this field does not). 2026-05-12 runaway:
+# 3479 blocks in ~12h predating the marker guard.
+if [[ "$(echo "$INPUT" | jq -r '.stop_hook_active // false')" == "true" ]]; then
+  exit 0
+fi
+
 TRANSCRIPT=$(echo "$INPUT" | jq -r '.transcript_path // empty')
 AGENT_TYPE=$(echo "$INPUT" | jq -r '.agent_type // empty')
 SUBAGENT_CWD=$(echo "$INPUT" | jq -r '.cwd // empty')
 
 case "$AGENT_TYPE" in
-  launch-implementer|mx2-executor) ;;
+  launch-implementer|launch-tester|launch-flex|mx2-executor) ;;
   *) exit 0 ;;
 esac
 
@@ -116,9 +126,14 @@ fi
 #
 # Marker stores the size at the last flag fire. Re-fire only when the diff
 # grows materially (>50 lines or >10%), so a confirmed size doesn't keep
-# nagging but a genuine scope expansion still surfaces. Marker is per-worktree;
-# worktree removal cleans it up naturally.
-MARKER="${WORKTREE}/.subagent-stop-pr-size.flagged"
+# nagging but a genuine scope expansion still surfaces. Marker lives OUTSIDE
+# the worktree (keyed by worktree-path hash): an in-worktree marker gets
+# staged into the PR by `git add -A` (2026-06-09 audit). Old markers are
+# GC'd by age.
+MARKER_DIR="${HOME}/.claude/scratch/pr-size-markers"
+mkdir -p "$MARKER_DIR"
+find "$MARKER_DIR" -type f -mtime +14 -delete 2>/dev/null || true
+MARKER="${MARKER_DIR}/$(echo -n "$WORKTREE" | sha1sum | cut -d' ' -f1)"
 if [[ -f "$MARKER" ]]; then
   LAST_FLAGGED=$(cat "$MARKER" 2>/dev/null || echo "0")
   LAST_FLAGGED=${LAST_FLAGGED//[^0-9]/}

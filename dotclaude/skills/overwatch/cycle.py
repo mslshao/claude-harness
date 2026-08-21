@@ -11,7 +11,7 @@ SKILL.md state machine verbatim; SKILL.md remains the spec and the manual fallba
                      [--quiet-period N]
 
 `--jira-file` holds the agent's classified Jira record as JSON, one of:
-    {"status": "ok", "items": [{"key": "MX2-AAAAA"}, ...]}
+    {"status": "ok", "items": [{"key": "MX2-NNNNN"}, ...]}
     {"status": "error", "error_detail": "..."}
 (Jira is MCP-only, so the agent gathers it and passes it in; everything else here.)
 

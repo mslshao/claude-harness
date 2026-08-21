@@ -36,6 +36,38 @@ bd update "$LAUNCH_BEAD_ID" --append-notes \
   "[LAUNCH_EVENT type=SESSION_STARTED session=$CLAUDE_SESSION_ID ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)]"
 ```
 
+### 5.0a: Discharge plan-declared pre-dispatch obligations (BLOCKING)
+
+Phase 4's approved plan may declare work that must happen BEFORE any agent is
+spawned: reconciling the bead's acceptance criteria, correcting a stale premise in
+the description, updating a sibling bead's contract, filing a prerequisite ticket.
+The plan states these as blocking. Nothing enforced them, so they were skipped.
+
+Before 5.2 spawns anything, re-read the Phase 4 plan for any step marked blocking,
+pre-dispatch, or "before the implementer starts", discharge each one, and write ONE
+event naming what was discharged:
+
+```bash
+bd update "$LAUNCH_BEAD_ID" --append-notes \
+  "[LAUNCH_EVENT type=PREDISPATCH_DONE items=<comma-separated,no-spaces> ts=<literal UTC>]"
+```
+
+When the plan declared none, write `items=none` rather than skipping the event. A
+missing event and a genuinely-empty obligation list must not look identical to a
+cold-start reader.
+
+**5.2 does not run until this event exists.** Cold-start enforces the same order: an
+`AGENT_SPAWNED` with no preceding `PREDISPATCH_DONE` in the log means the obligations
+were skipped, so discharge them before resuming rather than continuing the phase.
+
+Recurrence context, 2026-08-20 on docr-nuie8: the approved plan made "reconcile the
+bead's acceptance criteria" a blocking pre-dispatch step SPECIFICALLY because a
+Phase 3a challenge pass predicted the criteria would read 0/4 at PR time. The
+orchestrator went from Phase 4 approval straight to `WORKTREE_CREATED` and
+`AGENT_SPAWNED`, and caught the omission only during Phase 6, after PR 11861 was
+already open against unreconciled criteria. Every other phase boundary in this skill
+has a durable event; the one obligation the plan itself called blocking had none.
+
 ## 5.1: Create Shared Worktree
 
 ```bash

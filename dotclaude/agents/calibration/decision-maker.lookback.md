@@ -94,3 +94,71 @@ Format per entry:
 - **Action**: new-rule
 - **Summary**: Fit weakness rooted in a missing user constraint routes to ESCALATE-QUESTIONS, not a second re-diverge ITERATE.
 - **Rationale**: Distinct 4th gap; merged as its own Rule Override.
+
+## 2026-08-19
+
+- **Source key**: `calibration:mx2-decision-maker:converge:deterministic-enforcement-precedes-lens`
+- **Category**: converge (gate-context tag, routed to Rule Overrides)
+- **Action**: new-rule
+- **Summary**: Before approving a probabilistic-lens capability, check whether the target is deterministically enumerable (one grep/awk/tflint pass); if so the lens is the wrong mechanism.
+- **Rationale**: Evidence-backed: one awk pass found 17 unset config blocks a per-diff lens would never see, matching a known prior prod defect shape.
+
+- **Source key**: `calibration:mx2-decision-maker:converge:gating-query-positive-control`
+- **Category**: converge (gate-context tag, routed to Rule Overrides)
+- **Action**: new-rule
+- **Summary**: A plan gating execution on a zero/clean live-state query result must name a positive control and a credential/field-visibility assertion.
+- **Rationale**: Extends the already-standing "prove the search can return something" CLAUDE.md rule to the gate specifically for zero-result-as-gate-condition plans; distinct from the ideation absence-claim rule merged the same day.
+
+- **Source key**: `calibration:mx2-decision-maker:false-negative:promotion-samename-config-shadowing`
+- **Category**: false-negative (False-Negative Patterns)
+- **Action**: new-rule
+- **Summary**: The personal-shadows-project naming convention silently defeats a promotion whose value is a lockdown, if a same-named unrestricted definition already exists at the shadowing scope.
+- **Rationale**: Concrete instance where the promoter's own post-rebuild check would have tested the wrong (unrestricted) definition and returned a false pass.
+
+- **Source key**: `calibration:mx2-decision-maker:ideation:burned-precedent-promotes-verifiability`
+- **Category**: ideation (gate-context tag, routed to Rule Overrides)
+- **Action**: new-rule
+- **Summary**: A burned precedent on the same surface promotes Verifiability from one ranking column to the dominant term; a hard-constraint violator still stays in the candidate pool as the control arm.
+- **Rationale**: Corrects a real ranking inversion (MED-verifiability candidate scored above the only HIGH-verifiability one with a mechanical replay).
+
+- **Source key**: `calibration:mx2-decision-maker:ideation:unratified-decision-absence-claim`
+- **Category**: ideation (gate-context tag, routed to Rule Overrides)
+- **Action**: new-rule
+- **Summary**: A candidate proposing a new ratification must have its "no prior ratified decision exists" claim checked against the decision corpus before rating.
+- **Rationale**: Concrete instance where a prior lead-ratified decision on the same axis existed and the artifact's absence claim was simply unverified.
+
+- **Source key**: `calibration:mx2-decision-maker:launch:absence-claim-eliminating-option-class`
+- **Category**: launch (gate-context tag, routed to Rule Overrides)
+- **Action**: new-rule
+- **Summary**: An absence claim that eliminates an entire option class (and substitutes a different deliverable for the bead's own ACs) must be independently re-verified at the gate; added an intent-fidelity AC-diff criterion too.
+- **Rationale**: Same-session instance: a plan concluded no e2e harness existed after 5 search passes; the harness existed with a documented "deferred to v2" coverage gap, not an absence. This session's own /launch on docr-nuie8.
+
+- **Source key**: `calibration:mx2-decision-maker:launch:shared-infra-module-additive-carveout`
+- **Category**: launch (gate-context tag, routed to Rule Overrides)
+- **Action**: new-rule
+- **Summary**: Named carve-out under which a shared-infrastructure-module edit is PROCEED-eligible rather than auto-ESCALATE (additive, no-op default, full call-site shape audit, one zero-diff plan per shape family).
+- **Rationale**: An unconditional ESCALATE reading would have blocked a correct, evidence-backed P1 cutover-gating fix; the carve-out is conditioned tightly enough to preserve the example's protective intent.
+
+- **Source key**: `calibration:mx2-decision-maker:launch:surfaced-mechanism-deviation-delta-category`
+- **Category**: launch (gate-context tag, routed to False-Negative Patterns as a refinement)
+- **Action**: refinement
+- **Summary**: A pinned-mechanism reversal that is evidence-verified AND surfaced as an Open Assumption stays MINOR (capped at MEDIUM confidence) instead of being forced to MAJOR_REVISIONS.
+- **Rationale**: Refines the existing "Delta categorization: kind of change over count of changes" rule; forcing MAJOR here would have added a gate round with no new information, since the user-visibility purpose was already satisfied via the Open Assumption.
+
+- **Source key**: `calibration:mx2-decision-maker:proceed-gate:blind-vs-retrospective-replay`
+- **Category**: proceed-gate (Rule Overrides)
+- **Action**: new-rule
+- **Summary**: Verifiability evidence for a detector/lens must be a held-out (blind) artifact, not a retrospective replay on a known-answer case, which proves reproduction rather than discrimination.
+- **Rationale**: A round-1 ITERATE demanding replay evidence was satisfiable by a non-blind replay, leaving a documented false-positive-rate objection unresolved.
+
+- **Source key**: `calibration:mx2-decision-maker:proceed-gate:enumerate-populations-per-path`
+- **Category**: proceed-gate (Rule Overrides)
+- **Action**: new-rule
+- **Summary**: A plan gating/dropping traffic on a multi-population path (live/replay/backfill/re-ingest/sweep-requeue) must assign semantics per population, not a uniform drop.
+- **Rationale**: Concrete instance extended a drop to populations a ratified decision explicitly left open both ways; same shape as an existing but uncovered project-tier correction.
+
+- **Source key**: `calibration:mx2-decision-maker:proceed-gate:orchestrator-verification-not-evidence`
+- **Category**: proceed-gate (Rule Overrides, refinement)
+- **Action**: refinement
+- **Summary**: An orchestrator-asserted "I verified this live" claim must be re-run at the gate when load-bearing, same as a stale handoff status claim; refines "Verify checkable data parameters before rating."
+- **Rationale**: A false "fresh live finding" (an actually-unchanged YAML field) sat undetected next to a genuinely correct falsification, which is what made it easy to wave through.

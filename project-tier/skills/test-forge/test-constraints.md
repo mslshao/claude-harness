@@ -1,7 +1,6 @@
 # Test Constraints
 
-Copy these verbatim into the `test-generator` agent prompt (a team-authored project-tier
-agent, not included in this public mirror; see [SKILL.md](SKILL.md)).
+Copy these verbatim into the test-generator agent prompt.
 
 ```
 CONSTRAINTS: read these before writing any test.

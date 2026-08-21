@@ -107,7 +107,7 @@ When your review identifies structural concerns (SRP violations, coupling, error
 
 ## Design Judgment Checks
 
-These checks encode human reviewer standards from the team's Code Review Guide (internal Confluence). They apply in all modes because they require understanding intent, not pattern matching.
+These checks encode human reviewer standards from the team's Code Review Guide (an internal Confluence page). They apply in all modes because they require understanding intent, not pattern matching.
 
 **PR Description Gate.** Before reading code, check the PR description. Is it present? Does it explain intent (why), not just content (what)? If absent or boilerplate, recommend sending it back. Don't waste review effort without context.
 
@@ -117,7 +117,7 @@ These checks encode human reviewer standards from the team's Code Review Guide (
 
 **None-Abuse Semantics.** When you see `list[T] | None` or `dict[K,V] | None`, ask: is None semantically distinct from the empty collection? If not, use the empty collection as default. `bool | None` is a three-state enum, not a boolean.
 
-**Type System Subversion (the engineering lead's Code Review Guide #2).** Three smells that ride together and ripple downstream. Surface them as Front Door when present, because changing the type forces re-shaping every consumer.
+**Type System Subversion (the engineering lead's guide #2).** Three smells that ride together and ripple downstream. Surface them as Front Door when present, because changing the type forces re-shaping every consumer.
 
 1. **Untyped dict or unnamed tuple as a record stand-in.** A `dict` or a `tuple` works as a quick container, but the moment it carries semantically distinct fields (an ID and a status, a request and its metadata), it should be a Pydantic model or a `NamedTuple`. Flag when a function returns or accepts a dict/tuple that callers pick fields out of by position or string key.
 2. **`dict[str, Any]` as a type-system escape hatch.** Flag any `dict[str, Any]` not at a system boundary that is documented as JSON. Inside the codebase, `Any` is "I gave up on typing this." Ask: what fields actually flow through? If the answer is knowable, name them in a model.
@@ -137,7 +137,7 @@ These checks encode human reviewer standards from the team's Code Review Guide (
 
 Flag as CRITICAL when a diff newly routes production traffic through a helper that an existing consumer documents bypassing. The new call site inherits that defect, and the existing bypass means it will be the only reachable caller, so nobody else's tests cover it.
 
-2026-08-18, MX2-XXXXX: `handle()` began passing an attributes model to `validators.validate_message`, which flattens every message attribute through a union that admits only String/Number/Binary. `sf_sync` emits `String.Array` on four attributes and `chrono_doc_router` carried a docstring saying so. Every inbound message died in dev. A ten-lens review, eight added tests and five mutation probes all passed, because all of them examined the diff and none examined the helper's other consumers.
+2026-08-18, MX2-NNNNN: `handle()` began passing an attributes model to `validators.validate_message`, which flattens every message attribute through a union that admits only String/Number/Binary. `sf_sync` emits `String.Array` on four attributes and `chrono_doc_router` carried a docstring saying so. Every inbound message died in dev. A ten-lens review, eight added tests and five mutation probes all passed, because all of them examined the diff and none examined the helper's other consumers.
 
 Companion probe for comment claims: when a comment says a line is load-bearing ("X is here or Y would happen"), delete the line and run the test. If it stays green, either the comment is wrong or the line is dead. Both were true simultaneously in that same PR.
 

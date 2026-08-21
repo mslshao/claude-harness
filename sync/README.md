@@ -11,6 +11,7 @@ Installation tooling and CI guardrails for the personalized Claude Code harness.
 | `scrub-check.sh` | CI guardrail that scans repo content for proprietary patterns (real teammate names, internal IDs, atlassian cloud/space IDs). Exits 1 on any finding. |
 | `consistency-check.sh` | CI guardrail for internal consistency: dangling relative markdown links (a file the mirror references but never shipped) and hooks-count drift between `dotclaude/hooks/README.md`'s catalog and any place that states a total. Exits 1 on any finding. Also prints current agent/skill/command/project-tier counts for a human to eyeball against prose claims elsewhere (not auto-flagged; too many counting conventions to generalize safely). |
 | `SCRUB-SPEC.md` | Documentation of what gets scrubbed and why (the 4-tier scrub doctrine). |
+| `JUDGMENT-SCRUBS.md` | The scrubs `scrub-check.sh` structurally cannot catch (orphan surnames, bare first names, lowercase names in memory keys) plus the standing prose rewrites and the post-re-sync checklist. Read before any mechanical re-sync from live. |
 
 ## Install
 
@@ -38,7 +39,7 @@ Flags:
 
 ## CI
 
-`scrub-check.sh` and `consistency-check.sh` should both run on every PR to this repo; they catch different defect classes (proprietary leaks vs. internal inconsistency) and neither substitutes for the other. Both scripts are exit-code-friendly:
+`scrub-check.sh` and `consistency-check.sh` should both run on every PR to this repo; they catch different defect classes (proprietary leaks vs. internal inconsistency) and neither substitutes for the other. Neither substitutes for the manual steps in `JUDGMENT-SCRUBS.md` either: a mechanical re-sync can reintroduce a real name in a form no pattern matches, and both scripts will still report clean. Both scripts are exit-code-friendly:
 
 - Exit 0: clean
 - Exit 1: one or more findings (CI fails)

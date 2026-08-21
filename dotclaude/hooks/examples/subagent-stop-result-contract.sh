@@ -35,6 +35,16 @@ TRANSCRIPT=$(echo "$INPUT" | jq -r '.transcript_path // empty')
 AGENT_TYPE=$(echo "$INPUT" | jq -r '.agent_type // "unknown"')
 STOP_HOOK_ACTIVE=$(echo "$INPUT" | jq -r '.stop_hook_active // false')
 
+# Internal agent-type guard: the settings.json matcher does NOT reliably filter
+# SubagentStop events (2026-07-20 telemetry: this hook and decision-gates, whose
+# matchers are disjoint, block-fired as a pair 7x, including on a compaction
+# summarizer). Never trust the matcher alone; unknown/missing agent_type fails
+# open. Same shape as subagent-stop-pr-size.sh.
+case "$AGENT_TYPE" in
+  launch-implementer|launch-tester|launch-flex|mx2-executor) ;;
+  *) exit 0 ;;
+esac
+
 [[ -n "$TRANSCRIPT" && -f "$TRANSCRIPT" ]] || exit 0
 
 # Loop guard 1: if the harness marks this as a hook-driven retry, allow.

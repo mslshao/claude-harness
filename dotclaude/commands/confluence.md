@@ -51,7 +51,21 @@ interactive path, `--replace`, retries, and every iteration of a multi-edit sess
    e. Note the concurrent edit in your output ("page moved v<N> -> v<M> during editing;
       edits re-applied onto the fresh body").
 5. On every `updateConfluencePage` call, pass `versionMessage` with a one-line
-   description of the change (page-history audit trail; the schema supports it).
+   description of the change (page-history audit trail; the schema supports it). When
+   the push re-applies your edits onto a concurrent session's fresh body (step 4), say
+   so in the versionMessage and name the base you merged onto; that line is what makes
+   the other session's reconciliation instant (proven both directions on 2026-08-20).
+
+## Delta 2b: body must be literal text, never a shell expression
+
+`updateConfluencePage`/`createConfluencePage` are MCP tool calls, not Bash. A `body` value
+written as `$(cat file)` or any other shell-substitution syntax does NOT get expanded; it is
+pushed verbatim as the page content. This corrupted a live page for about a minute on
+2026-08-19 before Delta 3 caught it.
+
+Before every push, confirm the `body` argument is the actual composed text (typically already
+in context from a prior Read/Write), never a command string. If the content came from a file,
+read it into context first and inline it; do not shell out to fetch it inside the tool call.
 
 ## Delta 3: post-push verification
 
@@ -68,6 +82,15 @@ only the third leg, one full-body fetch per push. Large bodies overflow the echo
 tool-results file (see `memory/atlassian-mcp.md`); json-load that file rather than
 skipping the check. (Added 2026-08-12 after nine full-body round-trips in one day on
 the <service> cutover status/endgame page pair.)
+
+## Delta 4: quantitative claims carry their method
+
+Any rate, count, or denominator written to a page must carry its method inline (the
+tool/query plus measurement timestamp) or cite where the method is recorded. A bare
+"measured <date>" is not a method. 2026-08-20: two same-day /text 500-rate figures
+(5/~1,065 and 5/~1,475) landed on sibling cutover pages with no recorded method; they
+disagreed only because of filter and window drift, and a third session had to re-measure
+and supersede both. The figure with a recorded method is the one that survives.
 
 ## Multi-update sessions
 
