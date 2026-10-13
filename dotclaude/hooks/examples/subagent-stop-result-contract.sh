@@ -22,7 +22,7 @@
 #            the run as partial and resume the agent
 #
 # Registered in settings.json under SubagentStop with matcher
-# "launch-implementer|launch-tester|launch-flex|mx2-executor".
+# "launch-implementer|launch-tester|launch-flex|task-executor".
 set -uo pipefail
 
 if [[ -f "${HOME}/.claude/hooks/lib/log-event.sh" ]]; then
@@ -41,7 +41,7 @@ STOP_HOOK_ACTIVE=$(echo "$INPUT" | jq -r '.stop_hook_active // false')
 # summarizer). Never trust the matcher alone; unknown/missing agent_type fails
 # open. Same shape as subagent-stop-pr-size.sh.
 case "$AGENT_TYPE" in
-  launch-implementer|launch-tester|launch-flex|mx2-executor) ;;
+  launch-implementer|launch-tester|launch-flex|task-executor) ;;
   *) exit 0 ;;
 esac
 

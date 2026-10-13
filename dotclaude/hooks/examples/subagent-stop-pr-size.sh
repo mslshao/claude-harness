@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SubagentStop hook: surface PR scope when a launch-implementer or mx2-executor
+# SubagentStop hook: surface PR scope when a launch-implementer or task-executor
 # subagent reports DONE on a worktree-based implementation.
 #
 # Why: catches plan-vs-execution drift. The launch-implementer.md self-flag
@@ -19,12 +19,12 @@
 #
 # Input contract: SubagentStop event, JSON on stdin with:
 #   - transcript_path: path to subagent's transcript
-#   - agent_type: one of launch-implementer|launch-tester|launch-flex|mx2-executor
+#   - agent_type: one of launch-implementer|launch-tester|launch-flex|task-executor
 #     (settings.json matcher and the in-body gate below carry the same list)
 #   - cwd: subagent's working directory (may be the worktree)
 #
 # Registered in settings.json under SubagentStop with matcher
-# "launch-implementer|launch-tester|launch-flex|mx2-executor".
+# "launch-implementer|launch-tester|launch-flex|task-executor".
 #
 # Regression test: test_subagent_stop_pr_size.sh (hermetic; covers the agent
 # gate incl. tester/flex, thresholds, loop guard, marker suppression and
@@ -56,7 +56,7 @@ AGENT_TYPE=$(echo "$INPUT" | jq -r '.agent_type // empty')
 SUBAGENT_CWD=$(echo "$INPUT" | jq -r '.cwd // empty')
 
 case "$AGENT_TYPE" in
-  launch-implementer|launch-tester|launch-flex|mx2-executor) ;;
+  launch-implementer|launch-tester|launch-flex|task-executor) ;;
   *) exit 0 ;;
 esac
 

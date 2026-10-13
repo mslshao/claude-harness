@@ -21,7 +21,7 @@ status: active
 ref: agent-dispatch-heuristic.md
 fires_when: "deciding whether to handle work directly or dispatch to a specialist"
 prevents:
-  - "Opus-main-conversation token spend on mechanical work that mx2-executor handles"
+  - "Opus-main-conversation token spend on mechanical work that task-executor handles"
   - "default-to-main-conversation for tasks where the right agent is obvious"
   - "specialist invocation when the work would not survive the round-trip overhead"
 related: [model-selection, cost-via-delegation, pr-review-routing]

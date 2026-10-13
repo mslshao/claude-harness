@@ -1,5 +1,5 @@
 ---
-name: mx2-executor
+name: task-executor
 description: >
   Bounded implementation agent for well-scoped coding tasks. Use when the problem is
   fully specified, root cause is known, and the change is pattern-matching against known

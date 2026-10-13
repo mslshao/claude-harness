@@ -192,7 +192,7 @@ Placement invariant (2026-07-15, bd docr-ag1xa): the Terminal RESULT Contract
 section (summary-from key `result-contract`) is the LAST section of each agent
 file, with the `final-result-block` fence immediately above it, so the contract
 and its template are the final instructions the agent reads (recency; the
-mx2-executor ending shape). Keep them last when adding sections.
+task-executor ending shape). Keep them last when adding sections.
 
 ## References
 

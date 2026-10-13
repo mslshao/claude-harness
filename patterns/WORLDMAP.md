@@ -129,7 +129,7 @@ related: [agent-dispatch-heuristic, model-selection]
 ---
 ```
 
-When this fires: any bounded implementation task with a known root cause and small surface area. Dispatch to `mx2-executor` (Sonnet); review the returned diff; commit. The main conversation stays on Opus for dispatch and review.
+When this fires: any bounded implementation task with a known root cause and small surface area. Dispatch to `task-executor` (Sonnet); review the returned diff; commit. The main conversation stays on Opus for dispatch and review.
 
 The doc names the asymmetry explicitly: switching the main conversation to Sonnet means Sonnet self-assesses when it needs Opus help, which is unreliable. Delegation keeps Opus as the supervisor and Sonnet as the executor; the cost saving comes from the supervisor doing less typing, not from downgrading the supervisor.
 

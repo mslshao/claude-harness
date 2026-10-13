@@ -146,7 +146,7 @@ For each candidate that passed dedup, propose the concrete edit:
 
 - **Small surface (under ~30 lines)**: present the exact file write or edit diff. On accept, apply directly.
 - **Medium surface (30-150 lines, single file)**: present a sketch. On accept, write the full content via Write tool. Re-present the diff if the result deviates from sketch.
-- **Large surface (multi-file, new skill, new agent)**: route to `/launch` (worktree agent team) with explicit acceptance criteria; reserve `mx2-executor` for a fully-specified few-file build outside a PR iteration. Present the resulting diff before commit.
+- **Large surface (multi-file, new skill, new agent)**: route to `/launch` (worktree agent team) with explicit acceptance criteria; reserve `task-executor` for a fully-specified few-file build outside a PR iteration. Present the resulting diff before commit.
 
 **Present format**:
 

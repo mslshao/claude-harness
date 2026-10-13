@@ -151,7 +151,7 @@ Limits: the agent's quality is bounded by the project rules it loads. A project 
 
 ```yaml
 ---
-component: mx2-executor
+component: task-executor
 type: agent
 status: active
 trigger_signals:

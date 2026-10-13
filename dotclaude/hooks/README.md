@@ -80,7 +80,7 @@ These hooks police the agent system itself: who is allowed to weaken enforcement
 
 #### `subagent-stop-result-contract.sh`
 
-**Trigger**: SubagentStop event, matcher scoped to launch-phase agents (`launch-implementer|launch-tester|launch-flex|mx2-executor`).
+**Trigger**: SubagentStop event, matcher scoped to launch-phase agents (`launch-implementer|launch-tester|launch-flex|task-executor`).
 
 **Behavior**: Reads the subagent transcript and checks whether the final assistant text carries the terminal RESULT block the launch agent defs require (`RESULT:` plus `STATUS: done|partial|blocked`). To avoid false-flagging a compliant agent whose RESULT block was displaced by harness-injected reminder/notification text, it joins the LAST THREE assistant text blocks (tail-3) and matches across them. Missing block => exit 2 with a stderr recovery script (resume the same agent via SendMessage first; cold re-dispatch only if no longer resumable). Present block, or unreadable transcript => exit 0 (fail open).
 

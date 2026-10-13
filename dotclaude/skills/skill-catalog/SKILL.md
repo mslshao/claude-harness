@@ -47,7 +47,7 @@ End-to-end planning pipeline that chains refine, forge, challenge, consult, and 
 ## /launch
 Execution launcher: takes a Jira ticket or bead, enriches context, converges on a plan, then dispatches an agent team in a shared worktree to BUILD it; produces real commits and a draft PR. Distinct from /converge: launch writes code; converge writes a plan.
 **Recommend when**: Ticket is well-scoped and you want hands-off implementation. Multiple invocations run in parallel via worktrees.
-**Not for**: Ambiguous scope (use /converge first). Single-file mechanical changes (direct edit per routing rule 7 carve-out; mx2-executor only for a fully-specified few-file change outside a PR iteration).
+**Not for**: Ambiguous scope (use /converge first). Single-file mechanical changes (direct edit per routing rule 7 carve-out; task-executor only for a fully-specified few-file change outside a PR iteration).
 
 ## /campaign
 Walk-away epic runner: sequences an epic's pre-converged node beads through /launch --gate=agent unattended, producing a chain of stacked draft PRs with a crash-resumable cursor bead. Owns only the epic layer (node ordering, stack bases, whole-chain halt/abandon, run report); one human /converge happens BEFORE it runs. Sequential nodes only in v1.
