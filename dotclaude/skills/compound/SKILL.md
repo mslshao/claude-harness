@@ -1,6 +1,6 @@
 ---
 name: compound
-description: "Improvement loop: scan a just-completed work unit for session friction signals (blocked tool calls, redo edits, manual user actions a skill could automate, round-trip confirms), generate concrete buildable improvements grounded in those signals, and build the change directly (with present-and-confirm gate) or dispatch a build subagent. Falls back to habit-memory capture only when no buildable improvement exists. Use after a PR merges, a /launch ships, a bead closes, a multi-step investigation wraps, or a substantial work unit just shipped. The proactive sibling to /reflect (correction-triggered). Trigger phrases: '/compound', 'extract patterns', 'what did we learn from that', 'identify improvements', 'capture this workflow', 'compound that', 'what was friction here', 'pattern-capture'. Distinct from /handoff (cold-start prompt for the NEXT session) and direct `bd remember` (no synthesis, no dedup, no build path)."
+description: "Improvement loop: scan a just-completed work unit for session friction signals (blocked tool calls, redo edits, manual user actions a skill could automate, round-trip confirms), generate concrete buildable improvements grounded in those signals, and build the change directly (with present-and-confirm gate) or dispatch a build subagent. Falls back to habit-memory capture only when no buildable improvement exists. Use after a PR merges, a /launch ships, a bead closes, a multi-step investigation wraps, or a substantial work unit just shipped. The proactive sibling to /reflect (correction-triggered). Trigger phrases: '/compound', 'extract patterns', 'what did we learn from that', 'identify improvements', 'capture this workflow', 'compound that', 'what was friction here', 'pattern-capture'. Distinct from /handoff (cold-start prompt for the NEXT session) and a direct memory-topic-file write (no synthesis, no dedup, no build path)."
 argument-hint: "[optional: short hint about what just finished, e.g. 'launch of docr-XXXX' or 'PR #YYYY merged' or 'early' if mid-session]"
 ---
 
@@ -33,7 +33,7 @@ The "early" arg signals the work is mid-flight but the current sub-unit just shi
 - **Every PR or bead close.** Routine work without friction signals has nothing to compound.
 - **The work was a correction.** Use `/reflect`. /compound captures what worked or what could work better; /reflect captures what failed and codifies the avoidance.
 - **The next-session handoff is what is needed.** Use `/handoff`. /handoff produces a cold-start prompt for one specific successor; /compound produces edits to durable surfaces that affect many future sessions.
-- **A specific fact, not a pattern or improvement.** Use `bd remember` directly.
+- **A specific fact, not a pattern or improvement.** Write it directly to a memory topic file.
 - **Mid-flight checkpoint of conversation context.** Use `/bead-forge` in memory checkpoint mode. /compound is for shipped work, not in-progress analysis.
 
 ## Workflow
@@ -45,7 +45,7 @@ Determine what work unit just completed. Pull from every surface where a complet
 **Local (bash)**:
 
 ```bash
-bd list --status=in_progress --json -n 0 | jq -r '.[] | "\(.id) \(.title)"'
+cat ~/.claude/memory/open-chores.md
 git log --since='6 hours ago' --oneline -20
 gh pr list --author @me --state all --limit 5 --json number,title,state,updatedAt
 ```
@@ -120,8 +120,8 @@ Adjudication on match:
 - **Match in `.claude/rules/` or CLAUDE.md**: the rule exists. If the friction shows the rule is being violated by another path, the build target is a NEW enforcement layer (hook, lint, gate), NOT another memory. Surface: "rule exists at `<file:line>`; build a structural enforcement that catches the same violation at a different point in the flow."
 - **Match in `workflow.md`**: pattern is codified. If the candidate is a refinement or extension, edit the workflow.md row. If it is a distinct surface, file separately.
 - **Match in topic file or memory bead**: surface as near-duplicate. Offer: refine, extend, or distinct entry.
-- **Match in habit-tier `bd memories`, aged 30+ days**: this is a second observation. Two options: (a) promote to workflow.md row citing the original bead, OR (b) fold both into a rule via /reflect so the pattern becomes always-loaded behavior. Option (b) is the in-flow drain path.
-- **Match in habit-tier `bd memories`, recent (<30 days)**: refine or extend; do not create a new sibling.
+- **Match in habit-tier memory, aged 30+ days**: this is a second observation. Two options: (a) promote to workflow.md row citing the original entry, OR (b) fold both into a rule via /reflect so the pattern becomes always-loaded behavior. Option (b) is the in-flow drain path.
+- **Match in habit-tier memory, recent (<30 days)**: refine or extend; do not create a new sibling.
 - **No match anywhere**: novel. Continue to Route.
 
 ### 4. Route to surface
@@ -198,7 +198,7 @@ On `/bead-forge` failure: capture as lightweight `bd remember --key='habit:<topi
 | `/reflect` | Behavioral, on user correction matching prior `correction:*` memory | `correction:*` memory + rule files in `.claude/rules/` | (none; correction always produces an edit) |
 | `/bead-forge` checkpoint mode (direct) | Manual or proactive, during in-flight deep analysis | Memory-labeled bead capturing conversation context | (none; this IS the capture) |
 | `/handoff` | Session winding down | A copy-paste cold-start prompt for the NEXT session | (none) |
-| `bd remember` direct | Anywhere | A single `bd memory` key | (none; lightweight, no synthesis) |
+| Direct memory-file write | Anywhere | A single memory topic-file entry | (none; lightweight, no synthesis) |
 
 The distinguishing question for `/compound` vs everything else: **"What buildable change would reduce friction in a future instance of work like this?"** If a buildable answer exists, /compound builds it. If only a soft-signal pattern emerges, fall back to habit memory. If the answer is "the rule was wrong", route to /reflect.
 

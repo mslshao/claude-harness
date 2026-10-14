@@ -129,7 +129,7 @@ metadata BEFORE rendering output:
    **Decision count**: N (ceiling: 5 per reviewer-discipline.md T6; if > 5, compression gate fires per synthesis.md step 11)
    ```
 
-4. **Audit fields** (consumed by /post-review's bd memory write): record
+4. **Audit fields** (consumed by /post-review's memory topic file write): record
    `bot_surfaced_count`, `speed_amplified_count`. The `bot_endorsement_count`
    field is populated by the Bot Reactions phase, not this one.
 
@@ -141,11 +141,9 @@ Michael's editing pass can manually flip these before /post-review consumes
 the output.
 
 Low confidence three or more times in a single run is a signal that the
-upstream source-tagging is leaking findings without source fields. Record via:
-
-```
-bd remember --key="calibration:provenance-classifier:<topic>" "<one-line drift note>"
-```
+upstream source-tagging is leaking findings without source fields. Record it,
+keyed `calibration:provenance-classifier:<topic>`, in this agent's
+calibration memory topic file (one-line drift note).
 
 The right fix is upstream (set source explicitly when constructing the finding),
 not in this agent's defaults.
@@ -188,9 +186,7 @@ was low-confidence.
 
 ## Recurrence Context
 
-- `bd memories agent:provenance-classifier-2026-05-21`: agent's design rationale
-- `bd memories calibration:pr-intel-provenance-rule-2026-05-21`: the original
-  classifier work that landed (then was bypassed when buried in synthesis.md)
-- `bd memories calibration:mx2-decision-maker:ideation:pr-intel-cross-cutting`:
-  the /ideate gate that ESCALATE-ROUTE'd to instrumentation-first, leading to
+- The agent's design rationale
+- The original classifier work that landed (then was bypassed when buried in synthesis.md)
+- The /ideate gate that ESCALATE-ROUTE'd to instrumentation-first, leading to
   the transcript inspection that confirmed attention-layer skip

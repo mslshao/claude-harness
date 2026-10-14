@@ -91,7 +91,6 @@ Load all inputs, strip bias, clarify the problem.
 
 1. **Load inputs.** For each detected input type, fetch and parse:
    - Jira ID: `getJiraIssue` MCP call.
-   - Bead ID: `bd show <id>`.
    - Slack URL `https://*.slack.com/archives/<CHANNEL>/p<TS>`: extract
      channel ID and message timestamp, then `slack_read_thread`.
    - Confluence URL `*.atlassian.net/wiki/spaces/<SPACE>/pages/<PAGE_ID>/<slug>`:
@@ -123,7 +122,7 @@ Load all inputs, strip bias, clarify the problem.
    bash /home/vscode/.claude/scratch/domain-matcher/match.sh "<problem text>" \
      | cut -d: -f1 | head -10
    ```
-   For each matched keyword, `bd memories <keyword>` (top 5). If the
+   For each matched keyword, grep `~/.claude/memory/` (top 5 matches). If the
    problem names a known service or path under `src/python/mx2/`, read
    the service-level `CLAUDE.md` when one exists. Matcher misfires
    must NOT block ideation; skip and continue.
@@ -235,8 +234,9 @@ and iteration caps, see [iterate-gate.md](iterate-gate.md).
 
 Key invariants:
 - The gate is `mx2-decision-maker` invoked with `MODE: IDEATION GATE`
-  preamble. Calibration drift gets recorded with
-  `bd remember --key='calibration:mx2-decision-maker:ideation:<topic>'`.
+  preamble. Calibration drift gets recorded, keyed
+  `calibration:mx2-decision-maker:ideation:<topic>`, in this agent's
+  calibration memory topic file.
 - ITERATE re-runs Phase 2 with a focused WEAK_DIMENSION prompt
   modification. Cap: 2 ITERATE rounds per invocation.
 - ESCALATE-QUESTIONS poses 1-3 focused narrowing questions to the user
@@ -449,8 +449,9 @@ ITERATE then PROCEED) live in [walkthroughs.md](walkthroughs.md).
 - **Calibration soak is expected.** The decision-maker invoked in
   Phase 4 was calibrated for autopilot and launch gates, not
   ideation. First 3-5 `/ideate` invocations are calibration soak.
-  Drift gets recorded via
-  `bd remember --key='calibration:mx2-decision-maker:ideation:<topic>'`.
+  Drift gets recorded, keyed
+  `calibration:mx2-decision-maker:ideation:<topic>`, in this agent's
+  calibration memory topic file.
 - **Calibrated for code-shaped problems.** The specialist roster, the
   Fit-to-codebase column, and the Verification-path framing assume
   the output is a codebase change. Non-coding mode is best-effort;

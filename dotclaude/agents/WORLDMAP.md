@@ -525,7 +525,7 @@ related: [pr-intel, post-review, bot-review]
 ---
 ```
 
-When I reach for it: never directly; the classifier is invoked in batch by `/pr-intel` synthesis (step 5d) with the full findings list, and returns one classification per finding plus a one-sentence rationale. The synthesizer wires the classification into the finding briefing, the audit line in the Review Recommendation header, and the audit field counts written to bd memory by `/post-review`.
+When I reach for it: never directly; the classifier is invoked in batch by `/pr-intel` synthesis (step 5d) with the full findings list, and returns one classification per finding plus a one-sentence rationale. The synthesizer wires the classification into the finding briefing, the audit line in the Review Recommendation header, and the audit field counts written to a memory topic file by `/post-review`.
 
 What it prevents: speed-amplified vs bot-surfaced is the wrong split to make from the comment text. The verification path is the load-bearing signal: if the path required querying production state, cross-referencing N source files, or reading a long external doc, no human reviewer would have sustained the work at PR-review speed, regardless of how the comment reads. Decoupling the classifier from the voice/rendering layer makes the audit signal a property of the work, not the prose.
 

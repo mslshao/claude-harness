@@ -149,8 +149,9 @@ Agent(
   bad plan is real commits, real PR review burden, and a worktree
   cleanup; the gate's threshold should reflect that.
 
-  If you detect calibration drift, record via
-  `bd remember --key='calibration:mx2-decision-maker:launch:<topic>' '...'`.
+  If you detect calibration drift, record it, keyed
+  `calibration:mx2-decision-maker:launch:<topic>`, in this agent's
+  calibration memory topic file.
 
   PROCEED if the plan is defensible: convergence delta is concrete,
   every work item has a Verification path, Consequence=high items

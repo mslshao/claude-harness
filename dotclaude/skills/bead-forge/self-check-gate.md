@@ -4,7 +4,7 @@ For EACH bead, answer these questions internally. If any answer is "no", revise 
 
 ## All Beads
 
-1. **Actionable without context?** Could an agent pick this up cold from `bd show` and start working? If it needs "see also" or "ask Michael about", it's not ready.
+1. **Actionable without context?** Could an agent pick this up cold and start working? If it needs "see also" or "ask Michael about", it's not ready.
 
 2. **Right size?** Is this completable in one focused session (30-120 min)? If not, split.
 

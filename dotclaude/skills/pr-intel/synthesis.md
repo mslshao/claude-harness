@@ -191,7 +191,7 @@ provenance-classification.md):
     - Compute `Speed-amplified: N | Bot-surfaced: M` counts for the
       Review Recommendation header `**Provenance**:` line
     - Populate the `bot_surfaced_count` and `speed_amplified_count` fields
-      that /post-review writes to bd memory (post-review SKILL.md Step 5)
+      that /post-review writes to a memory topic file (post-review SKILL.md Step 5)
 
     The agent owns the classifier table (its prompt is the canonical
     reference). Override behavior (mx2-code-reviewer findings that turn out
@@ -203,8 +203,9 @@ provenance-classification.md):
     `Classification: <value> (low confidence)`. Michael's editing pass can
     manually flip these before /post-review consumes the output. Low
     confidence three or more times in a single run signals upstream
-    source-tagging is leaking findings without source fields; record via
-    `bd remember --key="calibration:provenance-classifier:<topic>"`.
+    source-tagging is leaking findings without source fields; record it,
+    keyed `calibration:provenance-classifier:<topic>`, in this agent's
+    calibration memory topic file.
 
     **Source-tagging discipline upstream of this step.** Inline pipeline
     steps that produce findings without a specialist dispatch (SonarCloud
@@ -261,7 +262,7 @@ provenance-classification.md):
     provenance on findings he genuinely didn't catch.
 
     Store the classification on each finding for output-formats.md Draft
-    Inline Comments rendering and for the /post-review bd memory write
+    Inline Comments rendering and for the /post-review memory topic file write
     (bot_surfaced_count + speed_amplified_count audit fields). See
     `review-voice.md` "Attribute tooling findings to tooling" for the
     voice-rule the classification drives.
@@ -375,8 +376,7 @@ provenance-classification.md):
     `sqlworkbench:ListDatabases` question rendered in BOTH the body's numbered list AND
     inline:37 with ~80% prose overlap. The 9646 instance (2026-06-04) is the recurrence
     that forced promotion: a body paragraph previewed an inline finding and was
-    deleted by hand at emit time. See `bd memories
-    calibration:pr-intel-voice-body-inline-duplication-2026-05-21`.
+    deleted by hand at emit time.
 
 ## Trust-band Weighting
 
@@ -411,10 +411,10 @@ it before posting.
 
 **Correction-memory surfacing**: when listing unmerged `correction:*`
 corrections (manual triage or future helper), order by trust band of the
-source attribution. `correction:*` entries are `bd remember` memories, not
+source attribution. `correction:*` entries are memory-topic-file entries, not
 beads; source attribution lives in the memory body as a `Source: <handle>`
 first line. Band-A first, Band-C and bots last. See the private file's
-"How to surface unmerged corrections" section for the concrete `bd memories`
+"How to surface unmerged corrections" section for the concrete
 query.
 
 ## Pre-Synthesis Analysis Patterns
@@ -939,11 +939,8 @@ high-consequence finding regardless of severity.
 bot-review findings are calibrated through user dismissals, and the agent
 cannot observe them (dismissal happens in this conversation after it returns).
 When the user dismisses a bot-review-sourced finding WITH reasoning, record it
-before moving on:
-
-```bash
-bd remember --key="calibration:bot-review:<short-tag>" "<date>: <pattern>. <why dismissed>. <how to recognize next time>."
-```
+before moving on: in this agent's calibration memory topic file, keyed
+`calibration:bot-review:<short-tag>` (dated: `<pattern>. <why dismissed>. <how to recognize next time>.`).
 
 One entry per distinct pattern (same key overwrites; that is the dedup).
 Likewise for mx2-skeptic dismissals when the skeptic was in the dispatch:

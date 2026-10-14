@@ -22,7 +22,7 @@ Behavioral test generation with iterative quality review. Runs `test-generator`,
 ## /bead-forge
 Crafts well-bounded beads (work items) from feature descriptions. Front-loads refinement so beads are ready in 1-2 rounds.
 **Recommend when**: Creating beads with design decisions, unclear scope, or multi-bead breakdown. Use checkpoint mode to preserve accumulated context before compaction.
-**Not for**: Lightweight well-understood items (use `bd create`).
+**Not for**: Lightweight well-understood items (add a checkbox to `open-chores.md`).
 
 ## /refine
 Interactive prompt refinement with full conversation and codebase context.
@@ -77,7 +77,7 @@ Autonomous polling loop for an open draft PR. Classifies incoming review comment
 ## /overwatch
 Standing work-queue watcher: a self-paced ScheduleWakeup loop that watches the user's beads, GitHub PRs, and Jira on a backing-off cadence (15 -> 30 -> 60 min) and surfaces only time-sensitive DELTAS (a bead newly unblocked, a new review request, an in-progress item going stale). Read-only and surfacing-only; quiet on a healthy no-op cycle. State persists in a tracking bead's notes so it survives compaction. Chat-only output for v1.
 **Recommend when**: The user is heads-down and wants to be told when something newly needs their attention across beads/PRs/Jira without polling by hand ("watch my work queue", "what should I pick up next" as a standing request).
-**Not for**: Watching one specific PR and acting on it (use /babysit-pr, which mutates); a backward-looking one-shot summary of past work (use /standup-prep); a single current-state check (use `bd ready` / `gh search prs` directly).
+**Not for**: Watching one specific PR and acting on it (use /babysit-pr, which mutates); a backward-looking one-shot summary of past work (use /standup-prep); a single current-state check (use `open-chores.md` / `gh search prs` directly).
 
 ## /enrich
 Context loader for Jira tickets, beads, PRs, or topics. Gathers ticket details, related beads, codebase references, and domain knowledge into a structured briefing.
@@ -105,7 +105,7 @@ Audit and clean up stale agent/autopilot worktree branches in `/workspaces/main`
 **Not for**: Cleaning up main-checkout state (use git directly). Removing in-flight agent worktrees (the skill protects those by design).
 
 ## /calibrate
-Review and merge calibration drift entries that subagents have emitted via beads memory. Reads `bd memories calibration:<agent>:*`, presents each entry alongside the current calibration file state, lets the user keep/merge/reject per entry, and writes accepted merges to the agent's calibration file.
+Review and merge calibration drift entries that subagents have emitted via memory topic files. Reads each agent's calibration memory topic file, presents each entry alongside the current calibration file state, lets the user keep/merge/reject per entry, and writes accepted merges to the agent's calibration file.
 **Recommend when**: SessionStart hook nudges about unmerged entries; periodic review of accumulated drift.
 **Not for**: Authoring calibration files from scratch (write directly). Tuning agent behavior in-session (edit the agent file).
 
@@ -132,7 +132,7 @@ Local self-review fan-out for uncommitted or branch-relative changes: dispatches
 ## /compound
 Improvement loop: scans a just-completed work unit for friction signals and builds the concrete improvement (with a present-and-confirm gate), falling back to habit-memory capture when none exists.
 **Recommend when**: After a PR merges, a /launch ships, a bead closes, or a substantial work unit wraps ("what did we learn from that", "capture this workflow").
-**Not for**: A cold-start prompt for the next session (use /handoff); a single fact (use bd remember).
+**Not for**: A cold-start prompt for the next session (use /handoff); a single fact (write directly to a memory topic file).
 
 ## /recall
 BFS-first cross-corpus search over beads, memories, and topic files for information another session produced.
@@ -145,7 +145,7 @@ Ingest a pasted meeting/standup/1:1 transcript and route it: a scannable action 
 **Not for**: Generating an outbound standup from your own activity (use /standup-prep); a cold-start prompt (use /handoff).
 
 ## /standup-prep
-Generate your OWN spoken-standup talk-track from your engineering activity (git, PRs authored + reviewed, PR/issue comments, Jira, Confluence, beads, plus a Slack sweep for unanswered asks), binned by your local timezone. Outbound status generation, not transcript capture.
+Generate your OWN spoken-standup talk-track from your engineering activity (git, PRs authored + reviewed, PR/issue comments, Jira, Confluence, plus a Slack sweep for unanswered asks), binned by your local timezone. Outbound status generation, not transcript capture.
 **Recommend when**: "prep my standup", "verbal standup", "what did I do yesterday/Friday", "what did I ship"; a bare "help me with standup" when recent context is code/PR/Jira work.
 **Not for**: Capturing a pasted transcript of a meeting that already happened (use /capture-transcript); a Slack-only message built from just your Slack activity (use the slack plugin /standup).
 

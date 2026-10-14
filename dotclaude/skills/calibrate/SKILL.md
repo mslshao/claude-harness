@@ -1,13 +1,13 @@
 ---
 name: calibrate
-description: Review and merge calibration drift entries that subagents have emitted via beads memory. Default agent is mx2-decision-maker; override with --agent. Reads `bd memories calibration:<agent>:*`, presents each entry with the current calibration file state, lets the user keep/merge/reject per entry. On merge writes to the agent's calibration file and the audit log, then deletes the source memory key. Includes scratch-file reconciliation (warns on orphaned files when scratch fallback is in use). Use when SessionStart hook nudges about unmerged entries, or periodically to review accumulated drift.
+description: Review and merge calibration drift entries that subagents have emitted via memory topic files. Default agent is mx2-decision-maker; override with --agent. Reads each agent's calibration memory topic file, presents each entry with the current calibration file state, lets the user keep/merge/reject per entry. On merge writes to the agent's calibration file and the audit log, then deletes the source memory key. Includes scratch-file reconciliation (warns on orphaned files when scratch fallback is in use). Use when SessionStart hook nudges about unmerged entries, or periodically to review accumulated drift.
 argument-hint: "[--agent <name>]"
 allowed-tools: ["Bash", "Glob", "Grep", "Read", "Edit", "Write", "AskUserQuestion"]
 ---
 
 # Calibrate
 
-Review human gate for agent calibration drift. Subagents (mx2-decision-maker today, others later) emit calibration drift as beads memory entries via `bd remember` rather than writing their calibration files directly. This is a deliberate human review gate (calibration changes are vetted before merge), not a write restriction. This skill is the orchestrator side of the loop: it reads the emitted entries, presents them for review, and writes the accepted merges to the agent's calibration file.
+Review human gate for agent calibration drift. Subagents (mx2-decision-maker today, others later) emit calibration drift as memory topic file entries rather than writing their calibration files directly. This is a deliberate human review gate (calibration changes are vetted before merge), not a write restriction. This skill is the orchestrator side of the loop: it reads the emitted entries, presents them for review, and writes the accepted merges to the agent's calibration file.
 
 ## Why This Exists
 
@@ -62,7 +62,7 @@ Calibration drift entry: calibration:<agent>:<category>:<specific-slug>
 Current state in <short-name>.md (section "<category>"):
   <existing entry body, or "(no existing entry)">
 
-New entry body (from bd remember):
+New entry body (from the calibration memory topic file):
   <new entry body>
 
 Sub-case: <new | refinement | redundant>

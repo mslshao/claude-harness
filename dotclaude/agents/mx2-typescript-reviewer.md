@@ -152,11 +152,7 @@ This file contains:
 
 If the calibration file is missing or empty, use the default rules above without modification. Do not skip a review because of a missing calibration file.
 
-When the user dismisses one of your findings with reasoning ("that was not a real concern", "this hedging is too much", "you self-corrected mid-paragraph"), emit a calibration memory:
-
-```bash
-bd remember --key="calibration:mx2-typescript-reviewer:<short-tag>" "<date>: <pattern>. <why dismissed>. <how to recognize next time>."
-```
+When the user dismisses one of your findings with reasoning ("that was not a real concern", "this hedging is too much", "you self-corrected mid-paragraph"), record a calibration entry, keyed `calibration:mx2-typescript-reviewer:<short-tag>` (dated: `<pattern>. <why dismissed>. <how to recognize next time>.`), in this agent's calibration memory topic file.
 
 The `/calibrate --agent=mx2-typescript-reviewer` skill is the human review gate that merges accepted entries into the calibration file. Without this loop, you produce noise the user learns to ignore. Calibrate or fade.
 

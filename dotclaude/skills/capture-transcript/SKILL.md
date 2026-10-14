@@ -1,6 +1,6 @@
 ---
 name: capture-transcript
-description: "Ingest a pasted meeting/standup/1:1 transcript (INBOUND) and route it to the right capture: a scannable action breakdown for an ephemeral standup, or a durable memory file plus recall bead plus index row for a sync or 1:1, cross-linking the capture to related memories and tracked bead clusters. The inbound complement to the slack plugin /standup command (which GENERATES an outbound standup from the user's own activity). Use when the user says 'capture this standup', 'break down this transcript', 'capture this sync', 'capture this 1:1', 'here is the transcript', or pastes a standup/sync/1:1 transcript with capture intent. Distinct from /standup (outbound), /handoff (cold-start prompt), /bead-forge checkpoint (in-flight analysis), and bd remember (single fact)."
+description: "Ingest a pasted meeting/standup/1:1 transcript (INBOUND) and route it to the right capture: a scannable action breakdown for an ephemeral standup, or a durable memory file plus recall bead plus index row for a sync or 1:1, cross-linking the capture to related memories and tracked bead clusters. The inbound complement to the slack plugin /standup command (which GENERATES an outbound standup from the user's own activity). Use when the user says 'capture this standup', 'break down this transcript', 'capture this sync', 'capture this 1:1', 'here is the transcript', or pastes a standup/sync/1:1 transcript with capture intent. Distinct from /standup (outbound), /handoff (cold-start prompt), /bead-forge checkpoint (in-flight analysis), and a direct memory-topic-file write (single fact)."
 argument-hint: "[standup | sync | 1:1]"
 ---
 
@@ -20,10 +20,10 @@ Pasted transcripts are high-value and high-loss. They carry org signals, decisio
 
 ## When NOT to use
 
-- **Generating Michael's own standup from his activity.** Use `/standup-prep` (git/PR/Jira/beads source) or the slack plugin `/standup` (Slack-messages source). Those are outbound generation; this is inbound capture.
+- **Generating Michael's own standup from his activity.** Use `/standup-prep` (git/PR/Jira source) or the slack plugin `/standup` (Slack-messages source). Those are outbound generation; this is inbound capture.
 - **A cold-start prompt for the next session.** Use `/handoff`.
 - **Capturing in-flight analysis or design decisions against compaction.** Use `/bead-forge` checkpoint mode. This skill is for meeting transcripts, not conversation state.
-- **A single fact.** Use `bd remember`.
+- **A single fact.** Write it directly to a memory topic file.
 
 ## Workflow
 
@@ -46,11 +46,11 @@ A standup that holds a named decision, an owned open question, or a strategy/dir
 
 ### STEP 2: Identity and style discipline (before writing anything)
 
-- **Resolve every name and title against `memory/org-context.md` (the source of truth).** Transcripts garble names, and senior execs plus non-English-origin names are the highest-frequency garble points (one teammate's first name can surface as three different spellings within a single transcript, and a short surname can be transcribed as an unrelated word). See `bd memories correction:identity:transcript-name-disambiguation`. **Searching past a garble**: grepping the garbled spelling alone is the trap - it returns no hit even when the person IS in org-context under their real name (2026-06-23: two garbled spellings were grepped verbatim and both missed the real entries that were already there). Before marking a name tentative or "not in org-context", search by ROLE, TEAM, or ADJACENT PERSON (e.g. grep `recruiter`, the team name, or the PM who sits near them), and scan same-day sibling capture files (a name added by another capture earlier today will not be in your mental model). Only mark tentative after the role/team/adjacent search also comes up empty. If a name will not resolve, mark it tentative (e.g. `[unverified: "<garbled spelling>"?]`); never invent one. Do not embed the org chart here; org-context.md owns it and drifts.
+- **Resolve every name and title against `memory/org-context.md` (the source of truth).** Transcripts garble names, and senior execs plus non-English-origin names are the highest-frequency garble points (one teammate's first name can surface as three different spellings within a single transcript, and a short surname can be transcribed as an unrelated word). **Searching past a garble**: grepping the garbled spelling alone is the trap - it returns no hit even when the person IS in org-context under their real name (2026-06-23: two garbled spellings were grepped verbatim and both missed the real entries that were already there). Before marking a name tentative or "not in org-context", search by ROLE, TEAM, or ADJACENT PERSON (e.g. grep `recruiter`, the team name, or the PM who sits near them), and scan same-day sibling capture files (a name added by another capture earlier today will not be in your mental model). Only mark tentative after the role/team/adjacent search also comes up empty. If a name will not resolve, mark it tentative (e.g. `[unverified: "<garbled spelling>"?]`); never invent one. Do not embed the org chart here; org-context.md owns it and drifts.
 - **Feed org deltas back (org-context is the source of truth, not just a lookup).** While resolving names, note any org-structure fact the transcript reveals that is new or changed vs `org-context.md`: a new person, promotion, role/title change, departure, or team move. Surface these in the chat deliverable (STEP 4) as a proposed `org-context.md` update naming the section, since stale org-context reintroduces the name-garble problem future captures fight. Propose, do not auto-write; the user adjudicates the org-context edit.
 - **Gender-neutral always.** Name-first or singular they. Never infer pronouns from a name and never inherit pronouns from the transcript text.
-- **One-man-army resourcing.** When framing action items, never assume added, SME, or extra engineering resourcing is available. See `bd memories feedback:resourcing:one-man-army`.
-- **No fabrication.** Capture only facts present in the transcript. Do not invent decisions, owners, dates, or a person's role/title/team. A role inferred from surrounding context (e.g. assuming someone discussed in an engineering promo-cycle thread is an engineer) is a fabrication: attribute a role/title/team only when the transcript states it or `org-context.md` confirms it, otherwise mark it tentative or omit it. See `bd memories correction:verification:transcript-role-inference`.
+- **One-man-army resourcing.** When framing action items, never assume added, SME, or extra engineering resourcing is available.
+- **No fabrication.** Capture only facts present in the transcript. Do not invent decisions, owners, dates, or a person's role/title/team. A role inferred from surrounding context (e.g. assuming someone discussed in an engineering promo-cycle thread is an engineer) is a fabrication: attribute a role/title/team only when the transcript states it or `org-context.md` confirms it, otherwise mark it tentative or omit it.
 
 ### STEP 3: Route by type
 
@@ -96,7 +96,7 @@ The default deliverable is a breakdown for Michael in chat, NOT a durable file (
 #### C) ONE-ON-ONE (1:1) -> durable capture
 
 1. **Write the file** `memory/1on1-YYYY-MM-DD-<name>.md` (in `memory/` ROOT, not `memory/1on1s/`). Frontmatter as in B, with `metadata.type: 1on1-capture`.
-2. **Sensitivity gate.** Set `metadata.sensitivity: private` AND add a header note ("PRIVATE. Do not surface in shared beads, Slack, or PR/Jira.") if the 1:1 hits any of: a named person plus a negative evaluation ("X is not ready", "X is struggling"); career-level, performance, or compensation content; or org-politics content naming specific individuals. Anything else defaults to non-private. The candid content stays in the LOCAL FILE ONLY.
+2. **Sensitivity gate.** Set `metadata.sensitivity: private` AND add a header note ("PRIVATE. Do not surface in Slack or PR/Jira.") if the 1:1 hits any of: a named person plus a negative evaluation ("X is not ready", "X is struggling"); career-level, performance, or compensation content; or org-politics content naming specific individuals. Anything else defaults to non-private. The candid content stays in the LOCAL FILE ONLY.
 3. Body sections: context and framing; the substantive work content (technical points, decisions, action items as a clear list); and, if private, the org/people read under a clearly labeled section.
 4. **Create the recall bead** (with `--labels=memory`) and the `log.md` append, exactly as in B. The recall bead and any work-tracking bead carry ONLY non-sensitive work content and cross-reference the private file by name. If the sensitivity gate fired, the bead title uses a generic label ("[memory] 1:1 YYYY-MM-DD") WITHOUT the person's name, since bead descriptions sync via Dolt across accounts; the file reference inside the description is fine. If the 1:1 maps to a tracked work cluster, apply B step 5 cross-linking too, sensitivity-gated: the anchor memory and bead comments carry non-sensitive work content only.
 5. **Add an index row** to `memory/1on1s/README.md`, newest-first. Row format: `| YYYY-MM-DD | <Name> | [1on1-YYYY-MM-DD-<name>.md](../1on1-YYYY-MM-DD-<name>.md) | <one-line> |`. Note the second column header is `With`, not `Topic`. A private one says "PRIVATE" plus a terse non-sensitive hook and the bead id; same under-150-char rule.
@@ -120,10 +120,10 @@ The default deliverable is a breakdown for Michael in chat, NOT a durable file (
 | Vs | Difference |
 |---|---|
 | slack plugin `/standup` | Outbound generation from Michael's OWN Slack activity. This skill is inbound capture of someone else's transcript. |
-| `/standup-prep` | Outbound generation of Michael's own status from his git/PR/Jira/beads activity (the spoken talk-track he brings to a standup). This skill is inbound capture of a pasted transcript. Complementary halves of a meeting: prep-before vs capture-after. |
+| `/standup-prep` | Outbound generation of Michael's own status from his git/PR/Jira activity (the spoken talk-track he brings to a standup). This skill is inbound capture of a pasted transcript. Complementary halves of a meeting: prep-before vs capture-after. |
 | `/handoff` | Cold-start prompt for the NEXT session. This skill captures a meeting that already happened. |
 | `/bead-forge checkpoint` | Preserves in-flight conversation analysis against compaction. This skill captures a meeting transcript. |
-| `bd remember` | Stores a single fact. This skill produces a structured breakdown or a durable file plus recall bead plus log entry plus index row. |
+| Direct memory-file write | Stores a single fact. This skill produces a structured breakdown or a durable file plus recall bead plus log entry plus index row. |
 
 ## Anti-patterns
 

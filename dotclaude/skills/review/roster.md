@@ -24,5 +24,4 @@ personal/project artifact pairs").
 Promotion criteria (informal): an agent is a candidate when (a) it has run
 without false-positive churn for 30+ days at personal tier, (b) its scope is
 codebase-general not michael-specific, and (c) its severity contract is clear
-enough that a less-tuned operator can act on findings without context. Track
-candidates via beads `docr-*` series.
+enough that a less-tuned operator can act on findings without context.

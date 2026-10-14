@@ -3,11 +3,10 @@
 Last reviewed by Michael: 2026-04-30 (initial scaffold; first /calibrate run pending)
 
 This file is read by the `mx2-typescript-reviewer` agent before every invocation.
-The agent emits calibration drift via `bd remember` (key prefix
-`calibration:mx2-typescript-reviewer:`); the `/calibrate` skill is the human
-review gate that merges accepted entries into this file. Append-only audit of
-merged/rejected entries lives at `typescript-reviewer.lookback.md` (created on
-first calibration merge).
+The `/calibrate` skill is the human review gate that merges accepted
+entries into this file. Append-only audit of merged/rejected entries
+lives at `typescript-reviewer.lookback.md` (created on first
+calibration merge).
 
 If this file contains only the scaffold below with no rule overrides, default
 rules from the agent definition apply.
@@ -32,8 +31,8 @@ These are past TS-reviewer outputs the user dismissed, with reasoning. Used as
 few-shot calibration so the agent recognizes the pattern next time and either
 suppresses or reframes.
 
-(None merged yet. Pending entries from 2026-04-30 baseline are emitted as
-`bd memories calibration:mx2-typescript-reviewer:*` and await `/calibrate`
+(None merged yet. Pending entries from 2026-04-30 baseline are emitted to
+this agent's calibration memory topic file and await `/calibrate`
 review.)
 
 ---

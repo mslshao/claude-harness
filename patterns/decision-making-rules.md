@@ -58,7 +58,7 @@ Before saying "you'll need to push" or "force-push" or "pull" or "the branch has
 
 ## Scan loaded context before claiming absence
 
-Before asserting "zero", "none", "no path for X", or "nothing exists" about own or team or project outputs, grep the loaded context: CLAUDE.md body, MEMORY.md topic index, recent bd memories. Loaded context is evidence, not background; if it names what you are about to claim is absent, you have not done the diligence to make the claim. Especially load-bearing in advisory work (career strategy, gap analysis, recommendations) where confident absence claims drive user decisions.
+Before asserting "zero", "none", "no path for X", or "nothing exists" about own or team or project outputs, grep the loaded context: CLAUDE.md body, MEMORY.md topic index. Loaded context is evidence, not background; if it names what you are about to claim is absent, you have not done the diligence to make the claim. Especially load-bearing in advisory work (career strategy, gap analysis, recommendations) where confident absence claims drive user decisions.
 
 ## Exhaust search strategies before claiming external-system absence
 

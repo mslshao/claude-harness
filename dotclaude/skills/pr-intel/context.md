@@ -89,11 +89,11 @@ If the PR's title, body, or linked Jira epic chain references an active
 migration (signals: tokens like "migration", "cutover", "v3", "matters",
 "backfill"; Jira ticket whose epic is a migration epic; PR title prefix that
 matches a known migration code-path rename), load the migration's operational
-state from beads memory **before forming review concerns**:
+state from memory **before forming review concerns**:
 
 ```bash
-bd memories <migration-name>            # e.g., doc_v3, dyn2red, folio-ocr
-bd memories cutover                     # cross-migration general state
+grep -ril "<migration-name>" ~/.claude/memory/   # e.g., doc_v3, dyn2red, folio-ocr
+grep -ril "cutover" ~/.claude/memory/            # cross-migration general state
 ```
 
 Surface in the briefing's Service Context block:
@@ -108,7 +108,7 @@ Surface in the briefing's Service Context block:
 artifacts. They do not tell you whether the alias has flipped, whether the
 backfill has run, or whether sibling consumers have already cut over. Without
 this state, review concerns about "sequencing risk" or "missing fallback" can
-be fully invalidated by facts already in beads memory. This is the same
+be fully invalidated by facts already in memory. This is the same
 authoritative-state principle as the deploy-list rule in `~/.claude/CLAUDE.md`
 ("Operational scope questions require authoritative-state verification"),
 applied to PR review.

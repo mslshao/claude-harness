@@ -14,8 +14,7 @@ command's update-mode steps 2 and 6 where they conflict.
 Why this override exists: `updateConfluencePage` is last-write-wins with NO
 expected-version parameter (verified against the tool schema 2026-07-23). A push built
 on a stale fetch silently clobbers every edit made since that fetch; this destroyed
-page versions v3-v8 of a runbook on 2026-07-22
-(`bd recall correction:workflow:confluence-refetch-before-update`).
+page versions v3-v8 of a runbook on 2026-07-22.
 
 ## Delta 1: record a baseline at fetch time (extends project Update step 2)
 

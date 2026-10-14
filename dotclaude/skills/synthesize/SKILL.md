@@ -29,7 +29,6 @@ Collect all inputs using tools. Record what was gathered.
 
 | Source type | Tool |
 |---|---|
-| Bead | `bd show <id>` via Bash |
 | File | Read |
 | PR | `gh pr view`, `gh pr diff` via Bash |
 | Jira | Atlassian MCP (`getJiraIssue`) |
@@ -142,8 +141,8 @@ Produces bead-ready output.
 [Unresolved items that need future attention]
 ```
 
-After producing a checkpoint, suggest: "Persist with `bd create` or
-`/bead-forge checkpoint` if this needs to survive compaction."
+After producing a checkpoint, suggest: "Persist with a new checkbox in
+`open-chores.md` or `/bead-forge checkpoint` if this needs to survive compaction."
 
 Note: `/synthesize` produces formatted text you decide what to do with.
 `/bead-forge checkpoint` creates actual beads in the tracker. Use synthesize
@@ -161,7 +160,7 @@ you know you want beads created immediately.
 - **Verify code claims.** When inputs reference what code does, check with
   Grep/Read before including the claim.
 - **Attribute sources.** Every finding should reference which input(s) it came from.
-- **Reference bead IDs.** When inputs include beads, include their IDs in the
+- **Reference IDs.** When inputs include tracked items, include their IDs in the
   output for traceability.
 - **Say when synthesis isn't needed.** If input is already clear and coherent,
   say so: "Input is already structured. No synthesis needed."

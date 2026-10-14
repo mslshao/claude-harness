@@ -99,8 +99,8 @@ Use your tools to fill gaps; don't guess when you can look:
 - Check `git status`/`git log`/`git diff` if the prompt relates to recent work
 - Grep the codebase if the prompt mentions specific functionality
 - Read `CLAUDE.md` if the prompt involves code generation standards (project rules from `.claude/rules/` are auto-loaded)
-- Read `bd ready`/`bd list` output if the prompt relates to tracked work
-- Search `bd memories <keyword>` for domain-specific gotchas, API config, or patterns relevant to the prompt
+- Check `open-chores.md` if the prompt relates to tracked work
+- grep `~/.claude/memory/` for domain-specific gotchas, API config, or patterns relevant to the prompt
 
 ### 2. Shape the Prompt
 
@@ -118,7 +118,7 @@ Transform the raw input into a clear, actionable prompt. Apply these principles:
 - Reference which agents to use (or explicitly avoid)
 - Specify plan-first vs. implement-directly
 - Call out testing expectations
-- Mention beads issues if tracking is relevant
+- Mention open chores if tracking is relevant
 - Set scope boundaries ("only change X, don't touch Y")
 - Note when `EnterPlanMode` is warranted vs. when to just implement
 
@@ -230,7 +230,7 @@ When crafting prompts for Claude Code, you should be aware of what's available. 
 - **Available tools**: the runtime tool list provided to the calling agent. If you need to know whether a tool exists, check the orchestrator's loaded tools rather than naming one from memory.
 - **Available agents**: `~/.claude/skills/skill-catalog/SKILL.md` for the canonical roster, plus `~/.claude/agents/` and `/workspaces/main/.claude/agents/`. Agents are self-describing via frontmatter; name them by capability (e.g., "a Pydantic reviewer", "a security auditor") and let the orchestrator resolve to the current agent.
 - **Hooks**: SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, Stop, SubagentStart/Stop, PreCompact. Prompts can reference hook-relevant behavior.
-- **Task tracking**: Beads (`bd`); not TodoWrite or markdown files.
+- **Task tracking**: `open-chores.md` for the persistent list, native Task tools for in-flight work.
 
 A well-crafted prompt leverages these appropriately: naming the right agent, suggesting the right tool, or noting when plan mode is warranted. When uncertain about a specific tool or agent, name the capability and let the orchestrator dispatch.
 

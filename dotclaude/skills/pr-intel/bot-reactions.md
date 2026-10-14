@@ -180,8 +180,8 @@ gh api -X POST \
 ```
 
 `/post-review` handles error cases (404, 422 "already exists", 403) per its
-own contract. It records the count of successful reactions in the bd memory
-write as `bot_reaction_count` (renamed from `bot_endorsement_count` to
+own contract. It records the count of successful reactions in the memory
+topic file write as `bot_reaction_count` (renamed from `bot_endorsement_count` to
 match this phase's name).
 
 ## Anti-Patterns
@@ -208,10 +208,8 @@ match this phase's name).
 
 ## Recurrence Context
 
-- `bd memories feedback:bot-comment-reaction-2026-05-20`: the engineering lead's
-  original "thumbs-up instead of repeating" feedback
-- `bd memories calibration:mx2-decision-maker:ideation:pr-intel-cross-cutting`:
-  the /ideate gate that ESCALATE-ROUTE'd to instrumentation-first
+- The engineering lead's original "thumbs-up instead of repeating" feedback
+- The /ideate gate that ESCALATE-ROUTE'd to instrumentation-first
 - Transcript inspection on 2026-05-21 of PRs #9276 and #9146 R3 sessions
   confirmed zero `gh api .../reactions` calls and zero `bot_endorsement`
   list construction; this file is the structural fix.

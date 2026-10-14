@@ -27,7 +27,6 @@ Parse the invocation (`/enrich $ARGUMENTS`) to detect the identifier type:
 |---------|------|--------|
 | `MX2-\d+` or `MANDM-\d+` | Jira ticket | Fetch via Atlassian MCP |
 | URL containing `atlassian.net/browse/` | Jira URL | Extract ticket ID, fetch via MCP |
-| `docr-\w+` | Bead ID | `bd show`, also fetch linked Jira if referenced |
 | `#\d+` or URL containing `github.com/.*/pull/\d+` | GitHub PR | `gh pr view` |
 | Everything else | Free text | Search beads and codebase by keywords |
 
@@ -53,7 +52,7 @@ Extract keywords from the primary source (ticket summary, bead title, PR title).
 Run `bd search <keywords>`. Take top 5 results. Load each with `bd show`.
 
 **3. Check beads memories.**
-Run `bd memories <keyword>` with 1-3 terms: service name, domain, ticket ID.
+Run grep over `~/.claude/memory/` with 1-3 terms: service name, domain, ticket ID.
 Take first 10 matches.
 
 **4. AWS context.**

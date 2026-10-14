@@ -59,7 +59,7 @@ The note is one line: `<filename>.md: brief reason`.
 
 - The actual fact content (that goes in the topic file)
 - Multi-paragraph reading material (use a topic file with frontmatter)
-- Long lists of beads or PRs (those belong in their respective beads/PR descriptions)
+- Long lists of PRs (those belong in their respective PR descriptions)
 
 The index is a router, not a reading surface.
 

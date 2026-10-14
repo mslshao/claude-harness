@@ -40,13 +40,13 @@ SCOPE-CHECK:
   PREDICTED: ~N lines added (production: ~A, tests: ~B)
   FILES: [list of files/modules you plan to touch]
   SPLIT-CANDIDATE: yes|no (does this work map to multiple distinct
-    concerns: two design decisions, two beads, or two acceptance criteria
+    concerns: two design decisions or two acceptance criteria
     that could each ship independently?)
   RATIONALE: [one sentence on why this scope is necessary or why it can be split]
   RECOMMENDATION: proceed-as-planned | split-into-N-PRs
 ```
 
-Get orchestrator adjudication. PREFERRED (2026-06-09, bd docr-pnx9): end your
+Get orchestrator adjudication. PREFERRED (2026-06-09): end your
 turn with a RESULT block (`STATUS: blocked`), the SCOPE-CHECK payload above, and
 `NEEDS-DECISION: proceed-as-planned or split-into-N-PRs?`; the orchestrator
 resumes you with the verdict and your context intact. FALLBACK (only if your

@@ -27,7 +27,7 @@ Trigger when the user prompt suggests past-session work:
 Do NOT trigger when:
 - The query has a clear current-session referent (just answer from context)
 - The user has provided a specific bead/memory/file path (just read it directly)
-- The work is operational (use `bd ready`, `bd list`, etc.)
+- The work is operational (check `open-chores.md`, etc.)
 
 ## Process
 
@@ -141,7 +141,7 @@ Stop here. The agent (or user) decides which previews warrant a deeper read. Do 
 
 - **BFS only**: each hit is one line. NO full content fetch in this skill. Deep reads are the next step, agent-initiated.
 - **Parallel where possible**: artifact-type searches don't depend on each other; run them in a single batched message of tool calls.
-- **Empty results are valid**: if no hits, say so plainly. Do not invent context. Suggest alternative seed terms or `bd list --status=open` for broader scan.
+- **Empty results are valid**: if no hits, say so plainly. Do not invent context. Suggest alternative seed terms or `open-chores.md` for broader scan.
 - **Recency is signal**: surface most recently touched entities first; that's usually what the user is referencing.
 - **Cross-reference, don't duplicate**: if a bead and a memory key both match, surface both but note the relationship ("docr-XXXX is the bead; coaching:foo is the memory key associated with it").
 - **No speculation**: do not interpret what the user "must mean" beyond what their prompt suggests. The recall surface is raw; interpretation happens after.

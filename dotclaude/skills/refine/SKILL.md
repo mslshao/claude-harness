@@ -31,7 +31,7 @@ Gather context with tools; don't guess when you can look:
 - Check `git status`/`git log`/`git diff` if the prompt relates to current work
 - Read agent definitions if the prompt should reference a specific agent
 - Grep the codebase if the prompt mentions functionality by name
-- Run `bd ready` or `bd list --status=in_progress` if the prompt relates to tracked work
+- Check `open-chores.md` if the prompt relates to tracked work
 - Read CLAUDE.md if the prompt involves code generation (project rules from .claude/rules/ are auto-loaded)
 
 ### 2. Shape the Prompt
@@ -45,7 +45,7 @@ constraints, expected behavior, and scope boundaries the user takes for granted.
 - Reference which agents to use (or avoid)
 - Specify plan-first vs. implement-directly
 - Call out testing expectations
-- Mention beads issues if tracking is relevant
+- Mention open chores if tracking is relevant
 - Set scope boundaries ("only change X, don't touch Y")
 
 **Right-sized scope.** If the task is too large for one prompt, say so and suggest how

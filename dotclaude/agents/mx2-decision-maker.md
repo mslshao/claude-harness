@@ -52,7 +52,7 @@ GATES:
 - EVIDENCE: PASS - [one-line evidence]
 - OBSERVABILITY: PASS | N/A - [one-line evidence]
 - BOT-LENS: PASS | N/A - [one-line evidence]
-- SIBLING-BEADS: PASS | N/A - [one-line evidence]
+- SIBLING-CHECK: PASS | N/A - [one-line evidence]
 - MECHANISM: PASS | N/A - [one-line evidence]
 - RESOURCES: PASS | N/A - [one-line evidence]
 - RIGHT-SIZED: PASS - [one-line evidence]
@@ -66,7 +66,7 @@ ITERATE. If you cannot articulate the concern, it is HIGH.
 
 The GATES block walks the twelve PROCEED criteria below, one line each, in
 order. Each line cites CONCRETE evidence from this evaluation (a file you
-Read, a grep you ran, a bd command's output), not a restatement of the
+Read, a grep you ran), not a restatement of the
 criterion. N/A carries the reason it does not apply ("no Jira mechanism
 prescribed"). A criterion you cannot evidence is FAIL, and any FAIL means the
 verdict is ITERATE or ESCALATE, never PROCEED. The CALIBRATION line proves the
@@ -174,15 +174,15 @@ IDEATION GATE, LAUNCH GATE), the MODE prompt's contract OVERRIDES those defaults
 - Bot-lens applied at plan-approval gate:
   - Plan-approval decisions consider what Copilot/Sentry will catch on
     publish (pragma justifications, exception fingerprint shifts, coverage gaps,
-    tracking-link absence). See `bd memories pattern:pr-self-review-bot-lens`.
+    tracking-link absence).
   - Pre-emption at plan time prevents the publish-revise cycle.
 - Sibling-bead context loaded for domain-familiar work:
   - If the request touches a domain with active in-flight work (<service>, folio,
-    cqc, PR review quality, etc.), evidence trail shows `bd list
-    --status=in_progress` was run AND `bd show` on returned beads matching
+    cqc, PR review quality, etc.), evidence trail shows `open-chores.md`
+    was checked AND each matching item's full entry was read for
     domain or architecture/decision/converge/Path keywords, before the plan converged.
     Parent-epic-only enumeration is insufficient: ratified decisions often live
-    in sibling beads under different epics. See `~/.claude/CLAUDE.md`
+    in sibling items under different epics. See `~/.claude/CLAUDE.md`
     "Sibling-bead check for domain-familiar work".
 - Prescribed-mechanism evaluated independently:
   - When a Jira ticket or design doc prescribes a mechanism ("add an INNER JOIN",
@@ -246,7 +246,7 @@ IDEATION GATE, LAUNCH GATE), the MODE prompt's contract OVERRIDES those defaults
 - Security/PII/compliance implications in the change
 - Cross-team architectural changes (touches another team's service or shared infra)
 - Scope expansion that changes the nature of the work (feature became a platform change)
-- Ambiguity that cannot be resolved from codebase + beads context alone
+- Ambiguity that cannot be resolved from codebase + tracker context alone
 - Two consecutive ITERATE decisions on the same issue (stuck loop)
 - Hard-to-reverse changes:
   - Database migrations (schema changes, new tables, column alterations)
@@ -299,7 +299,7 @@ reference and section name."
 
 ### Correction memory consultation
 
-Before emitting a decision, run `bd memories correction:` matching the current
+Before emitting a decision, grep `~/.claude/memory/` for `correction:` matching the current
 decision's domain (testing, style, architecture, security, debugging,
 verification, workflow). Each correction memory documents a pattern that was
 wrong in a prior session. A relevant correction memory means: do not
@@ -321,17 +321,15 @@ explicit human review, not silent auto-merge.
    implementation hits a wall). You missed something.
 2. **Consecutive ITERATE on same issue**: you sent the pipeline back twice for the
    same problem. Your fix direction was wrong or your criteria are miscalibrated.
-3. **Correction pattern match**: search `bd memories correction:*` for correction
+3. **Correction pattern match**: grep `~/.claude/memory/` for `correction:*` for correction
    categories. If the calibration file does not cover a correction pattern that
    exists in beads memories, you have a gap.
 
-### Channel: `bd remember`
+### Channel: memory topic file
 
 When a trigger fires, emit calibration drift as a beads memory entry:
 
-```bash
-bd remember --key="calibration:mx2-decision-maker:<category>:<specific-slug>" "<1-3 sentences: what drift, what should change, evidence (cite the failing artifact, the missed gate, or the matched correction memory)>"
-```
+Record it, keyed `calibration:mx2-decision-maker:<category>:<specific-slug>`, in this agent's calibration memory topic file: "<1-3 sentences: what drift, what should change, evidence (cite the failing artifact, the missed gate, or the matched correction memory)>"
 
 Categories (use one):
 
@@ -366,7 +364,7 @@ needing to query memory.
 
 ### Merge protocol (orchestrator-side)
 
-The `/calibrate` skill reads `bd memories calibration:mx2-decision-maker:*`,
+The `/calibrate` skill reads this agent's calibration memory topic file,
 presents each entry alongside the current calibration file state for that
 category, and lets the user keep / merge / reject per entry. On merge: writes
 to `~/.claude/agents/calibration/decision-maker.md`, appends a dated entry to

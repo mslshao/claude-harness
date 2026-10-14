@@ -339,8 +339,9 @@ suggested-skill mapping for ESCALATE-ROUTE, and iteration caps, see
 
 Key invariants:
 - The gate is `mx2-decision-maker` invoked with `MODE: CONVERGENCE GATE`
-  preamble. Calibration drift gets recorded with
-  `bd remember --key='calibration:mx2-decision-maker:converge:<topic>'`.
+  preamble. Calibration drift gets recorded, keyed
+  `calibration:mx2-decision-maker:converge:<topic>`, in this agent's
+  calibration memory topic file.
 - ITERATE re-runs Phase 2 + 3 with a focused WEAK_DIMENSION
   modification (verification / consequence / scope / decomposition /
   mechanism / proportionality). Cap: 2 ITERATE rounds per invocation.
@@ -511,8 +512,9 @@ plan is approved.
 - **Calibration soak is expected.** The decision-maker invoked in
   Phase 4.6 was calibrated for autopilot and launch gates, not
   convergence. First 3-5 `/converge` invocations are calibration
-  soak. Record drift via
-  `bd remember --key='calibration:mx2-decision-maker:converge:<topic>'`.
+  soak. Record drift, keyed
+  `calibration:mx2-decision-maker:converge:<topic>`, in this agent's
+  calibration memory topic file.
 - **Iteration log is always visible.** Phase 5 shows it even when
   Round 0 was final.
 - **/converge is downstream of /ideate.** When the input is rough

@@ -30,7 +30,7 @@ sees that the gate ran.
 ### Phase 1: Identify the Plan
 
 - If human-invoked with no args: identify the most recent plan, proposal, or set
-  of beads in the conversation.
+  of work items in the conversation.
 - If human-invoked with context: identify the plan AND note the new context as a
   constraint that existing assumptions must be tested against.
 - If agent-embedded: the plan is whatever was just drafted in the current flow.
@@ -49,7 +49,7 @@ After identifying the plan, detect the mode:
    references a Jira ticket (`MX2-\d+`) or bead ID (`docr-\w+`), fetch the
    ticket's AC and related beads. This gives Phase 2 concrete acceptance
    criteria to check assumptions against, and Phase 4a domain-specific
-   gotchas from beads memories. Skip if no identifiers found.
+   gotchas from memory. Skip if no identifiers found.
 
 2. **Domain-matcher enrich** (best-effort, not a gate): Run the domain-matcher
    to surface prior terminology decisions for the plan's domain:
@@ -59,7 +59,7 @@ After identifying the plan, detect the mode:
      | cut -d: -f1 | head -10
    ```
 
-   For each matched keyword, run `bd memories <keyword>` and skim the top
+   For each matched keyword, grep `~/.claude/memory/` and skim the top
    5 results. Cap pre-loaded context at roughly 2KB to avoid Phase 1 bloat.
    Use the loaded context to (a) avoid challenging things that are already
    established fact (false positives), and (b) sharpen what counts as
@@ -134,11 +134,11 @@ UNVERIFIABLE - the code is the evidence.
 
 - **Codebase**: Grep/Read the code. Record: `Searched: <pattern> | Found: <result>`
 - **Domain**: Cannot be checked against code. Mark UNVERIFIABLE.
-- **Technical/Dependency/Precedent**: Check beads, memory, code. Record searches.
+- **Technical/Dependency/Precedent**: Check memory, code. Record searches.
 - **Reasoning Chain**: Trace the logical dependency. Does step N-1 actually
   guarantee step N?
 - **Scope/Completeness**: Check whether the omitted concern is addressed elsewhere
-  in the codebase or in prior beads/decisions.
+  in the codebase or in prior decisions.
 
 ### Phase 4b: Adjudication
 

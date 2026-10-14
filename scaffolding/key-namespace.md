@@ -42,13 +42,13 @@ The split is partly intuitive and partly disciplined. Some guidance:
 Common search prefixes:
 
 ```bash
-bd memories correction:          # all corrections
-bd memories correction:style:    # all style corrections
-bd memories project:             # all ongoing projects
-bd memories <ad-hoc-keyword>     # text search across all
+grep -r "correction:" ~/.claude/memory/          # all corrections
+grep -r "correction:style:" ~/.claude/memory/    # all style corrections
+grep -r "project:" ~/.claude/memory/             # all ongoing projects
+grep -r "<ad-hoc-keyword>" ~/.claude/memory/      # text search across all
 ```
 
-The namespace makes prefix-search effective. `bd memories correction:debugging:` returns all debugging-domain corrections in one query.
+The namespace makes prefix-search effective. `grep -r "correction:debugging:" ~/.claude/memory/` returns all debugging-domain corrections in one query.
 
 ## Companion rule: stop tallying when reflection has converged
 

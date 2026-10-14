@@ -4,9 +4,9 @@ These agents are available via the Agent tool. Each has its own agent definition
 detailed instructions; do NOT replicate their knowledge. Give them clear input and a
 focused ask.
 
-**Domain context**: Specialists can search `bd memories <keyword>` for gotchas, API config,
+**Domain context**: Specialists can grep `~/.claude/memory/` for gotchas, API config,
 and patterns relevant to their analysis. Include this in specialist prompts when the domain
-has known pitfalls (e.g., `bd memories botocore` for exception handling, `bd memories datadog`
+has known pitfalls (e.g., grep for `botocore` for exception handling, `datadog`
 for service names).
 
 | Agent (subagent_type) | Domain | Model |

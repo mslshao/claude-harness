@@ -20,7 +20,7 @@ Worktree cleanup is a recurring chore in heavy `/launch` and `/autopilot` use. T
 - Manual `MX2-NNNNN/...` or `chore/docr-XXXX-...` branches abandoned mid-flow
 
 This skill codifies the per-branch verification ladder so it does not need to be
-re-invented each time. See bd memories `gotcha:orphaned-worktrees-2026-05-07`.
+re-invented each time.
 
 ## Scope (do check)
 

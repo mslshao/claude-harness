@@ -34,7 +34,7 @@ If that also fails, stop and ask the user for a PR number.
 
 ## Reading Paths (conditional, by mode and title-prefix size)
 
-The PR title's automated size prefix (XS/S/M/L/XL/2XL/3XL, stamped by Graphite/GitHub tooling) is the CANONICAL size for routing below; it is the same complexity signal a human reviewer sees. Infer from additions+deletions ONLY when no prefix exists (same fallback as Size Classification). Do not substitute independent complexity judgment for the prefix (2026-06-09 directive, bd docr-pnx9).
+The PR title's automated size prefix (XS/S/M/L/XL/2XL/3XL, stamped by Graphite/GitHub tooling) is the CANONICAL size for routing below; it is the same complexity signal a human reviewer sees. Infer from additions+deletions ONLY when no prefix exists (same fallback as Size Classification). Do not substitute independent complexity judgment for the prefix (2026-06-09 directive).
 
 This SKILL.md is always read in full. Sub-files load per the table; skipping a "Skip (sanctioned)" file on a matching run is correct behavior, not a shortcut.
 
@@ -82,7 +82,7 @@ moto fixture shadowing `responses.calls`). The same move applies when the author
 test fix is DONE: the red-green-revert cycle in `.claude/rules/verification.md` is what
 proves a matcher actually bites, and only execution supplies it. For a TypeScript PR the
 `pants test` path does not apply and a fresh worktree has no `node_modules`; the
-symlink-plus-direct-binary recipe is `bd recall gotcha:worktree-typescript-vitest-run`
+symlink-plus-direct-binary recipe is documented in `~/.claude/memory/`
 (PR #11442, 2026-08-10: proved an expanded `Word.Alignment` stub made a previously-vacuous
 alignment matcher load-bearing, three runs under 4s total).
 
@@ -123,7 +123,7 @@ targets either way, so the first zero was meaningless until a control base spann
 - [ ] Diff fetched (skip for `--quick`)
 - [ ] PR head ref fetched locally (for worktree)
 - [ ] Merge Base Freshness checked
-- [ ] **Prior review memories loaded** via `bd memories pr-<number>` (see [prior-reviews.md](prior-reviews.md))
+- [ ] **Prior review memories loaded** via a memory grep for `pr-<number>` (see [prior-reviews.md](prior-reviews.md))
 - [ ] **DynamoDB prior reviews loaded** (skipped if SSO not active) via `pr_review_state.list_reviews_for_pr` (see [prior-reviews.md](prior-reviews.md))
 - [ ] **Jira ticket hydrated** if `MX2-NNNNN` or similar appears in PR body
 - [ ] **Design doc hydrated** if any `<company>.atlassian.net/wiki/` URL appears in PR body (see lesson #11 in `reviewer-discipline.md`)
@@ -187,7 +187,7 @@ both later blocked at `/post-review` time).
 Before any other analysis, check if this PR has been reviewed in a prior session
 across two channels in parallel:
 
-1. `bd memories pr-<number>` for terminal-side review memories that `/post-review`
+1. A memory grep for `pr-<number>` for terminal-side review memories that `/post-review`
    writes on every successful post.
 2. The DynamoDB `pr-review` table (cross-modality state shared with the Slack bot).
 
@@ -197,14 +197,13 @@ delta-focused diff (`git diff <prior_head_sha> <headRefOid>`) sent to specialist
 is also the single highest-value signal on re-reviews; it cannot be computed
 without the prior `head_sha`.
 
-For the `bd memories` key format, DynamoDB SSO fallback (the table is in the dev
+For the DynamoDB SSO fallback (the table is in the dev
 account, the heredoc needs `AWS_PROFILE=dev AWS_DEFAULT_REGION=us-east-1` and
 `uv run --with boto3 --with 'pydantic>=2'`), revision-delta computation, prior-
 review dedup, briefing header format, and default-recommendation-shift rules,
 see [prior-reviews.md](prior-reviews.md).
 
-If both channels fail, proceed as first-round (see `correction:skill:pr-intel-first-round`
-in beads memory).
+If both channels fail, proceed as first-round.
 
 ### Merge Base Freshness & Ghost Diffs
 
@@ -265,8 +264,8 @@ posted pile-on that had to be deleted):
 `gh api /repos/<owner>/<repo>/pulls/<N>/reviews/<numeric_review_id>/comments`.
 `gh pr view --json reviews` exposes only the GraphQL node id (`PRR_...`), so derive the
 numeric id by base64url-decoding the part after `PRR_` and reading the third value of the
-msgpack 3-array (`0x93`, `0xce` u32 repo, `0xcf` u64 review). Full recipe:
-`bd recall github-inline-comments`. Only after that fallback also fails, note it explicitly
+msgpack 3-array (`0x93`, `0xce` u32 repo, `0xcf` u64 review). Full recipe
+documented in `~/.claude/memory/`. Only after that fallback also fails, note it explicitly
 and flag in the output that bot dedup could not run.
 
 ### Jira Ticket Hydration
@@ -317,7 +316,7 @@ After Jira hydration, run three context-gathering checks before specialist dispa
    paths and surface a 3-5 line orientation block.
 3. **Migration State** (permanent as of 2026-07-02; 2026-07-01 audit: revisit
    never ran, check in active use): when the PR touches an in-flight migration,
-   load operational state from `bd memories <migration-name>` before forming
+   load operational state from a `<migration-name>` memory grep before forming
    review concerns.
 
 **Without these, sibling-PR awareness is missing (orphan-export false positives

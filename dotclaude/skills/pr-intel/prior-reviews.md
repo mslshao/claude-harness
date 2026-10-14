@@ -1,21 +1,21 @@
-# Prior Reviews (bd memories + DynamoDB + own live GitHub review)
+# Prior Reviews (memory topic file + DynamoDB + own live GitHub review)
 
 This file documents how /pr-intel discovers prior review history for a PR and folds it into the current review's data-gathering, specialist preamble, dedup context, and default recommendation.
 
 Three channels are checked in parallel:
-1. `bd memories pr-<number>` for terminal-side review memories (`/post-review` writes these).
+1. A memory grep for `pr-<number>` for terminal-side review memories (`/post-review` writes these).
 2. DynamoDB `pr-review` table for cross-modality state (terminal sessions and the Slack bot share this).
 3. The reviewer's OWN live GitHub review, re-checked just before render (not only at data-gathering): scan `reviews[]` for an entry whose `author.login` is the running reviewer (`mslshao`). A review posted MANUALLY (GitHub UI, not via `/post-review`) lands in neither channel 1 nor 2, and one posted CONCURRENTLY during the run is absent from the initial metadata fetch, so a late re-check (`gh pr view <n> --json reviews`) right before producing the briefing catches both. When a self-review is found that channels 1-2 do not already cover, surface it BEFORE the briefing ("You already have a <STATE> review on this PR posted <date>, not via /post-review; read it first, this run may duplicate it") and default to a delta/confirm posture rather than a fresh full briefing. (Observed 2026-06-24 on #9926: a manual `mslshao` APPROVE landed mid-run, the briefing did not account for it, producing "read what I wrote instead.")
 
 If all three channels fail or are empty, the review proceeds as first-round.
 
-## Prior Review Memory (bd memories)
+## Prior Review Memory (memory topic file)
 
 `/post-review` writes a memory on every successful post, keyed as `review:pr-<number>:<YYYY-MM-DD>` (see post-review Step 5).
 
 Run in parallel with the other data-gathering commands:
 ```bash
-bd memories pr-<number>
+grep -r "pr-<number>" ~/.claude/memory/
 ```
 
 Parse the output for entries matching `review:pr-<number>:*`. For each prior round, extract:
@@ -28,10 +28,7 @@ Parse the output for entries matching `review:pr-<number>:*`. For each prior rou
 
 Store as `prior_reviews` list, sorted oldest to newest.
 
-**Full-detail fallback**: `bd memories pr-<number>` lists matching keys with truncated one-line previews (enough to parse `findings_summary`). To read the FULL content of a specific prior round (complete findings, not the preview), use `bd recall <key>`:
-```bash
-bd recall review:pr-<number>:<YYYY-MM-DD>
-```
+**Full-detail fallback**: the memory grep above finds matching entries (enough to parse `findings_summary`). To read the FULL content of a specific prior round (complete findings, not just the grep match), read the memory topic file directly for the `review:pr-<number>:<YYYY-MM-DD>` entry.
 Reach for this when a steer says "look at the prior review for #N", or when delta-aware dedup needs the verbatim prior findings. Fall back to the posted GitHub review (`gh api .../pulls/<number>/reviews` and `.../comments`) only when you need inline-comment thread positions or bot comments beyond what the memory captured.
 
 **Downstream effects** when one or more prior reviews exist:
@@ -68,8 +65,8 @@ Reach for this when a steer says "look at the prior review for #N", or when delt
    event, rev number, and a link. Example:
    ```
    Prior Reviews:
-   - 2026-04-13 COMMENT (rev 12, 3 inline): bd memories review:pr-8282:2026-04-13
-   - 2026-04-16 APPROVE (rev 30, 2 inline + 1 body): bd memories review:pr-8282:2026-04-16
+   - 2026-04-13 COMMENT (rev 12, 3 inline): review:pr-8282:2026-04-13
+   - 2026-04-16 APPROVE (rev 30, 2 inline + 1 body): review:pr-8282:2026-04-16
    ```
 5. **Default recommendation shift**: If the latest prior review was APPROVE and the
    delta is small (<= 3 commits, no structural file changes), the default
@@ -173,15 +170,15 @@ reads it as a clean short-circuit, not a collapsed render.
 
 **Behavior when `prior_reviews` is empty**: This is a first-round review. No delta
 available. Proceed with normal first-round defaults (see
-`correction:skill:pr-intel-first-round` in beads memory: default to Comment for L+
+`correction:skill:pr-intel-first-round`: default to Comment for L+
 PRs, novel patterns, external contracts, or unverified claims).
 
-**Behavior when `bd memories` fails**: Note the failure in the briefing, proceed as
-if first-round. Do not block on beads availability.
+**Behavior when the memory grep fails**: Note the failure in the briefing, proceed as
+if first-round. Do not block on it.
 
 ## DynamoDB Prior Reviews (cross-modality)
 
-Run in parallel with the `bd memories` call above. This provides state shared with
+Run in parallel with the memory grep above. This provides state shared with
 the Slack bot (and any other future callers that write to the same table).
 
 **Step 1: Verify SSO is active.**
@@ -227,8 +224,8 @@ PY
 **Step 3: Merge into `prior_reviews`.**
 
 If the output is non-empty, append each DynamoDB row to the same `prior_reviews` list
-built from `bd memories`. Distinguish source in the Briefing header:
-- `bd`-sourced rows keep their existing format.
+built from memory. Distinguish source in the Briefing header:
+- Memory-sourced rows keep their existing format.
 - DynamoDB rows tagged `source: "terminal"` show a `(terminal)` suffix.
 - DynamoDB rows tagged `source: "bot"` show a `(bot)` suffix.
 

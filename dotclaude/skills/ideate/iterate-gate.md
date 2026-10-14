@@ -34,9 +34,10 @@ Agent(
 
   If you detect calibration drift during this invocation (your
   intuition disagrees with the formula, or the formula adjudicates a
-  case you think it should not), record the drift via
-  `bd remember --key='calibration:mx2-decision-maker:ideation:<topic>' '...'`
-  with the topic and your reasoning. Tag with `ideation:` so calibrate
+  case you think it should not), record the drift, keyed
+  `calibration:mx2-decision-maker:ideation:<topic>`, in this agent's
+  calibration memory topic file, with the topic and your reasoning.
+  Tag with `ideation:` so calibrate
   reviews can keep ideation-specific calibration separate from
   autopilot/launch calibration.
 

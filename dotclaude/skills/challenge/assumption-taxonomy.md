@@ -211,7 +211,7 @@ cannot handle this query pattern." If true, the entire data layer changes → FR
 #### Staleness Test
 "When was this last validated? Could it have changed?"
 - Verified this conversation via Read/Grep → SOLID
-- Verified in a recent session (referenced in beads/memory) → SOFT
+- Verified in a recent session (referenced in memory) → SOFT
 - Unverified or from an old conversation → FRAGILE
 
 *Example*: Plan says "The qualifier engine uses operator dispatch." Agent Read the

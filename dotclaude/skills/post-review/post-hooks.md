@@ -20,8 +20,7 @@ separate commands, --input file) are summarized at the Step 3 pointer.
 > accepts the post regardless), so the discipline is at draft time. Wrap in
 > backticks: paths (`libs/models/__init__.py`), dunders (`__all__`, `__str__`),
 > class/function names (`Activities.RUNNING`, `update_item`), imports
-> (`from foo import *`), config files (`pyrightconfig.json`). Recurrence
-> context: `bd memories gotcha:review-body-needs-backticks`.
+> (`from foo import *`), config files (`pyrightconfig.json`).
 
 > **Destructive-commands false positive**: `~/.claude/hooks/block-destructive-commands.sh`
 > scans the bash command for an `rm <path>` pattern combined with a `-X-r-Y`
@@ -38,8 +37,7 @@ separate commands, --input file) are summarized at the Step 3 pointer.
 > does NOT sidestep content gates: the attribution and personal-tier-vocab hooks
 > both read the payload file, by design. Treating `--input` as general-purpose
 > hook avoidance is how the 2026-08-13 bead-ID leak happened; see the
-> personal-tier vocab note below. Recurrence context: `bd memories
-> gotcha:post-review-rm-path-hook`.
+> personal-tier vocab note below.
 
 > **Personal-tier vocab hook scans the command AND every file it references**:
 > `~/.claude/hooks/block-personal-tier-vocab.sh` blocks personal-tier vocabulary
@@ -67,8 +65,7 @@ separate commands, --input file) are summarized at the Step 3 pointer.
 >
 > **Default to a flat scratch path**:
 > `/home/vscode/.claude/scratch/<pr>-review-<YYYY-MM-DD>.json`. No subdirectory
-> named after a personal slash command. Recurrence context: `bd memories
-> gotcha:post-review-scratch-path-personal-tier-hook`. Coverage probe for which
+> named after a personal slash command. Coverage probe for which
 > posting shapes the hook does and does not see:
 > `~/.claude/scratch/test-vocab-hook-surfaces.sh`. Still uncovered, because
 > `IS_TARGETED` never fires for them: `gh api graphql` inline mutations, a Python
@@ -89,4 +86,3 @@ separate commands, --input file) are summarized at the Step 3 pointer.
 > (`<pr>-review-<date>-2.json`) so each round keeps its own payload, matching the
 > Step 5 memory-key scheme. If you do reuse the path, the Write tool blocks with
 > "File has not been read yet", so Read once then overwrite.
-> Recurrence context: `bd memories gotcha:post-review-build-then-post-separate-commands`.

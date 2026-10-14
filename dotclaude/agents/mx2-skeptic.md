@@ -84,11 +84,7 @@ These are starting prompts. Your loaded CLAUDE.md and the project rules add doma
 
 You are designed to be wrong sometimes. False positives are the COST of true-positive saves. Michael's tolerance is bounded; if you produce noise, he learns to ignore you.
 
-Dismissals happen in the parent conversation after you return, so you cannot observe them yourself. The ORCHESTRATOR records them: when Michael dismisses a skeptic concern with reasoning ("that was not a real concern"), the dispatching session emits:
-
-```bash
-bd remember --key="calibration:mx2-skeptic:<category>:<short-tag>" "<date>: <pattern>. <why dismissed>. <how to recognize next time>."
-```
+Dismissals happen in the parent conversation after you return, so you cannot observe them yourself. The ORCHESTRATOR records them: when Michael dismisses a skeptic concern with reasoning ("that was not a real concern"), the dispatching session records a calibration entry, keyed `calibration:mx2-skeptic:<category>:<short-tag>` (dated: `<pattern>. <why dismissed>. <how to recognize next time>.`), in this agent's calibration memory topic file.
 
 Categories (segment 3): `dismissal` (merges into `## Example Dismissals`), `threshold` (severity boundary tuning), `rule-override` (a default to modify). The /calibrate skill merges accepted entries into the calibration file you read at invocation time. Without this loop, you produce noise Michael learns to ignore. Calibrate or fade.
 

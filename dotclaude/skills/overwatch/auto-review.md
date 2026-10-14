@@ -117,7 +117,7 @@ cycles rather than rebuilt:
 
 `posted` and `held` are append-only and ARE the audit trail. Every auto-action appends
 before the next cycle can run, so a loop killed mid-flight still shows what it did. The
-operator reads this on return via `bd show <tracking-bead>`.
+operator reads this on return.
 
 `cycle.py` preserves this key verbatim and never interprets it: detection stays
 independent of action, which is what keeps `cycle.py`'s no-writes property intact.

@@ -29,7 +29,7 @@ Walk these categories. For each, identify (a) what this session changed in under
 
 ### Category 1: Communication style
 
-- Corrections received this session (`bd memories correction:*:*` saved today)
+- Corrections received this session (grep `~/.claude/memory/` for entries saved today)
 - Calibration shifts (user clarified what a phrase means, or how to interpret something)
 - Voice/register feedback (terse-vs-thorough, audience handling, formatting prefs)
 - Recurring slips caught by structural enforcement (em-dash hook fires, em-dash chat-output slips)
@@ -69,7 +69,7 @@ For each finding:
 - **New rule or substantive edit**: propose to the user; do NOT auto-apply.
 - **Out-of-scope** (would warrant its own conversation): note as a follow-up bead candidate; do not act.
 
-Save new correction memories via `bd remember --key="correction:<domain>:<topic>"`. Cite the umbrella memory if one exists (per the Reflection Trigger convergence rule).
+Save new correction memories to the matching `~/.claude/memory/` topic file, keyed `correction:<domain>:<topic>`. Cite the umbrella memory if one exists (per the Reflection Trigger convergence rule).
 
 ## Phase 2: Cold-Start Handoff Prompt
 
@@ -79,7 +79,7 @@ The handoff is only as fresh as its inputs. Do not synthesize from conversation 
 
 ```bash
 # Beads: in-flight tasks, today's corrections
-bd list --status=in_progress --json -n 0 | jq -r '.[] | "\(.id) \(.title)"'
+cat ~/.claude/memory/open-chores.md
 bd memories correction: 2>/dev/null | grep "$(date -u +%Y-%m-%d)"
 
 # GitHub: authored + review-requested + recent self-activity
@@ -147,8 +147,8 @@ SUGGESTED FIRST ACTIONS
 - Run /recall <2-4 concrete seeds from Step 3> and skim the BFS surface before
   substantive work (surfaces sibling beads/memories/topic files this prompt
   compressed away)
-- Run `bd ready` to surface unblocked work
-- Read `bd show <bead-id>` for the active item
+- Check `open-chores.md` to surface unblocked work
+- Read the active item's entry in `open-chores.md`
 - [Any domain-specific pointer that matters for the next move]
 
 NOTABLE FILES TOUCHED OR EDITED THIS SESSION
@@ -185,7 +185,7 @@ Wrap the template in a fenced code block in the output so the user can copy-past
 
 - Routing through `prompt-refiner`. That agent does not synthesize session context.
 - Generating audit findings that "should be done at some point" without a clear gate (trivial-apply, propose, or defer).
-- Listing every bead in `bd list` rather than only in-flight items.
+- Listing every item in `open-chores.md` rather than only in-flight items.
 - Emitting calibration shifts as memory keys without their body (the next session can't look them up if the key is wrong; include the rule itself).
 - Adding boilerplate like "remember to be helpful" or "follow the rules" to the handoff. The next session already has CLAUDE.md.
 - Synthesizing from conversation context only. Beads, Slack, Jira, and Confluence all hold in-flight state the conversation may not have surfaced. Skipping the cross-surface gather (Step 1) and cross-reference (Step 2) produces a handoff that LOOKS complete but silently drops adjacent work; the next session re-derives it the hard way.

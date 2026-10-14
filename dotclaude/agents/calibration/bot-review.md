@@ -4,8 +4,9 @@ Last reviewed by Michael: 2026-05-07 (initial scaffold; no overrides yet)
 
 This file is read by the `bot-review` agent before every invocation.
 The ORCHESTRATOR (pr-intel synthesis) records dismissal-driven calibration
-drift via `bd remember` (key prefix `calibration:bot-review:`); the agent
-itself cannot observe dismissals, which happen after it returns. The
+drift in this agent's calibration memory topic file, keyed
+`calibration:bot-review:`; the agent itself cannot observe dismissals,
+which happen after it returns. The
 `/calibrate` skill is the human review gate that merges accepted entries
 into this file. Append-only audit of
 merged/rejected entries lives at `bot-review.lookback.md` (created on first

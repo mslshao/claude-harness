@@ -161,11 +161,11 @@ When forging beads:
 2. **Use the field mapping** for that category to structure content.
 3. **Apply the category label** after creating: `bd label add <id> <category>`
 4. **Apply domain label(s)**: `bd label add <id> <domain>` (e.g., `skills`, `qualifier`)
-5. **Use the title convention** so `bd list` output is scannable.
+5. **Use the title convention** so list output is scannable.
 
 When a cold-start agent encounters a bead:
 
-1. **Check labels** with `bd show <id>`; the label signals the category.
+1. **Check labels**; the label signals the category.
 2. **Interpret fields** according to the category's field mapping.
 3. **Act accordingly**: task → implement, memory → absorb, decision → respect,
    discovery → consult, review → reference.

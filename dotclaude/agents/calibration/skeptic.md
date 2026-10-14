@@ -3,11 +3,9 @@
 Last reviewed by Michael: 2026-04-30 (initial scaffold; no overrides yet)
 
 This file is read by the `mx2-skeptic` agent before every invocation.
-The agent emits calibration drift via `bd remember` (key prefix
-`calibration:mx2-skeptic:`); the `/calibrate` skill is the human review
-gate that merges accepted entries into this file. Append-only audit of
-merged/rejected entries lives at `skeptic.lookback.md` (created on first
-calibration merge).
+The `/calibrate` skill is the human review gate that merges accepted
+entries into this file. Append-only audit of merged/rejected entries
+lives at `skeptic.lookback.md` (created on first calibration merge).
 
 If this file is empty (or contains only the scaffold below with no rule
 overrides), default rules from the agent definition apply. The agent's

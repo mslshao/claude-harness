@@ -191,8 +191,7 @@ per-comment strings: `python3 ~/.claude/scratch/scripts/check-review-attribution
 post will not be blocked. Do NOT `cd` into `hooks/lib` to import the module ad hoc; the
 Bash cwd persists and the next `gh`/`git` call fails. **Convention:** write review payload JSON via the
 Write tool (not an in-script `json.dump`), so the backup hook sees it; a payload both built and
-posted entirely inside one subprocess is invisible to both hooks. See
-`bd memories correction:skill:post-review-attribution-enforcement`.
+posted entirely inside one subprocess is invisible to both hooks.
 
 **Also run the personal-tier vocab pre-check on the same payload file, before the preview.**
 This is a second mandatory gate, not a nicety, and it mirrors the pre-flight `/jira` already
@@ -472,7 +471,7 @@ M bot reactions applied (<list bot names>).
 
 On partial failure (some comments skipped): list which were skipped and why.
 
-## Step 5: Persist to beads memory
+## Step 5: Persist to a memory topic file
 
 After a successful post (any event type, any number of inline comments), record the
 review so future sessions can recover context even when the session title is unhelpful.
@@ -530,16 +529,14 @@ If two reviews happen on the same PR on the same day, append `-N` to the date su
 (`:2026-04-16-2`). Do not overwrite the morning's review with the afternoon's; the
 rounds are different artifacts.
 
-Write with:
-```bash
-bd remember --key="review:pr-<N>:<YYYY-MM-DD>" "<YYYY-MM-DD> <event> on PR #<N> (<title>, <author>). Rev <commit_count> at <head_sha_short>. Posted <posted_inline_count> inline (<bot_surfaced_count> bot-surfaced + <speed_amplified_count> speed-amplified) + <body_fold_count> body-fold + <bot_reaction_count> bot-reactions (<bot_thumbs_up_count> up / <bot_thumbs_down_count> down) + <inline_replies_posted> inline-replies. Findings: <findings_summary>. URL: <review_url>"
-```
+Write, keyed `review:pr-<N>:<YYYY-MM-DD>`, to the post-review memory topic file:
+"<YYYY-MM-DD> <event> on PR #<N> (<title>, <author>). Rev <commit_count> at <head_sha_short>. Posted <posted_inline_count> inline (<bot_surfaced_count> bot-surfaced + <speed_amplified_count> speed-amplified) + <body_fold_count> body-fold + <bot_reaction_count> bot-reactions (<bot_thumbs_up_count> up / <bot_thumbs_down_count> down) + <inline_replies_posted> inline-replies. Findings: <findings_summary>. URL: <review_url>"
 
 The `<bot_surfaced_count>` and `<speed_amplified_count>` fields support an
 audit signal over time: the ratio of bot-surfaced to speed-amplified posted
 comments tracks whether pr-intel output is biased toward bot-noise (high
 bot-surfaced count with low author engagement) or genuine reviewer judgment.
-Read these back via `bd memories review:pr-` to spot-check the trust signal
+Read these back via a memory grep for `review:pr-` to spot-check the trust signal
 direction; if bot-surfaced consistently dominates and author engagement drops,
 the skill is producing bot-noise rather than amplifying judgment. The
 `<bot_reaction_count>` measures how often the dedup-and-react path fires;
@@ -547,12 +544,12 @@ high count signals the bots are catching things upstream.
 
 Example (illustrative only; do not copy verbatim):
 ```
-bd remember --key="review:pr-<NUMBER>:<YYYY-MM-DD>" "<YYYY-MM-DD> <DECISION> on PR #<NUMBER> (<TICKET title, author>). Rev <N> at <SHORT_SHA>. Posted <X> inline + <Y> body-fold. Findings: <file:line summaries>. URL: <review_url>"
+"<YYYY-MM-DD> <DECISION> on PR #<NUMBER> (<TICKET title, author>). Rev <N> at <SHORT_SHA>. Posted <X> inline + <Y> body-fold. Findings: <file:line summaries>. URL: <review_url>"
 ```
 
-This step is not optional. If `bd remember` fails (beads unavailable, network error),
-note the failure in the user-facing report but do not retry; the posted review is
-still the source of truth, this is an index entry.
+This step is not optional. If the memory topic file write fails (filesystem error,
+permissions), note the failure in the user-facing report but do not retry; the
+posted review is still the source of truth, this is an index entry.
 
 Consolidate the user-facing report to include this:
 ```
@@ -579,7 +576,7 @@ AWS_PROFILE=dev AWS_DEFAULT_REGION=us-east-1 uv run --with boto3 --with 'pydanti
 `params.json`: `{"repo", "pr", "timestamp", "head_sha", "title", "author", "size",
 "briefing_path", "comments": [{"id", "path", "line", "body"}]}` (omit `comments` for a
 body-only review). On write failure, log and continue; the GitHub post (Step 3) is
-authoritative and the beads memory (Step 5) is the durable record.
+authoritative and the memory topic file (Step 5) is the durable record.
 
 **Two prerequisites Step 6 does not inherit from Steps 1-5.** Both cost a round-trip on
 2026-08-12 (PR #11556):

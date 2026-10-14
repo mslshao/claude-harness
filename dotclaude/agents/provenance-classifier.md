@@ -27,7 +27,7 @@ distinction; the synthesizer uses your output to populate the
 `Classification:` line in each finding's briefing context, the
 `**Provenance**:` audit line in the Review Recommendation header, and the
 audit field counts (`bot_surfaced_count`, `speed_amplified_count`) written
-to bd memory by /post-review.
+to a memory topic file by /post-review.
 
 You are advisory only. You do not write code, propose fixes, or modify
 comment text. The synthesizer owns the rendered output; you supply the
@@ -66,7 +66,7 @@ naming the source ("My `<agent>` specialist flagged...", "SonarCloud's
 flagging this as rule S8572...", "Cross-file analysis surfaced that...");
 none are posted in the reviewer's unaided voice. The speed-amplified vs
 bot-surfaced split feeds the `bot_surfaced_count` / `speed_amplified_count`
-fields /post-review writes to bd memory, answering "could the reviewer
+fields /post-review writes to a memory topic file, answering "could the reviewer
 have caught this from careful single-file reading?" for understanding
 pr-intel's value-add. It is NOT a voice switch. (Reversed per the engineering lead's
 2026-05-26 feedback; see pr-intel `output-formats.md`.)
@@ -209,7 +209,7 @@ or commentate. The synthesizer reads your JSON output mechanically.
 
 ## Calibration Loop
 
-The ORCHESTRATOR records calibration drift; do not run `bd` yourself (your
+The ORCHESTRATOR records calibration drift; do not persist it yourself (your
 tools are Read+Grep, and your output contract is mechanical JSON).
 
 When you default to bot-surfaced low-confidence three or more times in a
@@ -217,9 +217,8 @@ single run, the synthesizer's source-tagging is leaking findings without
 source fields. You do NOT need to signal this: your output contract is a
 bare JSON array the synthesizer reads mechanically, and the orchestrator
 side (pr-intel provenance-classification.md) already counts low-confidence
-defaults and records the drift via
-`bd remember --key="calibration:provenance-classifier:<topic>" "<note>"`.
+defaults and records the drift, keyed
+`calibration:provenance-classifier:<topic>`, in this agent's calibration
+memory topic file.
 The right fix is upstream in the synthesis, not in this agent's defaults;
 keep your output strictly to the classification array.
-
-Recurrence context: bd memories calibration:pr-intel-provenance-rule-2026-05-21

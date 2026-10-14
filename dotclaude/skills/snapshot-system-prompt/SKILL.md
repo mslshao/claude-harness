@@ -23,8 +23,7 @@ inherits today.
 The Claude Code system prompt encodes behavioral defaults (the `# Doing tasks`
 section among others). The team is not version-locked, so each IC's effective
 defaults vary by which Claude Code version they have installed. The personal-tier
-hardening backlog (beads `docr-95m8`, `docr-z1qt`, `docr-rtce`, `docr-d0r9`,
-`docr-lga9`, `docr-kpe4`) codifies the load-bearing defaults at project tier so
+hardening backlog codifies the load-bearing defaults at project tier so
 behavior remains stable across version drift.
 
 This skill is the periodic capture mechanism that makes drift detection possible.
@@ -236,7 +235,7 @@ Next action: <none | "Re-run /converge on the affected bead" | "File a follow-up
   paraphrase, summarize, or "improve" the captured text. Em-dash placeholder is
   the only allowed transformation.
 - **Do not commit snapshots to the project repo.** They live in personal scratch.
-  Cross-account team sharing is a separate decision (`bd memories project:rule-architecture-version-changelog-mirror`).
+  Cross-account team sharing is a separate decision.
 - **Always run the diff.** A snapshot without a drift summary is half the value.
   If no prior snapshot exists, say so and skip the diff section; do not silently
   proceed.
@@ -244,7 +243,7 @@ Next action: <none | "Re-run /converge on the affected bead" | "File a follow-up
   `unknown` in the filename; the version is the primary index for future
   comparisons.
 
-## Related Beads
+## Related References
 
 - `docr-ojx5` (closed) - SessionStart hook that nudges to invoke this skill on drift
 - `project:rule-architecture-version-changelog-mirror` (memory) - a deferred 2026-05-05

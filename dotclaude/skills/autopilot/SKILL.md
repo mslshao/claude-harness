@@ -78,7 +78,7 @@ Challenge subagent AND all selected consult specialists (roster:
 `~/.claude/skills/consult/specialists.md`) YOURSELF, in one message. There
 is NO consult-coordinator subagent: subagents cannot spawn subagents
 (verified 2026-06-09), so a coordinator would silently roleplay its
-specialists in one context. Challenge searches `bd memories` for
+specialists in one context. Challenge greps `~/.claude/memory/` for
 domain-specific gotchas and produces a modifications table; each
 specialist reviews the plan items in its domain.
 
@@ -335,8 +335,7 @@ Because `bot-review` cannot emit BLOCKING/CRITICAL, its findings arrive inside
    **ScheduleWakeup gotcha:** wakeups queue, they don't replace. If you
    reissue with a different cadence before the first fires, both will fire.
    Defensive iteration prompts should check `bd show <tracking-bead>` for
-   prior logged work in the same iteration before duplicating effort. See
-   `bd memories gotcha:schedulewakeup-queues`.
+   prior logged work in the same iteration before duplicating effort.
 
    **Harness fallback:** ScheduleWakeup is a main-loop tool documented as
    /loop pacing machinery; direct calls work today (verified 2026-06-09) but
@@ -451,8 +450,8 @@ Agent(
   Context: [relevant details]
 
   Run your self-reflection protocol. If a new rule or example would
-  have prevented this miss, emit calibration drift via bd remember per
-  your Self-Reflection Protocol. Never attempt to edit the calibration
+  have prevented this miss, emit calibration drift to your calibration
+  memory topic file per your Self-Reflection Protocol. Never attempt to edit the calibration
   file directly; calibration changes pass through the /calibrate human
   review gate by design, so the bd-remember channel is the only merge path.
   """

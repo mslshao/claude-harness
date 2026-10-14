@@ -1,6 +1,6 @@
 ---
 name: standup-prep
-description: "Generate the user's OWN spoken-standup talk-track from their ENGINEERING activity (git, PRs authored + reviewed, PR/issue comments, Jira, Confluence, beads, plus a Slack sweep for unanswered asks + open threads) for a past day, binned by the user's LOCAL timezone. This is OUTBOUND status generation, not transcript capture. Use for 'verbal standup', 'standup prep', 'prep my standup', '/standup-prep', 'what did I do yesterday/Friday', 'what did I ship'. This is the one-stop standup generator across all those sources. The slack plugin's /standup is the lighter Slack-only alternative (just messages, formatted to post in a channel); to CAPTURE a pasted transcript of a meeting that already happened use /capture-transcript (inbound). On a bare 'help me with standup', prefer this skill when recent context is code/PR/Jira work."
+description: "Generate the user's OWN spoken-standup talk-track from their ENGINEERING activity (git, PRs authored + reviewed, PR/issue comments, Jira, Confluence, plus a Slack sweep for unanswered asks + open threads) for a past day, binned by the user's LOCAL timezone. This is OUTBOUND status generation, not transcript capture. Use for 'verbal standup', 'standup prep', 'prep my standup', '/standup-prep', 'what did I do yesterday/Friday', 'what did I ship'. This is the one-stop standup generator across all those sources. The slack plugin's /standup is the lighter Slack-only alternative (just messages, formatted to post in a channel); to CAPTURE a pasted transcript of a meeting that already happened use /capture-transcript (inbound). On a bare 'help me with standup', prefer this skill when recent context is code/PR/Jira work."
 argument-hint: "[<weekday> | <YYYY-MM-DD> | --days N] (default: previous business day)"
 ---
 
@@ -124,12 +124,6 @@ project = MX2 AND updated >= "<lower>" ORDER BY updated DESC
 ```
 `<lower>` is `D` for a single day, `D-(N-1)` under `--days N`; bare dates use the user's Jira-profile tz. Also seed the candidate set with the `[MX2-XXXXX]` keys pulled from the PRs in 1b/1c (an independent catch for drifted tickets). Then fetch the `comment` field for each candidate (batch via `key in (...)`), keep only comments where `author.accountId == <my accountId>` AND `created` (convert from the returned ET/`-0400` to UTC) is in `[WIN_START, WIN_END)`. Report the strategies tried (absence-prone external search).
 
-### 1e. Beads
-```bash
-bd list --status=in_progress
-```
-for the "what's active / blocked" framing. Use `bd show <id>` on the day's beads for richer "what's next".
-
 ### 1f. Confluence pages created or edited by the user
 Run via `mcp__atlassian__searchConfluenceUsingCql` (same cloudId as Jira; `currentUser()` resolves automatically). `contributor` covers both create and edit (superset of `creator`):
 ```
@@ -170,7 +164,7 @@ Lead with the single most important fact (what shipped / the headline effort). T
 - **Docs** - Confluence pages created or edited (title + page URL + the gist or edit message); a published runbook or design page is a real deliverable and belongs in the talk-track.
 - **Open asks / threads (Slack)** - unanswered questions or review-requests the user posted, and threads where the user owes or awaits a reply. This is usually the only standup-worthy Slack content. Skip routine chatter and anything already covered by PRs/Jira/deploys (per 1g dedup). Fold genuine blockers here into Status, follow-ups into Today/next.
 - **Status / blockers** - drafts still open, gated/manual deploys pending, real CI failures (not hygiene gates).
-- **Today / next** - the immediate next actions and any downstream beads blocked on this work.
+- **Today / next** - the immediate next actions and any downstream work blocked on this.
 
 Then a **calibration note** (1-2 lines) stating: (a) real outward review work vs bot-attributed noise excluded; (b) **Slack pagination completeness**: how many messages across how many pages, and whether the day was fully paginated to no-cursor or only the first page was read. A page-1-only sweep is an incomplete standup: either finish paginating or flag the gap explicitly. This makes silent Slack truncation impossible and keeps the spoken update accurate.
 

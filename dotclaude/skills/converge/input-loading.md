@@ -10,7 +10,6 @@ extraction before MCP calls:
 
 - **Jira ticket ID** (`MX2-\d+`): fetch via Atlassian MCP
   (`getJiraIssue`). Pull description, AC, comments.
-- **Bead ID** (`docr-\w+`): run `bd show <id>` to load description,
   notes, dependencies.
 - **Slack URL** (`https://*.slack.com/archives/<CHANNEL>/p<TS>` or
   `/archives/<CHANNEL>/<TS>`): extract the channel ID and message
@@ -78,7 +77,7 @@ bash /home/vscode/.claude/scratch/domain-matcher/match.sh "<user input>" \
   | cut -d: -f1 | head -10
 ```
 
-For each matched keyword, run `bd memories <keyword>` and skim the top
+For each matched keyword, grep `~/.claude/memory/` and skim the top
 5 results. If the input names a known service (e.g., `<service>`, `folio`,
 `salesforce`, `metadata_updater`) or a path under
 `src/python/mx2/<service>/`, also read the service-level `CLAUDE.md`
@@ -108,10 +107,10 @@ for project rules.
 
 ### Sibling-Bead Sweep (Mandatory, Not Optional)
 
-Always run `bd list --status=in_progress`. For EVERY returned bead
-whose title or description contains a domain keyword from the input OR
-any of architecture/decision/converge/Path/refactor, run
-`bd show <id>` and capture the ratified-decision section into the
+Always check `open-chores.md` and the memory topic files. For EVERY
+open item whose title or description contains a domain keyword from
+the input OR any of architecture/decision/converge/Path/refactor, read
+its full entry and capture the ratified-decision section into the
 `Loaded context:` heading from step 1.
 
 These are not "in-flight work I might collide with"; they are the
@@ -124,10 +123,10 @@ not the nominal-parent epic of the current ticket.
 **Recurrence note**: 2026-05-19 <service>-self-containment session
 converged through six wrong directions because docr-b7xa's ratified
 Path B decision (in a sibling epic MX2-NNNNN, not the nominal-parent
-MX2-NNNNN) was never loaded. The decision lived in the bead
-description, not in `bd remember`, so `bd memories <keyword>` did not
-surface it. `bd list --status=in_progress` + `bd show` is the only
-path that catches this class.
+MX2-NNNNN) was never loaded. The decision lived in the item's own
+description, not in a keyword-searchable memory entry, so a keyword
+grep did not surface it. Checking `open-chores.md` and reading every
+open item's full description is the only path that catches this class.
 
 ## Step 4: Enrich (when references detected)
 
@@ -136,7 +135,7 @@ or PR number (`#\d+`), the Step 0 input loading should have already
 fetched them. Additionally:
 
 - Run `bd search <keywords>` from the ticket/bead title (top 5 results)
-- Run `bd memories <keyword>` with service name or domain (top 10
+- grep `~/.claude/memory/` with service name or domain (top 10
   matches)
 - Fold all results into the refined scope as structured context
 

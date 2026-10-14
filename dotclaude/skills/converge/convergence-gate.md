@@ -37,8 +37,9 @@ Agent(
   autopilot-specific fields as waived and a missing iteration history
   as 'First evaluation'.
 
-  If you detect calibration drift during this invocation, record via
-  `bd remember --key='calibration:mx2-decision-maker:converge:<topic>' '...'`.
+  If you detect calibration drift during this invocation, record it,
+  keyed `calibration:mx2-decision-maker:converge:<topic>`, in this
+  agent's calibration memory topic file.
   Tag with `converge:` so calibrate reviews can keep convergence-specific
   calibration separate from autopilot/launch and ideation calibration.
 

@@ -46,14 +46,14 @@ provides the draft plan and instructs the subagent to:
 
 Include in the subagent prompt:
 
-> Search `bd memories` for domain-specific gotchas relevant to this
-> plan. Read source files to verify codebase assumptions. ALSO run
-> `bd list --status=in_progress` and `bd show` any bead whose title or
+> grep `~/.claude/memory/` for domain-specific gotchas relevant to this
+> plan. Read source files to verify codebase assumptions. ALSO check
+> `open-chores.md` for any item whose title or
 > description contains a domain keyword or architecture/decision/Path
 > keywords. The ratified architectural decision for the domain may
-> live in a sibling bead under a different epic, and the decision
-> often lives in the bead description rather than in `bd remember`,
-> so `bd memories` keyword search alone will miss it. Surface any
+> live in a sibling item under a different epic, and the decision
+> often lives in the item's own description rather than in a memory
+> topic file, so a memory grep alone will miss it. Surface any
 > such decision as a HIGH-impact assumption to verify against the
 > draft plan.
 >
@@ -103,8 +103,8 @@ Include in EACH specialist's prompt:
 > `~/.claude/skills/challenge/assumption-taxonomy.md`?), and
 > Scope/Completeness (what production concerns - rollback, observability,
 > migration - does this plan omit?).
-> BEFORE forming findings, run `bd list --status=in_progress` and
-> `bd show` any bead in the same domain. A ratified architectural
+> BEFORE forming findings, check `open-chores.md` for any item in
+> the same domain. A ratified architectural
 > decision in a sibling bead supersedes the draft plan; surface that
 > contradiction explicitly rather than producing findings that
 > re-litigate a closed question.
@@ -181,7 +181,7 @@ the recommended plan.
 **Dismissal capture (orchestrator duty)**: when the user dismisses a
 Skeptic Lens concern with reasoning ("not a real concern", "covered by
 X"), record it before moving on:
-`bd remember --key="calibration:mx2-skeptic:dismissal:<short-tag>" "<date>: <pattern>. <why dismissed>. <how to recognize next time>."`
+in this agent's calibration memory topic file, keyed `calibration:mx2-skeptic:dismissal:<short-tag>` (dated: `<pattern>. <why dismissed>. <how to recognize next time>.`).
 The skeptic cannot observe dismissals (they happen after it returns);
 this step is the only thing that makes its calibrate-or-fade loop real. If the agent returns `🔻 No concerns from this
 lens`, still include the section with that exact line so the user

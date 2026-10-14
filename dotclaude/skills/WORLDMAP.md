@@ -55,7 +55,7 @@ status: active
 trigger_signals:
   - "context window approaching limits"
   - "user signals 'audit configs' or 'wrap up'"
-  - "long session with accumulated non-trivial state not yet in beads"
+  - "long session with accumulated non-trivial state not yet in the tracker"
 prevents:
   - "loss of WIP-state context that native compact cannot preserve reliably"
   - "next session restarting from cold with no awareness of in-flight decisions"
@@ -476,7 +476,7 @@ related: [decision-maker, reflect]
 ---
 ```
 
-When I reach for this: the SessionStart hook tells me unmerged calibration entries exist. The skill reads `bd memories calibration:<agent>:*`, presents each entry with the current calibration file state, lets the user keep/merge/reject per entry. On merge it writes to the agent's calibration file and the audit log, then deletes the source memory key.
+When I reach for this: the SessionStart hook tells me unmerged calibration entries exist. The skill reads each agent's calibration memory topic file, presents each entry with the current calibration file state, lets the user keep/merge/reject per entry. On merge it writes to the agent's calibration file and the audit log, then deletes the source memory key.
 
 What it prevents: a frozen calibration system. Subagents (mx2-decision-maker today, others later) cannot write directly to their calibration files (the subagent sandbox restricts writes to the project workspace). Without this skill, the calibration channel is unidirectional: subagents emit drift, nothing reads it, nothing merges it. The skill is what makes calibration a learning loop.
 
@@ -733,7 +733,7 @@ trigger_signals:
 prevents:
   - "high-value transcript signal lost to compaction because nothing wrote it to a durable file"
   - "each capture re-deriving the two-tier memory conventions and slipping on identity, sensitivity, or length discipline"
-  - "candid 1:1 people-content leaking into Dolt-synced beads or shared surfaces"
+  - "candid 1:1 people-content leaking into synced memory or shared surfaces"
 related: [handoff, bead-forge, recall]
 ---
 ```
@@ -800,7 +800,7 @@ The operational rules in it are scar tissue, not polish: pin the head SHA and re
 
 How it compounds: it is the author-side third of the review surface (`/review` is same-session and local, `/pr-intel` is someone else's PR). The hand-back template is the half that is easy to overlook: the implementing session cannot see the review, so the per-round FIX REQUEST block is the only thing that crosses, and its ALREADY VERIFIED section is what keeps round N+1 from re-running the reviewer's work.
 
-Limits: the decorrelation half is explicitly unproven and under evaluation (bd `docr-qc87r`); only the diff-anchoring half rests on measured evidence today. Nothing enforces the handoff either. The skill can emit a perfect prompt and the user can paste it into a subagent of the authoring session, which buys the contextual reaches and none of the decorrelation, and the output will look identical.
+Limits: the decorrelation half is explicitly unproven and under evaluation; only the diff-anchoring half rests on measured evidence today. Nothing enforces the handoff either. The skill can emit a perfect prompt and the user can paste it into a subagent of the authoring session, which buys the contextual reaches and none of the decorrelation, and the output will look identical.
 
 ---
 
@@ -848,7 +848,7 @@ related: [capture-transcript, overwatch, handoff]
 ---
 ```
 
-When I reach for this: the user wants a spoken talk-track built from their own activity for a past day. Outbound generation, gathered across git, authored and reviewed PRs, PR and issue comments, tickets, Confluence, beads, and Slack. Read-only; it never posts or mutates.
+When I reach for this: the user wants a spoken talk-track built from their own activity for a past day. Outbound generation, gathered across git, authored and reviewed PRs, PR and issue comments, tickets, Confluence, and Slack. Read-only; it never posts or mutates.
 
 What it prevents: three concrete, observed errors. The day boundary is first and the skill treats it as load-bearing: the local UTC offset is derived mechanically from the user's own commit stamps and every source is re-binned against it, because hand-computing a date or a day of week is exactly where the wrong day creeps in. Second is the truncated sweep: a public-only Slack search returned 1 message where private plus DMs returned 109 across 6 pages, and stopping at page one drops the start of the day (descending sort puts the morning last), so the output must state how many pages were read. Third is overclaiming: stack-management and merge-activity comments the bot posts under the user's token are filtered out, and the exclusion is flagged rather than done silently.
 

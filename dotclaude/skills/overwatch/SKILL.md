@@ -10,7 +10,7 @@ allowed-tools: ["Bash", "Grep", "Read", "ScheduleWakeup", "CronCreate", "Agent",
 A standing loop that watches the user's work queue across beads, GitHub PRs, and
 Jira, and surfaces only the DELTAS that mean "something needs your attention now."
 It answers "what should I work on next?" continuously, so the user does not have
-to run `bd ready`, `gh search prs`, and a Jira query by hand every hour.
+to check `open-chores.md`, `gh search prs`, and a Jira query by hand every hour.
 
 Two things make it safe to leave running:
 
@@ -45,7 +45,7 @@ the poll-diff-surface body is fixed and the cadence self-calibrates.
 | `/babysit-pr <number>` | You want to WATCH ONE SPECIFIC PR and take bounded ACTIONS on it (auto-remediate mechanical bot comments, reply inline, escalate humans). babysit-pr is single-PR and always MUTATING, and it acts on the user's OWN draft PR; overwatch is multi-source and read-only unless `--auto-review` is passed, and that mode REVIEWS OTHER PEOPLE'S PRs rather than iterating on your own. babysit-pr is window-bounded (default 1h); overwatch is a standing loop, and `--auto-review` carries its own separate cap and window so the posting authority is bounded even though the loop is not. |
 | `/standup-prep` | You want a BACKWARD-LOOKING, one-shot talk-track of what you already did for a past day. standup-prep is a single generation over a fixed past window; overwatch is FORWARD-LOOKING and continuous ("what is newly actionable"). standup-prep never loops. |
 | `/loop` (dynamic) | You want to run an arbitrary prompt on a self-paced cadence. overwatch is the specialized variant of that pattern where the loop body (poll beads/PRs/Jira, diff, surface) is fixed. |
-| `bd ready` / `gh search prs` / a one-off Jira query | You want the current state ONCE, right now. overwatch is for the standing case where polling by hand is the toil being removed. |
+| `open-chores.md` / `gh search prs` / a one-off Jira query | You want the current state ONCE, right now. overwatch is for the standing case where polling by hand is the toil being removed. |
 
 overwatch is personal-tier and watches the user's OWN queue. It is unrelated to
 the Emerald team `/watchdog` (a separate, team-owned DevOps first-responder that

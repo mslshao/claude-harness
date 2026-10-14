@@ -18,7 +18,7 @@ proven 2026-07-02 (47/47 edits, 0 failures) and 2026-06-09 (fix-pass 10/10 pages
 3. Enforcement surfaces are read from SOURCE, never from memory paraphrase: the banned
    shared-page vocab list is the regex in `~/.claude/hooks/block-personal-tier-vocab.sh`
    (grep it fresh each sweep; a stale memory claim about this hook degraded a fix on
-   2026-07-02, `bd memories correction:verification:enforcement-claims-cite-source`).
+   2026-07-02).
 
 ## 1. Build the work-list
 
@@ -33,8 +33,8 @@ Collect candidate items from every lane that has historically produced drift:
   (`/workspaces/main/.claude/agents|commands|skills`, `bin/check_claude_inventory.py`
   output, repo `CLAUDE.md` tables).
 - **External product claims**: model lineup, Cursor rules mechanisms, Copilot
-  feature/availability claims (org fact: local Copilot disabled 2026-07,
-  `bd memories decision:copilot-chat-local-disabled-2026-07`), tool-feature assertions.
+  feature/availability claims (org fact: local Copilot disabled 2026-07),
+  tool-feature assertions.
   These rot on roughly a monthly cadence.
 - **Mechanical classes**: phantom links (bare `Word.md` auto-linkified to
   `http://Word.md`; fix by backticking), header/footer schema conformance, `## N.`
@@ -89,7 +89,7 @@ spaces widening on each round-trip (6->8->10), bold-link normalization
 
 - Update the format memory: convergence-history entry (date, edits, pages, notables)
   and the held-items list (re-confirmed / newly held / cleared).
-- `bd comments add docr-jxh7 "<one-paragraph sweep summary>"`.
+- Record the sweep summary (one paragraph) in the doc-sweep memory topic file.
 - If the sweep found systemic drift a structural fix would prevent, propose it
   (that is how the repo CLAUDE.md CI inventory check came to exist).
 

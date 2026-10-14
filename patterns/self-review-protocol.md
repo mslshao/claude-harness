@@ -41,7 +41,7 @@ Recovery from a partial subagent run: re-dispatch a new subagent of the same typ
 
 ## PR scope flag at implementer standup
 
-When a code-writing subagent reports DONE on a PR with more than approximately 1000 lines added in a single commit, surface the size to the user BEFORE bot-review and pre-PR steps: the line count plus file breakdown (production vs test split), whether the work spans a single conceptual responsibility or multiple, and a recommended split if applicable. Do not just trust the implementer's "all AC met" if the scope is large. The canonical concern-split test: does the work map to multiple ratified design decisions (two separate tickets, two separate sub-beads in the same epic), or to one? Multiple equals split candidate.
+When a code-writing subagent reports DONE on a PR with more than approximately 1000 lines added in a single commit, surface the size to the user BEFORE bot-review and pre-PR steps: the line count plus file breakdown (production vs test split), whether the work spans a single conceptual responsibility or multiple, and a recommended split if applicable. Do not just trust the implementer's "all AC met" if the scope is large. The canonical concern-split test: does the work map to multiple ratified design decisions (two separate tickets), or to one? Multiple equals split candidate.
 
 ## No speculation in PR descriptions
 

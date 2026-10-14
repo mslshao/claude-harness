@@ -6,7 +6,7 @@ complete algorithm.
 
 ## When to Embed
 
-Any flow that produces a multi-step plan, a set of beads, or an architecture
+Any flow that produces a multi-step plan, a set of work items, or an architecture
 decision MUST run this protocol before presenting to the user. Skip for
 single-item plans or memory checkpoints.
 
@@ -40,7 +40,7 @@ Target 3-7 assumptions. If you have 10+, you're scanning too broadly.
 1. **Inversion**: What if the opposite is true? Does the plan change direction
    (FRAGILE), change approach (SOFT), or hold (SOLID)?
 2. **Staleness**: Was this verified this conversation (SOLID), in a recent
-   session via beads/memory (SOFT), or never verified (FRAGILE)?
+   session via memory (SOFT), or never verified (FRAGILE)?
 
 One FRAGILE on either test -> FRAGILE overall. One SOFT -> SOFT. Both SOLID -> SOLID.
 
@@ -55,7 +55,7 @@ you found. No interpretation in this step.
 
 - **Codebase**: Grep/Read the code. Record: `Searched: <pattern> | Found: <result>`
 - **Domain**: Cannot be checked against code. Mark UNVERIFIABLE.
-- **Technical/Dependency/Precedent**: Check beads, memory, code. Record searches.
+- **Technical/Dependency/Precedent**: Check memory, code. Record searches.
 - **Reasoning Chain**: Trace the logical dependency. Does step N-1 actually
   guarantee step N? Record what you checked.
 

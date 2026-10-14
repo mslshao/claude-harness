@@ -8,8 +8,6 @@ Shared reference for context-gathering tools and bounds. Referenced by
 | Source | Tool | Bounds | Fallback |
 |--------|------|--------|----------|
 | Jira ticket | Atlassian MCP `mcp__atlassian__getJiraIssue` | Last 5 comments | Large-ticket extraction script |
-| Bead | `bd show` + `bd search` | Top 5 search results | Skip if bd unavailable |
-| Beads memories | `bd memories` | First 10 matches | Skip if no matches |
 | AWS context | `mcp__aws__call_aws` | 1 service, last 1h errors | Skip if no service identifier |
 | Datadog context | `mcp__datadog__*` | Last 24h hot tier | Skip if no service identifier |
 | GitHub PR | `gh pr view` (CLI) | Changed files list | `gh api` for review comments |

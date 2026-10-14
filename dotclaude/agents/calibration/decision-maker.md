@@ -3,11 +3,9 @@
 Last reviewed by Michael: 2026-08-19 (/calibrate merge: 11 merged, 0 rejected; see lookback log)
 
 This file is read by the mx2-decision-maker agent before every decision.
-The agent emits calibration drift via `bd remember` (key prefix
-`calibration:mx2-decision-maker:`, FULL agent name per
-`decision:calibration-key-full-agent-name-2026-06-04`); the `/calibrate` skill is the human review
-gate that merges accepted entries into this file. Append-only audit of
-merged/rejected entries lives at `decision-maker.lookback.md`.
+The `/calibrate` skill is the human review gate that merges accepted
+entries into this file. Append-only audit of merged/rejected entries
+lives at `decision-maker.lookback.md`.
 
 ---
 
@@ -230,7 +228,7 @@ gate.
 
 When a candidate's deliverable is a NEW ratification ("no ratified decision
 exists on X; making one is part of this work"), grep the decision corpus
-(`bd memories <domain>`, memory/ topic files) for a prior lead statement on the
+(memory/ topic files) for a prior lead statement on the
 same axis BEFORE rating. An unverified absence claim is grounds for a
 condition, not a silent PROCEED: a claimed absence can turn out to be a prior
 ratified decision the artifact simply didn't search for. Extends CLAUDE.md

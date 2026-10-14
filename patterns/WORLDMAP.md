@@ -252,14 +252,14 @@ fires_when: "starting substantive work (implementation, analysis, dispatching to
 prevents:
   - "duplicating in-flight work across parallel sessions (one session creates a bead another already authored)"
   - "PR review concerns that misread a migration's current state"
-  - "subagents producing findings that ignore prior decisions captured in beads"
+  - "subagents producing findings that ignore prior decisions captured in the tracker"
 related: [reflection-trigger, two-tier-doctrine, agent-dispatch-heuristic]
 ---
 ```
 
-When this fires: every session start, every dispatch to a specialist, every implementation kickoff. Run `bd list --status=in_progress`, `bd ready`, and `bd show <id>` on relevant beads. Pass relevant bead context into specialist prompts; otherwise the specialist starts cold.
+When this fires: every session start, every dispatch to a specialist, every implementation kickoff. Check the tracker's open and in-progress items on relevant work. Pass relevant context into specialist prompts; otherwise the specialist starts cold.
 
-The doc's "epic-first check for domain-familiar work" rule is the sharpest: in active migration domains (a doc-indexing pipeline, Folio, doc_v3, classifier rewrite), `bd show <epic-id>` plus its children is the prerequisite to convergence or PR review. Skipping costs one re-planning cycle. The cost of one `bd show` is near-zero.
+The doc's "epic-first check for domain-familiar work" rule is the sharpest: in active migration domains (a doc-indexing pipeline, Folio, doc_v3, classifier rewrite), reading the epic's full context plus its children is the prerequisite to convergence or PR review. Skipping costs one re-planning cycle. The cost of that read is near-zero.
 
 ---
 
