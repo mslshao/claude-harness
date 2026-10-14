@@ -162,11 +162,11 @@ lead-in note still drew "wait, we already approved it?"). Lead with the
 one-liner instead: `Already approved: your APPROVE on <date> is on the current
 head <short_sha>; nothing has changed since. No re-review needed.`, then list
 only the still-open threads from that round. This overrides the pre-fired
-`userpromptsubmit-pr-intel-contract.sh` message (that hook runs at invocation,
+`userpromptsubmit-pr-intel-contract.sh` message (not installed on this machine; that hook ran at invocation,
 before the delta is known, so it cannot exempt this case itself); keep the
 one-liner free of the structured-template headers and the collapse-pattern
 tokens (`Action:`, `Blocking: N`, `#N reviewed`) so `stop-validate-pr-intel.sh`
-reads it as a clean short-circuit, not a collapsed render.
+(not installed on this machine) would read it as a clean short-circuit, not a collapsed render.
 
 **Behavior when `prior_reviews` is empty**: This is a first-round review. No delta
 available. Proceed with normal first-round defaults (see

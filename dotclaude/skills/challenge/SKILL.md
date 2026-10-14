@@ -1,7 +1,10 @@
 ---
 name: challenge
 description: Assumption-challenging for plans, designs, and decisions. Extracts unstated assumptions, scores by fragility, and stress-tests against codebase evidence and domain constraints. Use when reviewing a plan before presenting, when the user provides new context that may invalidate a plan, or when explicitly invoked via /challenge.
-argument-hint: "[new context, or no args to challenge the most recent plan]"
+argument-hint: "[a path to the plan, new context, or no args to challenge the most recent plan]"
+allowed-tools: ["Bash", "Glob", "Grep", "Read", "Agent", "AskUserQuestion"]
+context: fork
+agent: general-purpose
 ---
 
 # Challenge
@@ -20,7 +23,7 @@ The user calls `/challenge` with one of:
 
 ### Agent-Embedded (Phase 2.5)
 
-Plan-producing skills (bead-forge, plan agents) embed the challenge as a mandatory
+Plan-producing skills (/converge, plan agents) embed the challenge as a mandatory
 phase using the protocol in [embed-protocol.md](embed-protocol.md). The agent runs
 the protocol before presenting. Output includes a visible callout block so the user
 sees that the gate ran.
@@ -34,11 +37,15 @@ sees that the gate ran.
 - If human-invoked with context: identify the plan AND note the new context as a
   constraint that existing assumptions must be tested against.
 - If agent-embedded: the plan is whatever was just drafted in the current flow.
+- If forked (this skill runs in a subagent with no conversation history): the
+  plan must arrive in the argument, as a path to read or as the text itself.
+  There is no "most recent plan" to fall back on. With neither, say what is
+  missing and stop.
 
 After identifying the plan, detect the mode:
 - **Plan mode** (default): The plan describes future work. Assumptions are
   forward-looking ("will this approach work?"). Some will be UNVERIFIABLE.
-- **Post-impl mode**: The plan was already built (code exists, PR merged, bead
+- **Post-impl mode**: The plan was already built (code exists, PR merged, chore
   closed, or user says "we shipped this"). Assumptions can be verified against
   actual code. In Phase 4a, do not mark codebase/technical assumptions
   UNVERIFIABLE when you can Read the implementation to confirm or invalidate.
@@ -46,8 +53,8 @@ After identifying the plan, detect the mode:
 **Enrich preamble** (lightweight pre-load before assumption extraction):
 
 1. **Identifier-driven enrich** (when references detected): If the plan
-   references a Jira ticket (`MX2-\d+`) or bead ID (`docr-\w+`), fetch the
-   ticket's AC and related beads. This gives Phase 2 concrete acceptance
+   references an open chore, read its entry in `open-chores.md` for its AC
+   and related items. This gives Phase 2 concrete acceptance
    criteria to check assumptions against, and Phase 4a domain-specific
    gotchas from memory. Skip if no identifiers found.
 
@@ -160,8 +167,7 @@ to Phase 4a and verify it. This prevents false confidence.
 
 Only escalate to specialist dispatch when:
 - 2+ FRAGILE assumptions require different specialist agents (e.g., one needs
-  `mx2-security-auditor`, another needs `mx2-devops-build-deploy`; see
-  `consult/specialists.md` for the dispatch routing)
+  `security-review`; see `consult/specialists.md` for the dispatch routing)
 - A single FRAGILE assumption requires deep structural analysis (3+ modules)
 
 If all FRAGILE findings map to one specialist, route directly. If they span
@@ -214,6 +220,12 @@ Findings, order by fragility (FRAGILE first), then by impact (HIGH first).
 **Agent-embedded output:** Follow [embed-protocol.md](embed-protocol.md).
 Modify the plan using the decision table, then show the challenge gate
 callout block.
+
+### Phase 7: Close the run
+
+Emit the output contract in [output.md](output.md) after the report, in the
+order it sets. A forked run has no dispatch to answer and no conversation
+behind it, so that block is the whole of what the reader gets.
 
 ## Principles
 

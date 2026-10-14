@@ -12,13 +12,13 @@ Example problem: "How should we add document deletion to the folio API?"
 folio API. Concerns: respect existing audit-log fields, handle soft-vs
 hard delete semantics, propagate to downstream consumers (<service> index,
 dyn2red replica). Scope: folio API only; downstream cleanup is
-out-of-scope for v1." Loaded context: `bd memories folio` surfaces
+out-of-scope for v1." Loaded context: `grep -ril folio ~/.claude/memory/` surfaces
 prior decision that folio writes via dyntastic with conditional writes
 for deduplication.
 
 **Phase 2 (diverge)**: Approach count = 4 (problem is design-shaped,
-not bug-fix-shaped). Roster: `mx2-tech-lead`, `mx2-code-reviewer`,
-`mx2-security-auditor` (audit-log keyword), `observability-reviewer`
+not bug-fix-shaped). Roster: `tech-lead`, `code-reviewer`,
+`security-review` (audit-log keyword), `observability-reviewer`
 (propagation concern). Parallel dispatch returns 5 approaches; merge
 near-duplicates to 4:
 1. Soft delete via `deleted_at` timestamp; consumers filter.
@@ -42,7 +42,7 @@ Skeptic dispatched on top-3 by Score (approaches 1, 2, 3). Returns
 column, the gap to top-2 is wide (22 vs 13), and the high-consequence
 candidates (3 and 4) are not in the recommendation slot.
 
-**Phase 4 (iterate)**. mx2-decision-maker called PROCEED: top-1 scored
+**Phase 4 (iterate)**. decision-maker called PROCEED: top-1 scored
 22/22, dominant on every column including Verifiability=high and
 Consequence=low; clear gap to top-2 (Score 13). No iteration round
 needed. Iteration log records "Round 0: 5 approaches generated, 4
@@ -79,11 +79,11 @@ when the source schema changes."
 **Phase 1 (refine)**: Input is 16 words, no constraints. Refined: "Add
 a mechanism to handle document re-ingestion when the source schema
 changes. Constraints unknown: scale (is this 100 docs or 10M?),
-greenfield vs retrofit, urgency unclear." No Confluence draft, no Jira
-ticket. Pure free-text problem.
+greenfield vs retrofit, urgency unclear." No draft doc, no ticket.
+Pure free-text problem.
 
 **Phase 2 (diverge)**: Approach count = 5 (open-ended). Roster:
-mx2-tech-lead, mx2-code-reviewer, mx2-pr-precedent. 5 approaches
+tech-lead, code-reviewer, pr-precedent. 5 approaches
 returned, ranging across "schema-version pinning", "lazy re-ingestion
 on read", "eager backfill via batch job", "event-driven on
 schema-change SNS", "no-op + telemetry to scope first."
@@ -94,7 +94,7 @@ returns: "I don't know which of these is right because I don't know
 if you're optimizing for backwards-compat with 10M existing docs or
 for forward-cleanliness on a new corpus."
 
-**Phase 4 (gate, Round 1)**: mx2-decision-maker calls
+**Phase 4 (gate, Round 1)**: decision-maker calls
 ESCALATE-QUESTIONS. NARROWING_QUESTIONS:
 1. Is this a retrofit on existing production docs, or greenfield?
    **WHY**: retrofit approaches need migration paths and back-compat
@@ -113,7 +113,7 @@ sweep", "schema-version-pinned shadow index", "eager batch backfill
 with throttling", "tombstone-then-reingest". Phase 3 scores: top-1 =
 "lazy + sweep" at Score 17, top-2 = "shadow index" at Score 14.
 
-**Phase 4 (gate, Round 2)**: mx2-decision-maker calls ITERATE.
+**Phase 4 (gate, Round 2)**: decision-maker calls ITERATE.
 WEAK_DIMENSION = verifiability (top-1 is low-Verifiability; no
 existing pattern in the codebase for the lazy-load + background sweep
 combo). The next Diverge pass asks specialists to add a verification

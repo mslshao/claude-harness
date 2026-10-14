@@ -53,7 +53,7 @@ These constraints OVERRIDE the test-generator's own system prompt where they con
   that verifies a meaningful outcome.
 
 - Do NOT add `pytest_plugins = ["mx2.testing.aws_fixtures"]` or similar; moto and
-  responses are already enabled globally via the mx2-level conftest.
+  responses are already enabled globally via the repository-level conftest.
 ```
 
 ## Infrastructure Breadcrumbs

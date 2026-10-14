@@ -25,9 +25,9 @@ re-invented each time.
 ## Scope (do check)
 
 All worktrees in `git worktree list` except the main checkout (homes: `/workspaces/main/.launch-worktrees/` and `/workspaces/main/.claude/worktrees/`), with branch names matching:
-- `agent/*` (WorktreeCreate-hook agent worktrees, the dominant current pattern) and `<user-prefix>/<jira-or-bead>` (e.g. `mslshao/mx2-...`)
+- `agent/*` (WorktreeCreate-hook agent worktrees, the dominant current pattern) and `<user-prefix>/<ticket-or-bead>` (e.g. `mslshao/mx2-...`)
 - `autopilot/*` (autopilot bead-driven runs)
-- `MX2-NNNNN/*` (Jira-prefixed feature branches)
+- `MX2-NNNNN/*` (ticket-prefixed feature branches)
 - `chore/*`, `fix/*` (bead-driven chores)
 - `launch-<timestamp>` (legacy /launch worktrees; the current hook produces `agent/*` instead)
 

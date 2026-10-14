@@ -14,8 +14,8 @@ loop. Stop when the reviewer is satisfied or after 3 iteration cycles.
 HARNESS CONSTRAINT (verified 2026-06-09): this skill must run in the main
 conversation, never as a `context: fork` execution; forked skill executions are
 subagent contexts with no Agent tool, so the generator/reviewer loop would
-silently degrade to roleplay. When invoked FROM a subagent (e.g. launch-tester
-via the Skill tool), the Agent dispatches in Phases 2-4 are unavailable: do the
+silently degrade to roleplay. When invoked FROM a subagent via the Skill tool,
+the Agent dispatches in Phases 2-4 are unavailable: do the
 generation and review in-context yourself and say so in the report; the
 orchestrator's checkpoint review covers the independent-reviewer gap.
 

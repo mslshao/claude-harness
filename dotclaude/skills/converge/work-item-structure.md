@@ -85,7 +85,7 @@ Break the refined scope into work items with these fields:
 
 ## Category Assignment
 
-Each work item gets a bead category label:
+Each work item gets a category label:
 - `task` (default)
 - `memory` (when the work item captures durable knowledge, not
   executable code)
@@ -93,7 +93,7 @@ Each work item gets a bead category label:
 - `discovery` (when the work item is "find out X" or "investigate Y")
 - `review` (when the work item is "review existing X for Y")
 
-Apply the granularity check from bead-forge: each item should be
+Apply a granularity check: each item should be
 completable in one focused session. If an item is too large,
 decompose further.
 

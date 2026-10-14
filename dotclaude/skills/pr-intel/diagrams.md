@@ -6,7 +6,6 @@ The engineering lead); a diagram carries more signal than another bullet of pros
 changes.
 
 Status: experimental enhancement, personal-tier first per lab-to-production rule.
-Tracked in bead `docr-lvaq`.
 
 ## When to emit
 
@@ -123,7 +122,7 @@ For each generated diagram, before emitting:
 
 ## First-run validation
 
-Bead AC requires testing on 2 recent merged M+ cross-service PRs. Pick PRs that:
+Before relying on it, test on 2 recent merged M+ cross-service PRs. Pick PRs that:
 - Touch >= 2 service directories
 - Have a clear request/event flow (not pure refactors)
 - Predate this feature so the diagrams weren't seen during original review
@@ -133,6 +132,6 @@ For each test PR, manually evaluate:
 - Would the diagram have helped you understand the PR faster on first read?
 - Are the NEW/CHANGED annotations correct?
 
-Record results in the bead. If 0 of 2 validations pass, drop the feature; the LLM
+Record results in `open-chores.md`. If 0 of 2 validations pass, drop the feature; the LLM
 summarization approach doesn't work and we'd need static call-graph analysis (out of
 scope for the experimental P3 phase).

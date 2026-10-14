@@ -2,8 +2,8 @@
 name: review
 description: >
   (personal; shadows the project-tier `review` and takes precedence) Delta vs
-  the project version: thirteen review agents instead of six, adding devops,
-  typescript, git-historian, pydantic, python-style, bot-review, and skeptic
+  the project version: twelve review agents instead of six, adding typescript,
+  git-historian, blast-radius-reviewer, skeptic, records-reviewer and race-reviewer
   lenses with conditional triggers. Local self-review fan-out for uncommitted
   or branch-relative changes: parallel dispatch, deduplicated overlapping
   findings, grouped severity report. Read-only and local-only; does not post
@@ -18,11 +18,11 @@ argument-hint: "[--staged | <range>]"
 Local self-review via parallel fan-out to personal-tier review agents. The
 personal /review is a superset of the project /review: it inherits the six
 project review agents (code-reviewer, test-quality-reviewer, observability-reviewer,
-silent-failure-hunter, mx2-security-auditor, module-cohesion-reviewer) and adds
-seven personal-only specialists (devops, TypeScript, git-history regression,
-pydantic, python-style, cross-file blast-radius, skeptic) behind conditional
+silent-failure-hunter, security-review, module-cohesion-reviewer) and adds
+four personal-only specialists (TypeScript, git-history regression,
+cross-file blast-radius, skeptic) behind conditional
 dispatch triggers. Read-only and local-only: no GitHub
-posting, no Jira/Confluence fetch, no code modification.
+posting, no ticket or wiki fetch, no code modification.
 
 ## Why personal-tier expansion
 
@@ -132,7 +132,7 @@ so FAIL LOUD per that guard instead.
       commit`, `address feedback`, `lint`, `more changes`, single-word)
       AND the branch has > 1 commit
     - All commits lack a body and the subjects are < 30 chars total
-    - No subject references a Jira ticket (`MX2-\d+`) AND the diff
+    - No subject references a ticket AND the diff
       touches multiple services
     - The branch is a squash candidate with > 5 noisy commits that should
       collapse before opening the PR
@@ -168,6 +168,7 @@ so FAIL LOUD per that guard instead.
    | `has_python_files` | Diff includes any `*.py` file outside `src/gen-python/` |
    | `has_python_module_change` | A `src/python/**/*.py` file is added, deleted, or renamed, OR added lines declare a net-new top-level `def `/`class ` (column-0 on a `+` line). Test-only Python changes (`*_test.py`, `test_*`, `conftest.py`) alone do not set it unless production/test-only mixing is the concern |
    | `adds_capability` | Added lines introduce a NEW outbound capability rather than extending an existing one. Any of: an HTTP call (`requests.`, `httpx.`, `urllib.request`, `aiohttp`, `fetch(`); a subprocess invocation (`subprocess.`, `os.system`, `shell=True`); a queue or topic publish (`publish(`, `send_message(`, `put_events(`); a new route declaration (`@app.`, `@router.`, `APIRouter(`); a new CLI entry point (`argparse`, `click.`, a new `__main__` block); a system-package or image install (`apt-get install`, a Dockerfile `RUN` adding a binary); or a new raw SQL or warehouse query string. Test-only files alone do not set it |
+   | `has_write_path` | A changed path under `src/lib/storage/**`; or a route under `src/app/api/**` whose added lines declare or change a POST, PUT, PATCH or DELETE handler; or a use case under `src/lib/<feature>/` whose added lines call a repository write. In the app repository each path starts with `web/`. Test-only files alone do not set it |
 
 2a. **Active reuse-search (capability-collision pre-check).** Fires when
     `adds_capability`. The question here is not "is the new code correct?"
@@ -235,7 +236,7 @@ so FAIL LOUD per that guard instead.
 
     - **Candidate owner found**: name it as `file:line`, state what it
       already does, and carry it into the report as a Front Door finding
-      (step 6). Also pass it into the `mx2-code-reviewer` and
+      (step 6). Also pass it into the `code-reviewer` and
       `module-cohesion-reviewer` prompts as evidence, so their reads start
       from the incumbent rather than from the new code.
     - **No owner found**: record the literal terms tried, as
@@ -279,7 +280,7 @@ so FAIL LOUD per that guard instead.
     `fixture-collision: skipped (no test files in diff)`. A lens that only speaks on a
     hit is indistinguishable from a lens that stopped running.
 
-3. **Fan out in parallel.** Single message with up to thirteen Agent tool calls.
+3. **Fan out in parallel.** Single message with up to twelve Agent tool calls.
    Build each prompt with these elements, in order:
 
    a. **Code root** path (worktree or repo root).
@@ -300,6 +301,11 @@ so FAIL LOUD per that guard instead.
       blobs via `git show <headref>:<path>` (pass `<headref>` in the prompt), or
       (b) check the branch into a worktree first so the working tree matches the
       review target.
+   **Read boundary (mandatory)**: tell the agent to read the repository and the
+   files named in the prompt only, and never to open `~/.claude/memory/` or
+   `~/.claude/scratch/syncs-*/`. A finding that leaves this box must not quote a
+   meeting capture (2026-10-01: a skeptic's report cited one by line; `rules/usage.md`
+   rule 8 keeps captures off every repository).
    d. **Author Mode preamble**: "CI has not run yet. Flag everything that
       would come back from CI or a careful reviewer."
    d2. **Read-only reminder (every agent)**: "You are a reviewer: report
@@ -310,7 +316,7 @@ so FAIL LOUD per that guard instead.
       pilot had a resumed reviewer apply its own findings unattributed.)
    e. **Commit log for intent context**: the captured `git log` output.
    f. **Citation requirement**: file:line on every finding.
-   g. **The engineering lead's priority order (mx2-code-reviewer only)**: append a one-line
+   g. **The engineering lead's priority order (code-reviewer only)**: append a one-line
       preamble naming the order so the agent surfaces findings in the
       reviewer-priority sequence: "Surface findings in the engineering lead's priority
       order: description, types, complexity / naming, boolean params,
@@ -327,24 +333,35 @@ so FAIL LOUD per that guard instead.
 
    | Agent | Dispatch when | Filter |
    |-------|---------------|--------|
-   | `mx2-code-reviewer` | always | implementation files (exclude tests/generated/lockfiles) |
+   | `code-reviewer` | always | implementation files (exclude tests/generated/lockfiles) |
    | `test-quality-reviewer` | `has_test_files` | test files + the sources they test |
    | `observability-reviewer` | `has_observability_signal` | obs-matching files + sibling `*.tf` |
-   | `mx2-silent-failure-hunter` | `has_error_handling_signal` | try/except/raise files + FE-BE boundary files |
-   | `mx2-security-auditor` | `has_security_signal` | auth/PII/audit/document + `logger.`/`SecretStr` files |
-   | `mx2-devops-build-deploy` | `has_terraform_files` | `*.tf`/`*.hcl`/`terragrunt.hcl` + sibling env dirs |
-   | `mx2-typescript-reviewer` | `has_typescript_files` | TS files only |
-   | `mx2-git-historian` | `structural_risk_size` AND `has_file_history` | changed-file line ranges |
-   | `bot-review` (advisory) | `changes_public_surface` | changed public-symbol decls + full file list |
-   | `mx2-skeptic` (advisory) | `structural_risk_size` | file list + commit log + first 50 diff lines/file |
-   | `mx2-pydantic-reviewer` | `has_pydantic_settings_signal` | Settings/config files + sibling Settings files |
-   | `mx2-python-style` | `has_python_files` | Python files only (Author Mode / pre-CI only) |
+   | `silent-failure-hunter` | `has_error_handling_signal` | try/except/raise files + FE-BE boundary files |
+   | `security-review` | `has_security_signal` | auth/PII/audit/document + `logger.`/`SecretStr` files |
+   | `typescript-reviewer` | `has_typescript_files` | TS files only |
+   | `git-historian` | `structural_risk_size` AND `has_file_history` | changed-file line ranges |
+   | `blast-radius-reviewer` (advisory) | `changes_public_surface` | changed public-symbol decls + full file list |
+   | `skeptic` (advisory) | `structural_risk_size` | file list + commit log + first 50 diff lines/file |
    | `module-cohesion-reviewer` (advisory) | `has_python_module_change` | implementation `.py` files + full file list |
+   | `records-reviewer` (advisory) | `has_memory_records` AND `records-for-diff.py` prints at least one record AND at least one changed path is not a Markdown file under `docs/` | changed files + the script's saved output |
+   | `race-reviewer` (advisory) | `has_write_path` | the range, the clone, and the spec's conflict lines for each aggregate written |
+
+   `has_memory_records` is true when the checkout holds
+   `web/docs/memory/records/SCHEMA.md` or `docs/memory/records/SCHEMA.md`
+   (the app repository). Run
+   `python3 ~/.claude/scratch/scripts/records-for-diff.py --repo <code root> <changed paths>`
+   first; dispatch only when it prints a record and the diff is not docs-only
+   Markdown, and pass its output. The
+   repository's `CLAUDE.md` applies records at design and at execution; this
+   row is the review-time half. Its output is per record (holds, contradicted,
+   not decidable), never a verdict on the change, and a contradiction is
+   IMPORTANT at most because a record can be stale. Added 2026-10-07 on
+   Michael's yes.
 
    Each non-always agent emits a skip note when its signal is absent (e.g.
    "test-quality-reviewer: skipped (no test files in diff)"). The three advisory
-   agents are severity-capped and emit non-verdict output: `bot-review` to
-   COMMENT/NOTE/SUGGESTION, `mx2-skeptic` to QUESTION only (report all real
+   agents are severity-capped and emit non-verdict output: `blast-radius-reviewer` to
+   COMMENT/NOTE/SUGGESTION, `skeptic` to QUESTION only (report all real
    questions ranked by blast radius, soft ceiling ~10), and
    `module-cohesion-reviewer` to QUESTION/SUGGESTION/COMMENT (every finding an
    author-facing question, never BLOCKING/CRITICAL).
@@ -360,10 +377,8 @@ so FAIL LOUD per that guard instead.
    two independent post-launch reviews, and `/pr-intel --mine`.
 
    Coordination:
-   when both `mx2-code-reviewer` and `mx2-typescript-reviewer` fire, send each
-   only its language-relevant files. `mx2-python-style` duplicates CI signal
-   (pylint/yapf/isort/autoflake); its value is the pre-push catch, so skip it
-   manually if running /review post-CI.
+   when both `code-reviewer` and `typescript-reviewer` fire, send each
+   only its language-relevant files.
 
 5. **SonarCloud pre-check (always; in parallel with the fan-out).** Sonar
    findings are tractable to self-remediate before pushing, so this skill
@@ -440,7 +455,7 @@ so FAIL LOUD per that guard instead.
      type/model smells (untyped dicts, `dict[str, Any]`, Literal-key
      dicts, `| None` on collections, `bool | None`, same model
      representing multiple states; typically surfaced by
-     `mx2-code-reviewer` Design Judgment Checks). **Also promote
+     `code-reviewer` Design Judgment Checks). **Also promote
      capability duplication** (from step 2a, or from any agent that
      independently names an existing owner): a change that reimplements
      what an existing endpoint or shared symbol already provides is the
@@ -472,7 +487,7 @@ so FAIL LOUD per that guard instead.
      provenance/intent question ("why does this exist?", "was this
      deliberate?"). This operationalizes the `code-review.md` False Positive
      Triage rule (a "callers may depend on X" claim with no named caller is
-     speculative) as a demote, not a silent drop. The thirteen-agent fan-out
+     speculative) as a demote, not a silent drop. The ten-agent fan-out
      produces more of this traffic than a six-agent one, so the demote path
      carries more here than it does at the project tier it came from.
    - **A reuse finding does not demote.** A step-2a finding names an in-repo
@@ -482,7 +497,7 @@ so FAIL LOUD per that guard instead.
      value is asking whether the change should exist, and a version of it
      parked in Open questions gets answered with a local refactor instead of
      a deletion. Never let trigger (b) above swallow it.
-   - `bot-review` findings go in their own "Advisory (cross-file)" subsection
+   - `blast-radius-reviewer` findings go in their own "Advisory (cross-file)" subsection
      to preserve the COMMENT/NOTE/SUGGESTION distinction.
    - `module-cohesion-reviewer` findings render in "Open questions" (every
      finding is an author-facing question); a finding the agent tags SUGGESTION
@@ -502,7 +517,7 @@ so FAIL LOUD per that guard instead.
 7. **Write the self-review cache (for `/pr-intel --mine` dedup).** After
    presenting the report, persist the RAW per-specialist findings so a
    subsequent `/pr-intel --mine` on the same unchanged diff can reuse them
-   instead of re-dispatching the overlapping roster (bead `docr-xvnr`).
+   instead of re-dispatching the overlapping roster.
 
    a. Compute the scope identity. The hash MUST be computed from the same
       scope the review ran against (default / `--staged` / `<range>`):
@@ -580,13 +595,13 @@ fixing them often invalidates the downstream review.
 
 ### Advisory (cross-file)
 - {file}:{line} - {one-line invariant articulation}
-  Source: bot-review
+  Source: blast-radius-reviewer
   Consumer: {consumer file}:{line}
   Severity: COMMENT | NOTE | SUGGESTION
 
 ### Open questions
 - {one-line question grounded in file:line or commit context}
-  Source: mx2-skeptic | module-cohesion-reviewer
+  Source: skeptic | module-cohesion-reviewer
 - {file}:{line, or n/a if the claim has no local anchor} - {the demoted claim}
   Source: {agent name(s)}
   Why demoted: {outside local scope | consumer not grep-confirmed | provenance/intent}
@@ -616,10 +631,10 @@ Severity rules:
 - **Critical**: bugs, data loss risk, security exposure, behavior break.
 - **Important**: patterns that will come back in CI or PR review.
 - **Suggestion**: polish items the author can take or leave.
-- **Advisory (cross-file)**: bot-review's consumer-invariant findings,
+- **Advisory (cross-file)**: blast-radius-reviewer's consumer-invariant findings,
   severity-capped to COMMENT/NOTE/SUGGESTION.
 - **Open questions**: two populations, both author-facing. Questions from
-  `mx2-skeptic` and `module-cohesion-reviewer` (their native output), plus
+  `skeptic` and `module-cohesion-reviewer` (their native output), plus
   findings DEMOTED from a severity tier because they cannot be verified
   against the local diff plus repo (out-of-local-scope, consumer not
   grep-confirmed, or provenance/intent). Demoted, not dropped. A reuse
@@ -669,19 +684,24 @@ uninterrupted runs, pre-approve the read-only set in
 - **Local-first.** The diff and local git history are the entire context
   the dispatched agents see. The skill itself queries the SonarCloud gate and
   issue endpoints when an open PR exists for the branch (see step 5); those are
-  the one remote read. Does not fetch Jira, Confluence, or PR review state.
+  the one remote read. Does not fetch ticket, wiki, or PR review state.
 - **Local self-review cache only.** The single state write is
   `~/.claude/scratch/review-cache/<branch>.json` (raw per-specialist findings,
-  for `/pr-intel --mine` dedup per bead `docr-xvnr`). Does not write task
+  for `/pr-intel --mine` dedup). Does not write task
   trackers, persistent memory, the repo, or GitHub. The Sonar queries are reads.
-- **Bounded fan-out.** Up to thirteen review agents with conditional dispatch.
-  Maximum ten verdict-emitting specialists fire on a single diff (five of the
-  six always-or-conditional agents from project /review, mx2-security-auditor
+- **Bounded fan-out.** Up to twelve review agents with conditional dispatch;
+  the eleventh is the advisory `records-reviewer`, which fires only on a
+  app diff that the records matcher ties to at least one active record and
+  in which at least one changed path is not a Markdown file under `docs/`.
+  The twelfth is the advisory `race-reviewer`, which fires only on
+  `has_write_path`.
+  Maximum seven verdict-emitting specialists fire on a single diff (five of the
+  six always-or-conditional agents from project /review, security-review
   included and the advisory module-cohesion-reviewer excluded,
-  plus five personal-only conditional agents: devops, typescript, git-historian,
-  pydantic, python-style). Three advisory-only agents fire conditionally and produce
-  non-verdict output: `bot-review` (cross-file invariant questions, fires on
-  public-surface changes), `mx2-skeptic` (adversarial questions, fires
+  plus two personal-only conditional agents: typescript and git-historian).
+  Three advisory-only agents fire conditionally and produce
+  non-verdict output: `blast-radius-reviewer` (cross-file invariant questions, fires on
+  public-surface changes), `skeptic` (adversarial questions, fires
   on M+ diffs), and `module-cohesion-reviewer` (cross-file cohesion and coupling
   questions, fires on Python-module changes).
 

@@ -23,7 +23,7 @@ check did not run.
 
 ```
 Agent(
-  subagent_type="mx2-decision-maker",
+  subagent_type="decision-maker",
   description="Proceed/iterate gate on converged plan",
   prompt="**MODE: CONVERGENCE GATE.** You are gating a converged plan
   from /converge (not an autopilot checkpoint, not an ideation gate).
@@ -38,7 +38,7 @@ Agent(
   as 'First evaluation'.
 
   If you detect calibration drift during this invocation, record it,
-  keyed `calibration:mx2-decision-maker:converge:<topic>`, in this
+  keyed `calibration:decision-maker:converge:<topic>`, in this
   agent's calibration memory topic file.
   Tag with `converge:` so calibrate reviews can keep convergence-specific
   calibration separate from autopilot/launch and ideation calibration.

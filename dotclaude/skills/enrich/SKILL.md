@@ -2,16 +2,16 @@
 name: enrich
 description: >
   (personal; shadows the project-tier `enrich` and takes precedence) Delta vs the
-  project version: beads-aware - accepts bead IDs as input, gathers related beads
-  and bead memories alongside everything the project version collects. Context
-  loader for Jira tickets, beads, PRs, or topics: ticket details, related beads,
+  project version: also searches `~/.claude/memory/open-chores.md` and
+  `~/.claude/memory/` for related context alongside everything the project
+  version collects. Context loader for PRs or topics: related context,
   codebase references, AWS service state, Datadog error signals, and domain
   knowledge into a structured briefing. Use when the user asks about a ticket,
   wants context before running /challenge or /consult, needs a briefing for
-  meeting prep, or wants to understand what a bead or PR involves. Trigger on:
+  meeting prep, or wants to understand what a PR involves. Trigger on:
   "what's the context on", "brief me on", "enrich", "load ticket", "what do we
-  know about", any Jira ticket ID or bead ID pasted without other instructions.
-argument-hint: "[MX2-XXXXX | docr-XXXX | #1234 | topic]"
+  know about", or free text pasted without other instructions.
+argument-hint: "[#1234 | topic]"
 ---
 
 # Enrich
@@ -25,13 +25,11 @@ Parse the invocation (`/enrich $ARGUMENTS`) to detect the identifier type:
 
 | Pattern | Type | Action |
 |---------|------|--------|
-| `MX2-\d+` or `MANDM-\d+` | Jira ticket | Fetch via Atlassian MCP |
-| URL containing `atlassian.net/browse/` | Jira URL | Extract ticket ID, fetch via MCP |
 | `#\d+` or URL containing `github.com/.*/pull/\d+` | GitHub PR | `gh pr view` |
-| Everything else | Free text | Search beads and codebase by keywords |
+| Everything else | Free text | Search open chores and codebase by keywords |
 
 If no argument is provided, check conversation context for a recently mentioned
-ticket, bead, or PR. If none found, ask: "What should I load context for?"
+ticket or PR. If none found, ask: "What should I load context for?"
 
 ## Enrichment
 
@@ -47,11 +45,11 @@ keywords and service identifiers for the parallel steps below.
 
 ### Steps 2-6: Run in parallel after step 1
 
-**2. Discover related beads.**
-Extract keywords from the primary source (ticket summary, bead title, PR title).
-Run `bd search <keywords>`. Take top 5 results. Load each with `bd show`.
+**2. Discover related open chores.**
+Extract keywords from the primary source (ticket summary, PR title).
+Search `~/.claude/memory/open-chores.md` for matching lines. Take up to 5.
 
-**3. Check beads memories.**
+**3. Check memory topic files.**
 Run grep over `~/.claude/memory/` with 1-3 terms: service name, domain, ticket ID.
 Take first 10 matches.
 
@@ -74,7 +72,7 @@ points, models, settings. Read up to 8 files.
 Steps 2-6 are independent once step 1 completes. Launch all applicable ones
 in a single message to minimize wall-clock time.
 
-If the input is free text (no primary source to fetch), beads search (step 2),
+If the input is free text (no primary source to fetch), open-chores search (step 2),
 memories (step 3), and codebase search (step 6) always run using the free text
 as keywords. AWS (step 4) and Datadog (step 5) only run if a service identifier
 can be inferred from the free text.
@@ -88,14 +86,14 @@ Present a Context Briefing to the user. Format:
 
 ### Summary
 [2-5 sentences: what this is about, current status, key context the user
-needs to know. Include ticket status, assignee, and priority if from Jira.]
+needs to know.]
 
 ### Findings
 
 | # | Finding | Source | Status |
 |---|---------|--------|--------|
-| 1 | [key fact from primary source] | Jira / Bead / PR | Confirmed |
-| 2 | [related context from beads] | Bead docr-xxxx | Confirmed |
+| 1 | [key fact from primary source] | PR | Confirmed |
+| 2 | [related context from open chores] | open-chores.md | Confirmed |
 | 3 | [domain gotcha from memories] | Memory | Confirmed |
 | 4 | [AWS service state or recent errors] | AWS | Confirmed |
 | 5 | [Datadog error pattern or quiet signal] | Datadog | Confirmed |
@@ -140,7 +138,7 @@ PR about" or need context before reviewing, use `/enrich`.
   grep/read the code to confirm before including it as a finding.
 - **Parallel gathering.** Launch independent sources simultaneously. The user
   is waiting; wall-clock time matters more than token efficiency.
-- **Respect bounds.** 5 Jira comments, 5 bead search results, 10 memory matches,
+- **Respect bounds.** 5 open-chores matches, 10 memory matches,
   8 codebase files, 1 AWS service, 24h Datadog window. See sources.md for the
   full bounds table.
 - **Graceful degradation.** If a source fails, note it and continue. A partial
@@ -148,4 +146,4 @@ PR about" or need context before reviewing, use `/enrich`.
 - **Don't pad.** If the enrichment produces 3 findings, show 3 findings. Don't
   manufacture findings to fill a table. If the input is already well-understood
   and enrichment adds nothing, say so: "Context is minimal - this is a
-  straightforward [type] with no related beads or domain gotchas."
+  straightforward [type] with no related open items or domain gotchas."

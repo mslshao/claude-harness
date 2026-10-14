@@ -5,8 +5,8 @@ recommendation logic:
 
 1. **CI Status Check**: distinguishes PR-specific regressions from global flakes
    so failing checks do not over-escalate the recommendation.
-2. **AC Compliance Check**: traces each Jira acceptance criterion against the
-   diff and surfaces deviations or empty-ticket boilerplate.
+2. **AC Compliance Check**: traces each ticket acceptance criterion against the
+   diff and surfaces deviations. This machine has no ticket system, so it is skipped.
 
 Both run after Phase 0 description quality, before specialist dispatch.
 
@@ -70,33 +70,11 @@ running" without blocking the recommendation.
 
 **Cost**: 0 API calls when green; 1 call when failures exist.
 
-## AC Compliance Check (when Jira ticket is available)
+## AC Compliance Check (when a ticket is available)
 
-When a Jira ticket was successfully hydrated, compare the PR's implementation
-against the ticket's acceptance criteria before specialist dispatch. This is the
-highest-value check in the review because it catches spec deviations that no
-amount of code-level analysis would surface.
-
-**Empty ticket detection (blocking).** Before checking AC, verify the ticket has
-real content. Per project convention (see
-[/workspaces/main/.claude/commands/jira.md](/workspaces/main/.claude/commands/jira.md),
-MX2-NNNNN): non-Salesforce issue types put canonical content in `description`
-with `customfield_11220` blanked to empty ADF; SF-specific issue types mirror
-content in both fields. Determine which field to check by issue type. If the
-canonical field contains only the default Jira template boilerplate
-(identifiable by placeholder text like "As a [type of user], I want to
-[perform some task]", "Given that [some context of business problem]", or
-sections that are entirely italic/example text with no real requirements),
-the ticket is effectively empty. Flag this as a **blocking concern** in the AC
-Compliance section and the Draft Review Summary: "The linked Jira ticket has no
-acceptance criteria (only template boilerplate). What does 'done' look like for
-this work?" This is not an informational footnote; it is a question the author
-must answer because the reviewer cannot assess whether the PR satisfies
-requirements that do not exist.
-
-Also check for ticket/PR mismatch: if the PR title references a different ticket
-key than the one linked in the body, note the discrepancy. The PR may be doing
-the work of one ticket while linking a different one.
+This company uses neither Jira nor Confluence (Michael, 2026-09-23 10:34 PDT), and
+this machine has no ticket system, so there is no ticket to hydrate. Skip this check
+and say so in the output. The steps below are kept for a ticket source that may come later.
 
 For each acceptance criterion in the ticket:
 1. **Trace it in the diff.** Can you identify the code that implements this criterion?

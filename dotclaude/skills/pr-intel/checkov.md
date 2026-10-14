@@ -4,10 +4,9 @@ Adds a Checkov static-analysis pass for Terraform/HCL diffs as part of `/pr-inte
 structural IaC regressions (IAM blast-radius, S3 public access, missing encryption,
 network exposure) that don't depend on reviewer judgment to dispatch. Complements
 `mx2-devops-build-deploy` (which reviews HCL correctness and pattern fit) and
-`mx2-security-auditor` (which reasons about blast radius and HIPAA/audit angle).
+`security-review` (which reasons about blast radius and HIPAA/audit angle).
 
 Status: experimental enhancement, personal-tier first per lab-to-production rule.
-Tracked in bead `docr-kfjv`.
 
 ## When to invoke
 
@@ -215,7 +214,7 @@ suppression rationale.
 
 ## What Checkov does NOT replace
 
-- **`mx2-security-auditor`**: still dispatched when security/PII files are touched.
+- **`security-review`**: still dispatched when security/PII files are touched.
   Checkov flags structural IaC issues; security-auditor reasons about blast radius,
   HIPAA, and audit-trail completeness.
 - **`mx2-devops-build-deploy`**: still dispatched on IaC PRs. Reviews pattern fit

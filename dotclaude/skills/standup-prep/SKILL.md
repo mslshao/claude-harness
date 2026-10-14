@@ -1,12 +1,12 @@
 ---
 name: standup-prep
-description: "Generate the user's OWN spoken-standup talk-track from their ENGINEERING activity (git, PRs authored + reviewed, PR/issue comments, Jira, Confluence, plus a Slack sweep for unanswered asks + open threads) for a past day, binned by the user's LOCAL timezone. This is OUTBOUND status generation, not transcript capture. Use for 'verbal standup', 'standup prep', 'prep my standup', '/standup-prep', 'what did I do yesterday/Friday', 'what did I ship'. This is the one-stop standup generator across all those sources. The slack plugin's /standup is the lighter Slack-only alternative (just messages, formatted to post in a channel); to CAPTURE a pasted transcript of a meeting that already happened use /capture-transcript (inbound). On a bare 'help me with standup', prefer this skill when recent context is code/PR/Jira work."
+description: "Generate the user's OWN spoken-standup talk-track from their ENGINEERING activity (git, PRs authored + reviewed, PR/issue comments, plus a Slack sweep for unanswered asks + open threads) for a past day, binned by the user's LOCAL timezone. This is OUTBOUND status generation, not transcript capture. Use for 'verbal standup', 'standup prep', 'prep my standup', '/standup-prep', 'what did I do yesterday/Friday', 'what did I ship'. This is the one-stop standup generator across all those sources. The slack plugin's /standup is the lighter Slack-only alternative (just messages, formatted to post in a channel); to CAPTURE a pasted transcript of a meeting that already happened use /capture-transcript (inbound). On a bare 'help me with standup', prefer this skill when recent context is code/PR work."
 argument-hint: "[<weekday> | <YYYY-MM-DD> | --days N] (default: previous business day)"
 ---
 
 # Standup Prep
 
-Build a spoken-standup talk-track from the user's OWN activity, to bring INTO the meeting. Output is for the user to TALK THROUGH, not a written report: scannable, IDs in code spans, leads with impact.
+Build a spoken-standup talk-track from the user's OWN activity, to bring INTO the meeting. Output is for the user to TALK THROUGH, not a written report: scannable, IDs in code spans, leads with impact, and within the talk-track budget in `~/.claude/rules/outbound-brevity.md`.
 
 This is read-only intelligence gathering. It never posts, comments, or mutates anything.
 
@@ -35,7 +35,7 @@ Today's date is a runtime fact (check the environment context, not memory). If t
 
 ## Step 0: target day + LOCAL timezone (do this first, it is load-bearing)
 
-Everything must be binned by the user's LOCAL day, not UTC. Worktree/CI commits and GitHub/Jira API responses are UTC-stamped; binning by UTC misfiles late-evening work onto the wrong day. The whole point of this skill is getting the day boundary right.
+Everything must be binned by the user's LOCAL day, not UTC. Worktree/CI commits and GitHub API responses are UTC-stamped; binning by UTC misfiles late-evening work onto the wrong day. The whole point of this skill is getting the day boundary right.
 
 **CRITICAL: derive today, the day of week, and the target day MECHANICALLY via shell. Never hand-substitute a date or compute a day-of-week in your head - both are where the wrong day silently creeps in (a wrong day-of-week, or assuming June 20 is a Friday when it is a Saturday). The snippet below does all of it from the live clock; do not bypass it.**
 
@@ -72,9 +72,9 @@ Everything must be binned by the user's LOCAL day, not UTC. Worktree/CI commits 
 
 ## Step 1: gather (run the independent queries in parallel)
 
-Identities: GitHub login `gh api user --jq .login`; git author `git config user.email`; repo `gh repo view --json nameWithOwner --jq .nameWithOwner` (default scope is the current repo). Jira: accountId from `mcp__atlassian__atlassianUserInfo`, cloudId from `getAccessibleAtlassianResources`. Always take these from the live MCP lookup; a stale accountId silently breaks the 1d author filter (drops everything or keeps the wrong person). Last-known Morgan-instance values, to be re-verified, not trusted blindly: accountId `712020:e7620f9a-43fa-4ea6-9b7a-38bc2ee47ff5`, cloudId `<atlassian-cloud-id>`.
+Identities: GitHub login `gh api user --jq .login`; git author `git config user.email`; repo `gh repo view --json nameWithOwner --jq .nameWithOwner` (default scope is the current repo).
 
-When the candidate sets are large (a full project day of Jira, or many PRs), delegate the heavy filtering to parallel subagents (one per source) so the raw payloads never enter the main context; for a single normal day inline queries are fine.
+When the candidate sets are large (many PRs), delegate the heavy filtering to parallel subagents (one per source) so the raw payloads never enter the main context; for a single normal day inline queries are fine.
 
 ### 1a. Git commits authored by the user
 ```bash
@@ -113,38 +113,14 @@ Two complementary paths (run both, dedup by PR number):
   ```
   Keep reviews whose `submitted_at` is in window. (`gh search` `--updated` is the PR's update date, NOT the review date; always re-filter by the actual review/comment timestamp.)
 
-### 1d. Jira tickets the user commented on
-This Jira instance has no reliable `commentedBy` JQL function, so cast a candidate net then filter comments by author + date yourself. CRITICAL: do NOT put an upper bound (`updated < ...`) on the candidate net. A ticket commented on the target day whose `updated` field later drifts forward (any subsequent activity bumps it) falls out of an upper-bounded net and is silently missed. The per-comment date filter below supplies all the precision; the candidate net needs a lower bound only.
-```
-# Primary net (drift-proof + tractable): lower bound only, run via searchJiraIssuesUsingJql.
-(assignee was currentUser() OR reporter = currentUser() OR watcher = currentUser()) AND updated >= "<lower>"
-# `was` is intentional (history operator: catches issues assigned then reassigned). Do not change to `=`.
-# Completeness backstop, page fully, only if the primary net looks thin:
-project = MX2 AND updated >= "<lower>" ORDER BY updated DESC
-```
-`<lower>` is `D` for a single day, `D-(N-1)` under `--days N`; bare dates use the user's Jira-profile tz. Also seed the candidate set with the `[MX2-XXXXX]` keys pulled from the PRs in 1b/1c (an independent catch for drifted tickets). Then fetch the `comment` field for each candidate (batch via `key in (...)`), keep only comments where `author.accountId == <my accountId>` AND `created` (convert from the returned ET/`-0400` to UTC) is in `[WIN_START, WIN_END)`. Report the strategies tried (absence-prone external search).
-
-### 1f. Confluence pages created or edited by the user
-Run via `mcp__atlassian__searchConfluenceUsingCql` (same cloudId as Jira; `currentUser()` resolves automatically). `contributor` covers both create and edit (superset of `creator`):
-```
-contributor = currentUser() AND type = page AND lastmodified >= "<DAY_BEFORE>" AND lastmodified <= "<D+1 as YYYY-MM-DD>"
-```
-expand `content.version,content.history` to get the editor, version number, and edit message. GOTCHA (verified): Confluence CQL evaluates `lastmodified` bare dates in UTC, the OPPOSITE of Jira JQL (profile tz). So cast the net one day wide on each side with bare dates.
-
-**Precision gating GOTCHA (verified in session):** The MCP tool returns `lastModified` as a friendly string ("yesterday at 6:23 PM"), NOT a UTC ISO instant. You cannot do UTC-exact gating from this field alone. Instead: use the friendly string to confirm the page was modified on the target local day (it already reflects the user's local tz), then accept it as in-window.
-
-**Multi-contributor disambiguation GOTCHA (verified in session):** `contributor = currentUser()` returns pages where the user made ANY past edit, not necessarily on the target day. Pages where another person is the listed `author` and the `lastModified` shows someone else's recent edit are false positives. Filter: only include a page in the talk-track if (a) the page `author.displayName` is the user AND `lastModified` is the target day, OR (b) you confirm via a follow-up version fetch that your specific edit landed in window. When in doubt, note the uncertainty rather than silently omitting or overclaiming.
-
-Capture: title, page URL (`webui`), version number (1 = newly created), and the edit message.
-
 ### 1g. Slack messages (the user's own)
-Slack is a MIXED-signal source: public channels largely echo deploy/PR/Jira items already captured above, but the standup-worthy substance (async doc reviews, decisions worked out with leads, direct asks) lives in DMs and private channels. Its value is the asks, threads, and reviews, not the public chatter. Steps:
+Slack is a MIXED-signal source: public channels largely echo deploy/PR items already captured above, but the standup-worthy substance (async doc reviews, decisions worked out with leads, direct asks) lives in DMs and private channels. Its value is the asks, threads, and reviews, not the public chatter. Steps:
 1. `mcp__plugin_slack_slack__slack_read_user_profile` (no `user_id`) -> the user's Slack ID + display name. (Last-known: `U095SF76XLL`; re-verify, do not hardcode blindly.)
 2. Search the user's own messages for the target day. DEFAULT to `slack_search_public_and_private`: this is the user's OWN activity, and their standup substance (design-doc reviews, lead threads, 1:1 asks) is almost entirely in DMs and private channels. The user invoking standup-prep IS standing consent to sweep their own messages; do not downgrade to public-only or gate on a consent prompt. Public-only silently drops the day's real work (verified 2026-07-08: public returned 1 message, private+DM returned 109 across 6 pages including an async design-doc review and a lead decision thread).
    - Query: `from:<@USER_ID> on:<D>` (single day) or `from:<@USER_ID> after:<D-1> before:<D+1>` (range). GOTCHA: the tool's `after`/`before` PARAMETERS are Unix epoch seconds, NOT dates; put the day filter in the QUERY string as `on:`/`after:`/`before:` `YYYY-MM-DD`, which is evaluated in the user's Slack tz (verified: `on:2026-06-18` returns Pacific-Thursday messages, matching the local-day binning). Use `sort=timestamp`.
    - Paginate to exhaustion: `limit` maxes at 20. If the response returns 20 results AND a `pagination_info` cursor, you are NOT done: more messages exist (an active day spans 2+ pages, and desc sort means page 2 holds the EARLIER messages of the day). Loop on the cursor until the response returns no cursor. Count the pages: you assert the count in the Step 3 calibration note. Stopping at page 1 silently drops the start of the day (verified: a Monday run returned 20 + a cursor; the page-1-only synthesis missed pre-08:40-local messages). GOTCHA: `public_and_private` result blobs routinely exceed the tool token limit and get spilled to a file; parse each saved file by char-range in python (the lines are too long for Read offset/limit), extract channel/time/text per result block, and read the `pagination_info` cursor from the same file.
 3. For thread messages (`is:thread`, or a `thread_ts` in the permalink), use `slack_read_thread` to check whether a question the user asked got a reply: that is how you classify an ask as still "unanswered".
-4. DEDUPE against 1a-1f: deploy announcements in channels like `#production-changes` and PR-review pings restate items already in Done/Reviews. Do NOT re-report them; keep only what Slack adds that the other sources do not (an unanswered ask, an open thread, a commitment).
+4. DEDUPE against 1a-1c: deploy announcements in channels like `#production-changes` and PR-review pings restate items already in Done/Reviews. Do NOT re-report them; keep only what Slack adds that the other sources do not (an unanswered ask, an open thread, a commitment).
 
 ## Step 2: filter bot noise
 
@@ -160,9 +136,7 @@ Lead with the single most important fact (what shipped / the headline effort). T
 
 - **Done [day]** - shipped, merged, and built, grouped by ticket. One line each: ticket + PR + one-clause what.
 - **Reviews** - someone-else's PRs reviewed: author name, verdict (approved / changes / commented), one-clause why, current PR state. (Name the author; never infer pronouns, use the name or singular they.)
-- **Jira** - tickets commented on or closed out, with the gist of each comment.
-- **Docs** - Confluence pages created or edited (title + page URL + the gist or edit message); a published runbook or design page is a real deliverable and belongs in the talk-track.
-- **Open asks / threads (Slack)** - unanswered questions or review-requests the user posted, and threads where the user owes or awaits a reply. This is usually the only standup-worthy Slack content. Skip routine chatter and anything already covered by PRs/Jira/deploys (per 1g dedup). Fold genuine blockers here into Status, follow-ups into Today/next.
+- **Open asks / threads (Slack)** - unanswered questions or review-requests the user posted, and threads where the user owes or awaits a reply. This is usually the only standup-worthy Slack content. Skip routine chatter and anything already covered by PRs/deploys (per 1g dedup). Fold genuine blockers here into Status, follow-ups into Today/next.
 - **Status / blockers** - drafts still open, gated/manual deploys pending, real CI failures (not hygiene gates).
 - **Today / next** - the immediate next actions and any downstream work blocked on this.
 

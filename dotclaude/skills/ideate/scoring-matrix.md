@@ -14,7 +14,7 @@ references this file; do not duplicate here.
 | **Reversibility** | easy / hard | Can we roll back if it does not work? "easy" = single commit revert. "hard" = data migrations, schema changes, downstream consumer impact. |
 | **Fit** (codebase pattern) | match / new | Does this approach match existing codebase patterns (`match`), or introduce a new one (`new`)? Cite the matched pattern or note the divergence. This is PATTERN fit, not goal fit (see the next row). |
 | **Goal fit** | full / partial / weak | How completely does the approach deliver the user's STATED want, judged against the goal as the user framed it (not a lighter proxy)? `full` = delivers the stated outcome; `partial` = delivers a subset or a lighter proxy of it; `weak` = ships something adjacent that leaves the stated want largely undelivered. Cite the stated want. This is the counterweight to Effort and the Right-Sizing flag: proportionality catches OVER-building, Goal fit catches UNDER-delivering (the failure where the least-shipping candidate wins on Effort while delivering little of what was asked). When a `partial`/`weak` score traces to an UNDECLARED user constraint (a required autonomy floor, an expected frequency) rather than a real candidate limitation, do NOT just score it low: that is the Phase 4 ESCALATE-QUESTIONS-on-missing-constraint trigger, not a second re-diverge. |
-| **Rules alignment** | aligned / contradicts / N/A | Is the approach covered or recommended by an existing `.claude/rules/*.md` rule? Does it contradict one (e.g., a Redshift query in operational code contradicts `architecture.md` Data Store Selection)? |
+| **Rules alignment** | aligned / contradicts / N/A | Is the approach covered or recommended by an existing `.claude/rules/*.md` rule? Does it contradict one (e.g., a Redshift query in operational code contradicts `architecture.md` Data Store Selection)? A deliverable that keeps an existing violation in place scores `contradicts`, not N/A. |
 | **Verifiability** | high / med / low | How confidently can we validate the approach DELIVERS THE OUTCOME before committing? The validation must prove the CAPABILITY or DECISION is correct, not merely that the mechanism executes without error. `high` = working reference code that mirrors this approach AND demonstrates the outcome, or a prototype achievable in under 1 hour that proves the capability (e.g. the crash-resume actually resumes state; the ranking is actually correct). `med` = similar patterns exist; a capability-proving prototype is 1-3 hours. `low` = novel, OR the only available check proves the mechanism RUNS but not that the outcome is right; proving the capability requires shipping or a multi-day prototype. A path that shows only "it runs without error" is `low`, never `high`. |
 | **Consequence of wrong** | low / med / high | If this approach turns out to be wrong AFTER shipping, what is the cost? `low` = single PR revert, no data loss, no customer impact. `med` = data migration to undo, customer-visible regression. `high` = data corruption, irreversible state, trust loss, lost workstream. |
 
@@ -90,15 +90,17 @@ Any ONE of these overrides forces an approach to last place:
 
 Surface every override explicitly in the Phase 5 rationale.
 
+**A staged pair is one path, not two rivals.** When one candidate is the first stage of another (A, then B), score them together as one staged path with a named checkpoint between the stages. Never rank them as a choice between A and B. On 2026-10-08 the matrix scored the order of work as a choice, and the winner had to be reframed by hand as the second candidate's first stage (dev-73, `storage-decoupling-2026-10-08/dev-73/GATE.md`).
+
 ## Phase 3c: Mandatory Skeptic Stress-Test on Top-3
 
-After ranking, dispatch `mx2-skeptic` on the top-3 by Score. This is
+After ranking, dispatch `skeptic` on the top-3 by Score. This is
 NOT opt-in; the skeptic pass is the canonical adversarial check that
 catches the class of issue the convergent ranking assumes away.
 
 ```
 Agent(
-  subagent_type="mx2-skeptic",
+  subagent_type="skeptic",
   description="Adversarial stress-test of top-3 ideate approaches",
   prompt="Ask naive, dumb, or obvious-but-unasked questions about these
   three candidate approaches. The user is trying to choose among them.

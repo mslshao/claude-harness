@@ -4,16 +4,15 @@ description: >
   End-to-end planning pipeline with challenge + consult stress-test,
   mandatory skeptic pass, and decision-maker proceed/iterate gate. Use
   when the user has a rough idea and wants a production-quality plan
-  without manually orchestrating each skill. Accepts free-text, Jira
-  tickets, beads, Slack threads, Confluence rough-drafts, or transcripts.
+  without manually orchestrating each skill. Accepts free-text, open
+  chores, Slack threads, or transcripts.
   Produces a converged plan (no code written) with iteration log,
   convergence delta category, and verification paths per work item.
   Detects mechanism-prescribed inputs and forces specialists to challenge
-  the prescribed mechanism rather than rubber-stamp it. For hands-off
-  implementation from a well-scoped ticket (plan + code + PR), use
-  /launch. For divergent approach generation BEFORE a plan exists, use
+  the prescribed mechanism rather than rubber-stamp it. To execute a
+  checked-in task list, use /burn. For divergent approach generation BEFORE a plan exists, use
   /ideate.
-argument-hint: "[rough idea, feature description, bead ID, Jira ticket, Slack URL, Confluence URL, or transcript]"
+argument-hint: "[rough idea, feature description, chore id, Slack URL, or transcript]"
 allowed-tools: ["Bash", "Glob", "Grep", "Read", "Agent", "WebFetch", "AskUserQuestion"]
 ---
 
@@ -27,7 +26,7 @@ for signoff. The user sees one synthesis-level output: the final plan.
 
 ## Why This Exists
 
-Without this skill, the user manually invokes `/refine`, `/bead-forge`,
+Without this skill, the user manually invokes `/refine`,
 `/challenge`, `/consult`, and `/synthesize` in sequence, passing
 context between each. They review intermediate output they don't care
 about. This skill runs the full pipeline internally and presents only
@@ -37,16 +36,15 @@ the converged result.
 
 One or more of:
 - A rough idea or feature description (text)
-- A bead reference (`bd show <id>` output or bead ID)
-- A Jira ticket ID (`MX2-\d+`)
+- An open chore (its id or entry from `~/.claude/memory/open-chores.md`)
 - A Slack thread URL or pasted thread excerpt
-- A Confluence page URL or pasted page body (often a rough-draft doc)
+- A pasted page body (often a rough-draft doc)
 - A PR reference (`#\d+` or `gh pr` URL)
 - A conversation transcript
 - A mix of the above
 
 Mixed inputs are consolidated. Precedence on disagreement:
-**inline text > Slack/transcript > Confluence > Jira/PR > bead notes**.
+**inline text > Slack/transcript > pasted page > PR > chore notes**.
 Disagreements surface in Phase 5 "Open Assumptions".
 
 For the full input-loading protocol, URL parsing rules, mixed-input
@@ -56,7 +54,7 @@ see [input-loading.md](input-loading.md).
 ## Pipeline Overview
 
 ```
-rough idea (text, Jira, bead, Slack, Confluence, transcript)
+rough idea (text, chore, Slack, pasted page, transcript)
     |
     v
 [Phase 1: Refine] <-------+
@@ -88,7 +86,7 @@ rough idea (text, Jira, bead, Slack, Confluence, transcript)
        [user approval]
              |
              v
-[Phase 6: Create]           Beads created, optional gate.
+[Phase 6: Create]           Work items recorded, optional gate.
 
 Phase 4.6 verdicts:
   PROCEED            -> Phase 5
@@ -110,15 +108,15 @@ Load all inputs, detect bias mode, clarify scope.
 
 For the full protocol (multi-input loading with URL parsing,
 mixed-input precedence, bias-detection / INPUT_MODE classification,
-domain context pre-load, sibling-bead sweep, enrich, expand
+domain context pre-load, sibling-item sweep, enrich, expand
 specificity), see [input-loading.md](input-loading.md).
 
 Key invariants:
 - Detect `INPUT_MODE: problem-framed` vs `INPUT_MODE: mechanism-prescribed`
   in step 0. Mechanism-prescribed triggers enhanced scrutiny in Phase 3
   and the Prior Thinking Comparison section in Phase 5.
-- Sibling-bead sweep is mandatory, not optional. Ratified architectural
-  decisions in sibling beads supersede any plan formed fresh.
+- Sibling-item sweep is mandatory, not optional. Ratified architectural
+  decisions in sibling items supersede any plan formed fresh.
 - Domain-matcher misfires must NOT block convergence (best-effort).
 - **Underlying-defect precondition.** When the problem is review-quality,
   process-quality, or "how do we catch X sooner", check whether the defect
@@ -135,7 +133,7 @@ the `Loaded context:` block and the `INPUT_MODE:` classification.
 
 ### Delta-reconvergence (input already carries a stress-tested brief)
 
-When the input ticket/bead carries a prior converged brief (structural
+When the input ticket or chore carries a prior converged brief (structural
 check: pinned decisions, work items with AC, verification paths, an
 iteration/stress-test provenance note), do NOT re-run the full pipeline
 against the original problem, and do NOT bypass (that is launch's move
@@ -150,8 +148,7 @@ for execution). Instead:
    not-to-be-relitigated.
 3. **Output shape**: an AMENDMENTS block (authoritative where it
    conflicts) prepended over the preserved prior body, versioned
-   (v3 -> v4), updating the canonical comment IN PLACE
-   (addCommentToJiraIssue supports commentId updates) so there is one
+   (v3 -> v4), updating the canonical brief IN PLACE so there is one
    brief, not a trail of partial supersessions.
 4. Open PRs in the same ticket family are part of the drift surface:
    dispatch at least one specialist against the open PR's actual
@@ -163,7 +160,7 @@ draft: CONFIRMED means the brief survived the drift check.
 
 ### Phase 2: Scope & Decompose (internal)
 
-Using the refined scope, perform the core bead-forge analysis:
+Using the refined scope, perform the core decomposition analysis:
 
 1. **Understand scope**: Read source files mentioned. Search the MX2
    codebase for existing patterns. Identify natural seams.
@@ -204,10 +201,10 @@ Using the refined scope, perform the core bead-forge analysis:
    overlaps. Note where new code must stay separate and why.
 
 4. **Terminology-collision check**: Cross-reference each new concept
-   the plan introduces (new bead title, new function name, new module
+   the plan introduces (new work-item title, new function name, new module
    name, new domain noun) against the `Loaded context:` section from
    Phase 1. If a name collides, surface to the user: "You named this
-   X, but bead memories define X as Y. Are you proposing to extend Y
+   X, but `~/.claude/memory/` defines X as Y. Are you proposing to extend Y
    or introduce something orthogonal?" If orthogonal, propose a
    sub-term so the plan does not silently overload an existing concept.
 
@@ -216,10 +213,10 @@ Using the refined scope, perform the core bead-forge analysis:
    Verification path, Consequence of wrong, Context) and field-level
    invariants, see [work-item-structure.md](work-item-structure.md).
 
-6. **Category assignment**: Each item gets a bead category label
+6. **Category assignment**: Each item gets a category label
    (task/memory/decision/discovery/review).
 
-Apply the granularity check from bead-forge: each item should be
+Apply a granularity check: each item should be
 completable in one focused session. If an item is too large, decompose
 further.
 
@@ -253,7 +250,7 @@ Key invariants:
   enhanced-scrutiny instructions: treat the prescribed mechanism as
   an explicit assumption to evaluate on first-principles grounds, not
   a given.
-- Every dispatch must check sibling beads for ratified architectural
+- Every dispatch must check sibling items for ratified architectural
   decisions that supersede the draft plan.
 
 ### Phase 4: Synthesize (internal)
@@ -310,7 +307,7 @@ prose + DELTA_CATEGORY label).
 
 ### Phase 4.5: Skeptic Lens (internal)
 
-Dispatch `mx2-skeptic` for an adversarial pass on the converged
+Dispatch `skeptic` for an adversarial pass on the converged
 plan. The agent asks naive, dumb, or obvious-but-unasked questions
 designed to surface risks the consensus passes assumed away. Output
 is advisory.
@@ -338,9 +335,9 @@ suggested-skill mapping for ESCALATE-ROUTE, and iteration caps, see
 [convergence-gate.md](convergence-gate.md).
 
 Key invariants:
-- The gate is `mx2-decision-maker` invoked with `MODE: CONVERGENCE GATE`
+- The gate is `decision-maker` invoked with `MODE: CONVERGENCE GATE`
   preamble. Calibration drift gets recorded, keyed
-  `calibration:mx2-decision-maker:converge:<topic>`, in this agent's
+  `calibration:decision-maker:converge:<topic>`, in this agent's
   calibration memory topic file.
 - ITERATE re-runs Phase 2 + 3 with a focused WEAK_DIMENSION
   modification (verification / consequence / scope / decomposition /
@@ -381,40 +378,34 @@ section in order; do not free-form narrate the plan.
 
 When the user approves:
 
-0. **Self-reference preflight (run BEFORE the first `bd create`).** Every
+0. **Self-reference preflight (run BEFORE recording anything).** Every
    check in Phases 2-4.6 runs on the draft plan TEXT, before this plan's
-   own beads exist, so none of them can see a collision between a label
+   own items exist, so none of them can see a collision between a name
    this step is about to mint and an artifact the plan's own work-item
-   text says a later build will create (a runtime bead, a table, a
-   file). Using the FINAL post-synthesis work-item text: extract every
-   forward-reference to an artifact this plan's own future code/runtime
-   will create (bead labels/titles, table names, file paths, function/
-   module names, any phrasing like "the skill/service creates/writes/
-   persists X"), then cross-reference that list against the label/naming
-   scheme THIS invocation is about to apply to the planning beads
-   themselves. If they overlap, or a work item leaves a to-be-created
-   artifact's label unspecified while this step is about to claim the
-   obvious default name, surface it and get a disambiguated pair before
-   executing any `bd create`. Added 2026-07-10 after a plan's 7 planning
-   beads were labeled `--labels=overwatch` while a work item's own text,
-   written in the same session, described a runtime tracking bead the
-   skill would create at first run with no label specified; the two
-   would have collided under the obvious default name.
-1. Create beads via `bd create` for each work item. Use `--title`,
-   `--description`, `--type`, `--priority`. Include AC, design notes,
-   verification path, and consequence-of-wrong in the description.
-2. Wire dependencies via `bd dep add`.
-3. If the plan has 3+ implementation items, ask: "Add a signoff gate?
-   This blocks implementation beads in `bd ready` until you explicitly
-   resolve the gate." If yes, create a gate bead with
-   `--type=task --title="Signoff: [plan topic]"` and make
-   implementation items depend on it.
-4. Present the created bead IDs and the dependency graph.
+   text says a later build will create (a table, a file). Using the FINAL
+   post-synthesis work-item text: extract every forward-reference to an
+   artifact this plan's own future code/runtime will create (table names,
+   file paths, function/module names, any phrasing like "the
+   skill/service creates/writes/persists X"), then cross-reference that
+   list against the names THIS invocation is about to give the work
+   items themselves. If they overlap, or a work item leaves a
+   to-be-created artifact's name unspecified while this step is about to
+   claim the obvious default, surface it and get a disambiguated pair
+   before recording. Added 2026-07-10 after a naming collision of exactly
+   this kind.
+1. Record each work item as a checkbox in `~/.claude/memory/open-chores.md`,
+   written with the Edit tool: a title line, then AC, design notes,
+   verification path and consequence-of-wrong beneath it.
+2. Name each item's dependencies in its entry ("needs: <other item>").
+3. If the plan has 3+ implementation items, ask: "Add a signoff gate?"
+   If yes, add a "Signoff: [plan topic]" checkbox first and mark the
+   implementation items as needing it.
+4. Present the recorded items and the dependency graph.
 
 If the user provides feedback instead of approving, revise the plan
 and re-present (Phase 5 again). Do not loop more than twice; if the
 user has extensive changes, suggest they provide the feedback and
-you'll run `/bead-forge` with the converged context directly.
+you'll record the work items from the converged context directly.
 
 ## Checkpoint Protocol
 
@@ -434,8 +425,8 @@ Context to preserve:
 Rationale: convergence analysis produced decisions that inform implementation
 ```
 
-The main agent should persist this via `/bead-forge checkpoint` if the
-plan is approved.
+The main agent should persist this as a `project`-type memory topic
+file with its `MEMORY.md` index row if the plan is approved.
 
 ## Distinctions
 
@@ -444,9 +435,9 @@ plan is approved.
   ONE approach and stress-tests it. When the user has not yet picked
   an approach, the Phase 4.6 gate fires ESCALATE-ROUTE with
   SUGGESTED_NEXT_SKILL=/ideate.
-- **vs `/launch`**: `/launch` writes code and produces a draft PR.
-  `/converge` writes a plan (no code). For hands-off implementation
-  from a well-scoped ticket, use `/launch`.
+- **vs `/burn`**: `/burn` writes code, one task at a time, from a
+  checked-in task list. `/converge` writes a plan (no code). (`/launch`,
+  which once took a ticket to a draft PR, was retired on 2026-09-10.)
 - **vs `/challenge`**: `/challenge` extracts assumptions from an
   EXISTING plan. `/converge` produces the plan. `/converge` invokes
   `/challenge`-style assumption extraction internally in Phase 3a.
@@ -466,7 +457,7 @@ plan is approved.
 - **Parallel is mandatory.** Phase 3's Challenge subagent and all
   selected consult specialists run in parallel via separate Agent tool
   calls in the same message (no coordinator subagent).
-- **Beads are created last.** Do not create beads during Phases 1-4.6.
+- **Work items are recorded last.** Do not record them during Phases 1-4.6.
   The whole point is convergence before commitment.
 - **Don't rubber-stamp.** A CONFIRMED delta category is suspicious
   when the input was complex or mechanism-prescribed. Bias toward
@@ -482,7 +473,7 @@ plan is approved.
   complexity, or the gate fires ITERATE with
   WEAK_DIMENSION=proportionality. See convergence-gate.md.
 - **Mixed-input precedence is fixed.** Inline text > Slack/transcript
-  > Confluence > Jira/PR > bead notes. Surface disagreements in
+  > pasted page > PR > chore notes. Surface disagreements in
   Phase 5 Open Assumptions.
 - **Detect mechanism-prescription up front.** Phase 1 must classify
   the input as `problem-framed` or `mechanism-prescribed`.
@@ -513,7 +504,7 @@ plan is approved.
   Phase 4.6 was calibrated for autopilot and launch gates, not
   convergence. First 3-5 `/converge` invocations are calibration
   soak. Record drift, keyed
-  `calibration:mx2-decision-maker:converge:<topic>`, in this agent's
+  `calibration:decision-maker:converge:<topic>`, in this agent's
   calibration memory topic file.
 - **Iteration log is always visible.** Phase 5 shows it even when
   Round 0 was final.

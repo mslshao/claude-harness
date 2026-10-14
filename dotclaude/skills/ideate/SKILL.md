@@ -1,19 +1,18 @@
 ---
 name: ideate
 description: >
-  (personal; shadows the project-tier `ideate` and takes precedence) Delta vs the project version: adds the mx2-decision-maker iterate gate (ITERATE/ESCALATE loops), accepts bead IDs as input, and hands the winner off to /converge as a suggested next step (it stops at presentation; no auto-invocation).
+  (personal; shadows the project-tier `ideate` and takes precedence) Delta vs the project version: adds the decision-maker iterate gate (ITERATE/ESCALATE loops), and hands the winner off to /converge as a suggested next step (it stops at presentation; no auto-invocation).
   Divergent approach generation with evaluative ranking, mandatory skeptic
   pass, and a decision-maker iterate gate. Use when you have a problem but
   do not yet know which of N approaches to pursue: "what are my options for
   X", "brainstorm Y", "tradeoffs between X and Y", "which approach should
-  I take". Accepts free-text, Jira, beads, Slack threads, Confluence drafts,
-  or transcripts. Produces 3-5 ranked approaches with a recommended winner,
+  I take". Accepts free-text, open chores, Slack threads, or transcripts. Produces 3-5 ranked approaches with a recommended winner,
   preserves rejected alternatives, hands off the winner to /converge.
   Distinct from /converge (stress-tests ONE approach), /consult
   (multi-specialist on SAME code), /challenge (assumption-test of an
   EXISTING plan), /pr-intel (PR review), /investigate (root cause).
-argument-hint: "[problem statement, bead ID, Jira ticket, Slack URL, Confluence URL, or transcript]"
-allowed-tools: ["Bash", "Glob", "Grep", "Read", "Agent", "AskUserQuestion", "mcp__atlassian__getJiraIssue", "mcp__atlassian__getConfluencePage"]
+argument-hint: "[problem statement, chore id, Slack URL, or transcript]"
+allowed-tools: ["Bash", "Glob", "Grep", "Read", "Agent", "AskUserQuestion"]
 ---
 
 # Ideate
@@ -38,14 +37,13 @@ hands off the winner.
 
 One or more of:
 - Free-text problem statement (most common)
-- Bead ID (`docr-\w+`)
-- Jira ticket ID (`MX2-\d+`)
+- An open chore from `~/.claude/memory/open-chores.md`
 - Slack URL or pasted thread excerpt
-- Confluence URL or pasted page body
+- Pasted page body
 - Conversation transcript
 
 Mixed inputs are consolidated. Precedence on disagreement: inline text >
-Slack/transcript > Confluence > Jira > bead notes. Disagreements surface
+Slack/transcript > pasted page > chore notes. Disagreements surface
 in Phase 5 "Open Assumptions".
 
 ## Pipeline Overview
@@ -90,11 +88,8 @@ the narrowing questions in ESCALATE-QUESTIONS (when fired).
 Load all inputs, strip bias, clarify the problem.
 
 1. **Load inputs.** For each detected input type, fetch and parse:
-   - Jira ID: `getJiraIssue` MCP call.
    - Slack URL `https://*.slack.com/archives/<CHANNEL>/p<TS>`: extract
      channel ID and message timestamp, then `slack_read_thread`.
-   - Confluence URL `*.atlassian.net/wiki/spaces/<SPACE>/pages/<PAGE_ID>/<slug>`:
-     extract `<PAGE_ID>`, then `getConfluencePage`.
    - Pasted text (Slack excerpt, transcript, page body, free-text): use
      as-is.
    - If an MCP fetch tool is unavailable or the call fails, ask the user
@@ -169,7 +164,7 @@ Key invariants:
   calls. Serializing defeats parallelism.
 - Specialists receive ONLY the problem-only context block. Bias-stripping
   is structural, not advisory.
-- `mx2-tech-lead` is always in the roster as the broadest-shape lens.
+- `tech-lead` is always in the roster as the broadest-shape lens.
 - **Minimal-viable candidate is mandatory in the candidate pool.** One
   approach is always the minimal-viable version: the smallest thing
   delivering ~80% of the *stated* goal, explicitly labeled. Every
@@ -217,7 +212,7 @@ Key invariants:
   rather than re-diverging.
 - Verifiability rates whether the OUTCOME can be proven before committing, not
   whether the mechanism merely runs; a "it executes" check is `low`, not `high`.
-- Skeptic (`mx2-skeptic`) runs on the top-3 by Score. Mandatory,
+- Skeptic (`skeptic`) runs on the top-3 by Score. Mandatory,
   not opt-in. Findings fold into Phase 5 as a `Skeptic Lens` block.
   When fewer than 3 approaches survive Phase 2, run on whatever
   exists. If dispatch fails, note "Skeptic Lens unavailable" and
@@ -233,9 +228,9 @@ preamble), branch logic per verdict, narrowing-question constraints,
 and iteration caps, see [iterate-gate.md](iterate-gate.md).
 
 Key invariants:
-- The gate is `mx2-decision-maker` invoked with `MODE: IDEATION GATE`
+- The gate is `decision-maker` invoked with `MODE: IDEATION GATE`
   preamble. Calibration drift gets recorded, keyed
-  `calibration:mx2-decision-maker:ideation:<topic>`, in this agent's
+  `calibration:decision-maker:ideation:<topic>`, in this agent's
   calibration memory topic file.
 - ITERATE re-runs Phase 2 with a focused WEAK_DIMENSION prompt
   modification. Cap: 2 ITERATE rounds per invocation.
@@ -309,7 +304,7 @@ recommendation is being made. Format:
 "The decision-maker gate fired ESCALATE-ROUTE: <reason from gate>.
 No winner is being recommended; the suggested next step is
 <SUGGESTED_NEXT_SKILL: /investigate, /converge, /challenge, or
-dispatching mx2-tech-lead>. The candidate approaches and their scoring
+dispatching tech-lead>. The candidate approaches and their scoring
 are preserved above for reference, but /ideate is not the right tool
 for this problem.">
 
@@ -409,7 +404,7 @@ ITERATE then PROCEED) live in [walkthroughs.md](walkthroughs.md).
   pre-loading the user's answer into the specialists' question
   defeats the purpose.
 - **Mixed-input precedence is fixed.** Inline text > Slack/transcript
-  > Confluence > Jira > bead notes. Surface disagreements in Open
+  > pasted page > chore notes. Surface disagreements in Open
   Assumptions.
 - **Steelman, do not strawman.** Each approach in Phase 2 must be the
   strongest version of itself.
@@ -450,7 +445,7 @@ ITERATE then PROCEED) live in [walkthroughs.md](walkthroughs.md).
   Phase 4 was calibrated for autopilot and launch gates, not
   ideation. First 3-5 `/ideate` invocations are calibration soak.
   Drift gets recorded, keyed
-  `calibration:mx2-decision-maker:ideation:<topic>`, in this agent's
+  `calibration:decision-maker:ideation:<topic>`, in this agent's
   calibration memory topic file.
 - **Calibrated for code-shaped problems.** The specialist roster, the
   Fit-to-codebase column, and the Verification-path framing assume

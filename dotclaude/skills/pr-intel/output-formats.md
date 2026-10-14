@@ -33,7 +33,7 @@ one row; the goal is orientation, not reproduction.]
 
 **<service name>**: <1-2 sentence description of what this service/pipeline does>
 - **Dependencies**: <key infra: DynamoDB tables, S3 buckets, upstream/downstream>
-- **Docs**: <Confluence link, Datadog dashboard if available>
+- **Docs**: <design doc or dashboard link, if available>
 - **Gotchas**: <known constraints or design quirks relevant to this PR>
 
 ### Scope
@@ -79,13 +79,13 @@ the signal.]
 ---
 
 ### Review Recommendation
-**Action**: Request Changes | Comment | Approve with Comments | Approve
+**Action**: Request Changes | Comment | Approve
 **Blocking**: N | **Discussion (high-consequence)**: N | **Discussion (low-consequence)**: N | **Minor**: N | **Front Door**: N
 **Provenance**: Speed-amplified: N | Bot-surfaced: M
 **Decision count**: N (ceiling: 5)
 
 [This section is metadata ONLY: the four lines above ARE the section. No
-parenthetical glosses on values (stop-validate-pr-intel.sh flags any label
+parenthetical glosses on values (stop-validate-pr-intel.sh, not installed on this machine, flags any label
 value over 15 words as review-rec-prose; the 2026-06-09 firing came from
 glosses this template itself used to carry). Speed-amplified = reviewer
 would have caught from diff reading; bot-surfaced = required live-state,
@@ -105,7 +105,7 @@ still more restrictive (Request Changes wins).]
 ---
 
 ### AC Compliance
-[Present ONLY when a Jira ticket was hydrated. Omit entirely if no ticket was found.]
+[Present ONLY when a ticket was hydrated. This machine has no ticket system, so omit it.]
 
 **Ticket**: <KEY> - <summary> (<link to ticket>)
 
@@ -120,29 +120,6 @@ If deviations exist, each gets a row with a brief explanation of what differs.
 
 ---
 
-### Design Doc Compliance
-[Present ONLY when a Confluence design page was hydrated. Omit entirely if no design
-doc was linked in the PR body.]
-
-**Design doc**: [<page title>](<Confluence URL>)
-
-| Spec element | Status | Notes |
-|--------------|--------|-------|
-| <parameter, response shape, or logic step> | Matches / Deviation / Gap | <what matches or diverges> |
-
-[If all spec elements match, a single line: "Implementation matches the design spec."
-If deviations exist, each gets a row. Keep rows to the behavioral differences that
-matter; don't enumerate every matching parameter.]
-
-**Unresolved design comments** (<N> open):
-- <author>: "<abbreviated comment>" (on: "<annotated text>")
-
-[List unresolved inline and footer comments from non-author reviewers. These represent
-design-level feedback that may not be reflected in the implementation. If all comments
-are resolved or from the author, note "All design comments resolved."]
-
----
-
 ### Draft Review Summary
 
 ```
@@ -153,7 +130,7 @@ are resolved or from the author, note "All design comments resolved."]
 
 **One-home rule (body, inline, and outer prose).** Every finding has exactly ONE home: its inline comment, or the Draft Review Summary when it has no inline. The Review Recommendation header, the Verdict, the Scope, and any outer briefing prose reference a finding by line number; they never re-narrate its substance or its verification rationale. If a finding renders inline, the body's reference to it is a pointer ("see inline on line 37"), not a paraphrase. The 9304 anti-pattern (2026-05-21) is canonical: the `sqlworkbench:ListDatabases` question rendered substantively in BOTH the body's numbered list AND inline:37 with ~80% prose overlap. Both venues contained the same hedge ("Either way it's harmless") and the same evidence (the `RedshiftDataApi` statement reference). Body must compress to a pointer in this case, not duplicate. The pre-emit check at synthesis time (enforced as synthesis.md step 11b, the body-inline dedup pass): for each body sentence, ask "does an inline comment share both this core claim AND its anchor?" If yes, replace it with `see inline on line N` or drop it.
 
-**No process meta-narration in the body.** The Draft Review Summary carries the assessment and pointers to findings, never narration of the review process itself. Four recurring noise classes to strip before emitting: (1) do not reference a bot comment in the body AT ALL: not its substance, not that you agree, not that you reacted ("reacted 👍", "confirming the bot's flags are accurate", "Copilot's note is fair, thumbs-up'd rather than repeat it"). The Bot Reactions phase is the entire signal: a `+1`/`-1` says "the bot was right/wrong" without spending a word of body prose, and the author already sees the bot's own comment. If a bot finding genuinely warrants more than a reaction, that is an inline comment carrying NEW analysis, never a body paraphrase. (2) Do not include "Reviewed for X / no concerns identified" positive-confirmation prose UNLESS `mx2-security-auditor` was actually dispatched (the sole sanctioned exception, SKILL.md Section Conditionality); a non-security specialist (devops, style, etc.) returning clean is not summary-worthy and reads as unactionable filler. (3) Do not narrate CI or quality-gate status in the body or Scope: not "CI is green", not the description-check failures, not the Require-Reviewers / approval gate, not "merge unblocks on approval", and not the SonarCloud (or any quality-gate) pass/fail, INCLUDING a "the gate is red but it's pre-existing / misattributed / not yours to fix" clarification. The author sees the checks tab; passing or pending CI is not review signal, the approval gate is mechanical, and explaining away a red gate is still gate narration, not a finding. A static-analyzer issue earns body or inline space ONLY when it lands on a changed line AND is independently actionable (then it routes as a normal finding via the Static Analyzer Pre-Check, attributed to the tool); a gate failure driven by pre-existing or line-shifted issues outside the diff gets NO mention at all. The only CI mention is the terse header line, and only for PR-specific failures (see the header template). (4) On a continuation or sibling-PR review (a slice of the same stack, a re-review, or one of a set of related PRs), do NOT restate the prior review's shared findings: reference the prior review in ONE clause ("same base/resolve blockers as #10633; see that review") and spend body prose ONLY on what is NEW to this PR. A "Recurring from #X" block that re-explains blockers the author already has on a sibling PR is noise; the author read the other review. Classes (1) and (2) were stripped by the user on PR #9885 (2026-06-15); class (3) plus the sharpened (1) on PRs #9993/#9996 (2026-06-18); the gate-misattribution sub-case on PR #9979 (2026-06-18), where a correct "the red SonarCloud gate is pre-existing, not yours" paragraph was still cut as noise (the author has eyes on the gate); class (4) on PR #10634 (2026-07-17), where a "Recurring from #10633" block restating the sibling slice's blockers was cut as noise.
+**No process meta-narration in the body.** The Draft Review Summary carries the assessment and pointers to findings, never narration of the review process itself. Four recurring noise classes to strip before emitting: (1) do not reference a bot comment in the body AT ALL: not its substance, not that you agree, not that you reacted ("reacted 👍", "confirming the bot's flags are accurate", "Copilot's note is fair, thumbs-up'd rather than repeat it"). The Bot Reactions phase is the entire signal: a `+1`/`-1` says "the bot was right/wrong" without spending a word of body prose, and the author already sees the bot's own comment. If a bot finding genuinely warrants more than a reaction, that is an inline comment carrying NEW analysis, never a body paraphrase. (2) Do not include "Reviewed for X / no concerns identified" positive-confirmation prose UNLESS `security-review` was actually dispatched (the sole sanctioned exception, SKILL.md Section Conditionality); a non-security specialist (devops, style, etc.) returning clean is not summary-worthy and reads as unactionable filler. (3) Do not narrate CI or quality-gate status in the body or Scope: not "CI is green", not the description-check failures, not the Require-Reviewers / approval gate, not "merge unblocks on approval", and not the SonarCloud (or any quality-gate) pass/fail, INCLUDING a "the gate is red but it's pre-existing / misattributed / not yours to fix" clarification. The author sees the checks tab; passing or pending CI is not review signal, the approval gate is mechanical, and explaining away a red gate is still gate narration, not a finding. A static-analyzer issue earns body or inline space ONLY when it lands on a changed line AND is independently actionable (then it routes as a normal finding via the Static Analyzer Pre-Check, attributed to the tool); a gate failure driven by pre-existing or line-shifted issues outside the diff gets NO mention at all. The only CI mention is the terse header line, and only for PR-specific failures (see the header template). (4) On a continuation or sibling-PR review (a slice of the same stack, a re-review, or one of a set of related PRs), do NOT restate the prior review's shared findings: reference the prior review in ONE clause ("same base/resolve blockers as #10633; see that review") and spend body prose ONLY on what is NEW to this PR. A "Recurring from #X" block that re-explains blockers the author already has on a sibling PR is noise; the author read the other review. Classes (1) and (2) were stripped by the user on PR #9885 (2026-06-15); class (3) plus the sharpened (1) on PRs #9993/#9996 (2026-06-18); the gate-misattribution sub-case on PR #9979 (2026-06-18), where a correct "the red SonarCloud gate is pre-existing, not yours" paragraph was still cut as noise (the author has eyes on the gate); class (4) on PR #10634 (2026-07-17), where a "Recurring from #10633" block restating the sibling slice's blockers was cut as noise.
 
 ---
 
@@ -163,6 +140,8 @@ Ready-to-post comments, grouped by file. Each comment is the actual text
 to paste on the PR. The reviewer can copy them verbatim or edit before posting.
 
 **Comment budget**: Scale to the number of real findings, not to a fixed cap. Zero is a legitimate count: a 2XL infra PR with nothing to flag should get an approval with no inline comments, not padded findings to meet a typical-range floor (empirical case: PR #9022, 696-line Redshift Serverless PR approved with zero inline comments by a high-trust reviewer). Typical range when findings exist: 2-3 for a clean PR with minor observations, 5-8 for one with real issues, 10-15 for a large PR with multiple discussion-class concerns. Beyond 15, consolidate related findings into the review summary or use cross-references to point multiple sites at the same canonical thread (P13 in reviewer-discipline.md). BLOCKING findings always get a comment regardless of count. When trimming, drop MINOR findings first. When in doubt, drop the comment: a PR with two precise questions is more useful than one with eight padded observations.
+
+**Blockers only, since 2026-10-01.** Per `~/.claude/rules/code-review-policy.md`, only Blocking findings render as Draft Inline Comments. Discussion, Minor and Front Door findings go under Open Threads as the author's call, one line each with file and lines, and the Draft Review Summary offers them in one line at most.
 
 **Structural variation**: Not every comment needs the same shape. Mix these forms (examples lifted from the engineering lead's corpus across PRs #8931, #8741, #8066):
 - Bare question: "where does this come from?", "why?", "intentional?", "must they be?"
@@ -178,11 +157,11 @@ Avoid uniform [SEVERITY] / title / code quote / explanation structure on every c
 
 Every finding emitted by pr-intel passed through a specialist agent or an orchestrator pattern check; none of them came from Michael's unaided reading. Treat ALL of them as bot-discovered for voice purposes. Open each draft inline comment with an explicit attribution prefix naming the source. Examples:
 
-- Specialist-source: "My `silent-failure-hunter` specialist flagged a potential silent failure here: ..." / "Cross-file analysis (via `bot-review`) surfaced that ..." / "My `mx2-code-reviewer` pass flagged this pattern: ..."
+- Specialist-source: "My `silent-failure-hunter` specialist flagged a potential silent failure here: ..." / "Cross-file analysis (via `blast-radius-reviewer`) surfaced that ..." / "My `code-reviewer` pass flagged this pattern: ..."
 - AC compliance: "AC item N expects X, the diff implements Y; was that intentional?"
 - Spec compliance / design doc: "The design doc specifies X (page section 3), this implementation returns Y; intentional divergence?"
 - SonarCloud: "SonarCloud flagged this as `python:S<code>`: ..."
-- bot-review: "Cross-file consumers of this symbol assume X (`<consumer file:line>`); this change weakens that invariant: ..."
+- blast-radius-reviewer: "Cross-file consumers of this symbol assume X (`<consumer file:line>`); this change weakens that invariant: ..."
 - Orchestrator pattern check (Pre-Synthesis Analysis Patterns 1-6 in synthesis.md): "Pattern check flagged a frozen-Pydantic mutation here: ..." / "Opaque constant detected: where does this come from?"
 - Orchestrator reuse-search (Active Reuse-Search in dispatch.md): "An automated reuse-search check flagged that `<incumbent module.symbol>` (`<file:line>`) already owns this capability (searched: `<terms>`); worth calling it instead of reimplementing?" The incumbent `file:line` and the literal search terms are mandatory in the body; keep the whole comment inside the 2-3 sentence ceiling.
 - Multi-specialist convergence: when two specialists flag the same finding, still lead with ONE specialist and note the other mid-sentence (e.g. "My `agent-a` specialist flagged this, and `agent-b` independently agreed: ..."). The attribution hook (`check_review_attribution.py`) matches the singular "My `<agent>` specialist <verb>" shape; a plural "My `a` and `b` specialists both flagged ..." lede fails the matcher and blocks the post at write time (observed 2026-06-24, PR #9664).
@@ -220,7 +199,7 @@ Format: file heading, then numbered comments. Each comment has a target line, a 
    ```
 
    **Briefing context**
-   [MINOR] ○ DIFF-VISIBLE | Classification: speed-amplified (specialist: `mx2-code-reviewer`, verification path: single-file diff inspection)
+   [MINOR] ○ DIFF-VISIBLE | Classification: speed-amplified (specialist: `code-reviewer`, verification path: single-file diff inspection)
    `ClassName` > `other_method` - `<verbatim code quote>`
    <explanation>
    Reviewer verify: <what to check to confirm this>
@@ -234,7 +213,7 @@ Format: file heading, then numbered comments. Each comment has a target line, a 
    ```
 
    **Briefing context**
-   [DISCUSSION] ? QUESTION | Classification: bot-surfaced (specialist: `mx2-pr-precedent`, verification path: prior-PR archaeology)
+   [DISCUSSION] ? QUESTION | Classification: bot-surfaced (specialist: `pr-precedent`, verification path: prior-PR archaeology)
    `process_message` - `<verbatim code quote>`
    <explanation>
    Agent searched: <what was searched, why inconclusive>
@@ -246,7 +225,7 @@ Format: file heading, then numbered comments. Each comment has a target line, a 
    ```
 
    **Briefing context**
-   [DISCUSSION] ? QUESTION | Classification: speed-amplified (specialist: `mx2-code-reviewer`, verification path: single-file diff inspection)
+   [DISCUSSION] ? QUESTION | Classification: speed-amplified (specialist: `code-reviewer`, verification path: single-file diff inspection)
    Reply target: comment 3275599283 (mslshao 2026-05-20 on `docket_sync/update_scheduler/triggers.py:23`)
    `triggers` > `Trigger` - `<verbatim code quote>`
    <explanation of what new context the reply adds beyond round-1>
@@ -255,7 +234,7 @@ Format: file heading, then numbered comments. Each comment has a target line, a 
 5. **Line 40** (`THEN file."OCR_Detected_Type__c"`), unverified-assertion form
 
    ```
-   My `mx2-code-reviewer` pass flagged a cross-system column reference to verify: this
+   My `code-reviewer` pass flagged a cross-system column reference to verify: this
    selects `file."OCR_Detected_Type__c"` from the `sf.prod.doc_file_info` Redshift mirror,
    but that mirror uses the simplified snake_case name `ocr_detected_type` (via
    `simplify_sf_name`), not the raw Salesforce field name. A sibling query confirms it:
@@ -265,7 +244,7 @@ Format: file heading, then numbered comments. Each comment has a target line, a 
    ```
 
    **Briefing context**
-   [BLOCKING] ✓ VERIFIED | Classification: bot-surfaced (specialist: `mx2-code-reviewer`; Cross-System Investigation resolved `OCR_Detected_Type__c` -> `ocr_detected_type` via `simplify_sf_name`, grep-confirmed `matter_sync.py:24` in a file unchanged by the diff) | Form: unverified-assertion (CSC trip-wire fired; mismatch, so the verdict is Comment)
+   [BLOCKING] ✓ VERIFIED | Classification: bot-surfaced (specialist: `code-reviewer`; Cross-System Investigation resolved `OCR_Detected_Type__c` -> `ocr_detected_type` via `simplify_sf_name`, grep-confirmed `matter_sync.py:24` in a file unchanged by the diff) | Form: unverified-assertion (CSC trip-wire fired; mismatch, so the verdict is Comment)
    `get_query` - `THEN file."OCR_Detected_Type__c"`
    The CSC investigation resolved the expected mirror column and a sibling query in an
    unchanged file confirms `ocr_detected_type` is the real name; the asserted
@@ -359,13 +338,13 @@ Files: <count> | Draft: yes/no
 ### Pre-Submission Checklist
 
 - [ ] **Description matches diff**: <assessment>
-- [ ] **AC compliance**: <if Jira ticket found: "All N criteria met" or "N deviations - see below">
+- [ ] **AC compliance**: <if a ticket was found: "All N criteria met" or "N deviations - see below">
 - [ ] **Scope is clean**: <accidental inclusions? unrelated changes?>
 - [ ] **CI passing**: <status, failing checks>
 - [ ] **No debug artifacts**: <leftover prints, commented code, TODOs?>
 
 ### AC Compliance
-[Present ONLY when a Jira ticket was hydrated. Same table format as default mode.
+[Present ONLY when a ticket was hydrated; none can be here. Same table format as default mode.
 For --mine mode, deviations are framed as "fix before review" or "add rationale to PR description".]
 
 ### Issues to Fix Before Review
@@ -395,7 +374,7 @@ For --mine mode, deviations are framed as "fix before review" or "add rationale 
 ```
 
 **Agent-handoff variant.** When the invocation says the feedback goes back to an
-implementing agent (a launch-implementer, executor, or "hand this back to the main
+implementing agent (an executor, or "hand this back to the main
 agent") rather than to a human author, keep the same `--mine` sections but make the
 output self-contained for a fresh agent with no conversation context: state the
 definition-of-done, reference the worktree/branch if one exists, and phrase "Issues
@@ -415,7 +394,7 @@ Adds: +N | Removes: -N | Files: N
 [Each file: new/modified/deleted + one-line characterization]
 
 ### AC Compliance
-[Present ONLY when a Jira ticket was hydrated. Same table format as default mode.
+[Present ONLY when a ticket was hydrated; none can be here. Same table format as default mode.
 For --quick, keep it brief: one-line per criterion, flag deviations only.]
 
 ### Quick Assessment
@@ -434,7 +413,7 @@ For --quick, keep it brief: one-line per criterion, flag deviations only.]
 
 ## Tone Rules
 
-Apply tone rules from `memory/review-voice.md` (formatting, content filters, voice).
+Apply tone rules from the "PR review register, distilled 2026-09-18" section of `~/.claude/memory/michael-voice.md` (`memory/review-voice.md` was never brought to this machine).
 For tiebreaking principles when specialists disagree, see `memory/reviewer-discipline.md`
 (Review Voice Tenets T1-T5).
 
@@ -463,7 +442,7 @@ text this skill emits. Scope covers ALL output: the outer briefing prose (Servic
 Context, Scope, Review Recommendation commentary, Verdict), the Draft Review
 Summary, the Draft Inline Comments, AND any free-form text between structural
 sections, AND every string echoed from an upstream system (the PR title in the H1
-header, quoted bot or author comment text, Jira summaries). Echoed strings are the
+header, quoted bot or author comment text). Echoed strings are the
 one class self-review cannot catch, because the dash is not in prose you wrote;
 sanitize those at fetch time per SKILL.md's Data Gathering note.
 Before writing each of these sections, scan the composed text for U+2014

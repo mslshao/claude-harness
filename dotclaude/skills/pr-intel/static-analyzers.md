@@ -129,7 +129,7 @@ the MCP returns an error, log the error inline ("Sonar MCP errored:
 &lt;message&gt;") and fall through to step 4.
 
 **Growth rule.** When a NEW rule fires on a real PR via the MCP (own or
-reviewed) and is not yet in the catalog, the follow-up bead is "add
+reviewed) and is not yet in the catalog, the follow-up chore is "add
 `python:S<code>` to sonarcloud-rules.md with a concrete `**Detector**`
 block." Preventive entries (rules not yet seen on MX2) are allowed when the
 SonarSource rule definition is public AND the detector is concrete enough
@@ -203,7 +203,7 @@ Both can legitimately be BLOCKING.
 **No live bot on MX2 PRs (verified 2026-05-28).** A scan of issue-comment
 authors across recent PRs returned zero Sentry-style bot users (no `sentry`,
 `getsentry`, or `sentry-io` author). The "Sentry-Derived Bug Patterns"
-section in `mx2-code-reviewer` carries institutional knowledge from past
+section in `code-reviewer` carries institutional knowledge from past
 Sentry catches that were ported into the agent's review checklist
 (`model_dump()` + `json.dumps()` boundary, fragile string parsing on
 user-facing identifiers). Those patterns ride on the agent, not on a
@@ -218,4 +218,4 @@ Two future trigger conditions for adding a fetch step here:
 - A Sentry MCP becomes available with per-PR finding query support.
 
 Until then, this sub-section is intentionally empty of fetch logic. The
-`mx2-code-reviewer` static-pattern surface is the current Sentry signal.
+`code-reviewer` static-pattern surface is the current Sentry signal.

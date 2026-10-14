@@ -1,37 +1,37 @@
 ---
 name: calibrate
-description: Review and merge calibration drift entries that subagents have emitted via memory topic files. Default agent is mx2-decision-maker; override with --agent. Reads each agent's calibration memory topic file, presents each entry with the current calibration file state, lets the user keep/merge/reject per entry. On merge writes to the agent's calibration file and the audit log, then deletes the source memory key. Includes scratch-file reconciliation (warns on orphaned files when scratch fallback is in use). Use when SessionStart hook nudges about unmerged entries, or periodically to review accumulated drift.
+description: Review and merge calibration drift entries that subagents have emitted via memory topic files. Default agent is decision-maker; override with --agent. Reads each agent's calibration memory topic file, presents each entry with the current calibration file state, lets the user keep/merge/reject per entry. On merge writes to the agent's calibration file and the audit log, then deletes the source memory key. Includes scratch-file reconciliation (warns on orphaned files when scratch fallback is in use). Use when SessionStart hook nudges about unmerged entries, or periodically to review accumulated drift.
 argument-hint: "[--agent <name>]"
 allowed-tools: ["Bash", "Glob", "Grep", "Read", "Edit", "Write", "AskUserQuestion"]
 ---
 
 # Calibrate
 
-Review human gate for agent calibration drift. Subagents (mx2-decision-maker today, others later) emit calibration drift as memory topic file entries rather than writing their calibration files directly. This is a deliberate human review gate (calibration changes are vetted before merge), not a write restriction. This skill is the orchestrator side of the loop: it reads the emitted entries, presents them for review, and writes the accepted merges to the agent's calibration file.
+Review human gate for agent calibration drift. Subagents (decision-maker today, others later) emit calibration drift as memory topic file entries rather than writing their calibration files directly. This is a deliberate human review gate (calibration changes are vetted before merge), not a write restriction. This skill is the orchestrator side of the loop: it reads the emitted entries, presents them for review, and writes the accepted merges to the agent's calibration file.
 
 ## Why This Exists
 
-Without this skill, the calibration channel is write-only: subagents emit drift to beads memory, nothing reads it, nothing merges it, the calibration file stays empty. This skill is what makes the calibration system a learning loop instead of a frozen snapshot.
+Without this skill, the calibration channel is write-only: subagents emit drift to a memory topic file, nothing reads it, nothing merges it, the calibration file stays empty. This skill is what makes the calibration system a learning loop instead of a frozen snapshot.
 
 ## Input
 
 `/calibrate [--agent <name>]`
 
-- `--agent <name>` (optional): the agent whose calibration to review. Default: `mx2-decision-maker`.
+- `--agent <name>` (optional): the agent whose calibration to review. Default: `decision-maker`.
 
 ## Process
 
 ### Phase 1: Discover
 
-1. Determine target agent from `--agent` flag or default to `mx2-decision-maker`.
+1. Determine target agent from `--agent` flag or default to `decision-maker`.
 2. Read the agent definition file (`~/.claude/agents/<name>.md`) to confirm it exists. If missing, halt with: "Agent <name> not found at ~/.claude/agents/<name>.md."
-3. Determine calibration file path: `~/.claude/agents/calibration/<short-name>.md` (where `<short-name>` strips any `mx2-` prefix from the agent name; e.g., `mx2-decision-maker` becomes `decision-maker`). If the file does not exist, halt with a message asking the user whether to create it.
+3. Determine calibration file path: `~/.claude/agents/calibration/<short-name>.md` (where `<short-name>` is the agent name; e.g., `decision-maker`). If the file does not exist, halt with a message asking the user whether to create it.
 4. Determine lookback log path: `~/.claude/agents/calibration/<short-name>.lookback.md`. If missing, create with a header (see template below).
 
 ### Phase 2: Harvest
 
-1. Harvest in two steps: first discover KEYS with plain `bd memories calibration:<agent>:` (FULL agent name, e.g. `calibration:mx2-decision-maker:`), then pull each entry's FULL untruncated body with `bd recall <key>` per key. Do NOT use `bd memories --json`: it returns an empty result in this environment (observed 2026-07-21), which Phase 2 step 3 would then read as "no drift" and silently drop every pending entry (a false-negative that loses calibration). Plain `bd memories` truncates each value at ~124 chars in its preview, so it is safe ONLY for discovering keys; `bd recall <key>` is the authoritative body to merge from. Then discard any result whose KEY does not start with `calibration:<agent>:` (bd memories substring-matches VALUES too, so unrelated memories that merely mention the prefix appear in results; merging or `bd forget`-ing those would destroy non-calibration records). Note: the memory key uses the full agent name (matching what subagents store), NOT the `<short-name>` used for the file path above. Keys whose second segment is not a known agent (legacy `calibration:pr-intel-*`, `calibration:style:*`, `calibration:user-improvement-stance`) are out of /calibrate scope; triage those manually (`bd forget` or re-key).
-2. Parse each memory key. Standard form is 4-segment: `calibration:<agent>:<category>:<specific-slug>`; extract category and specific-slug. **3-segment fallback**: some emitters (bot-review, provenance-classifier, legacy skeptic entries) use `calibration:<agent>:<short-tag>` with no category segment; treat segment 3 as the specific-slug and route the entry to the agent's default section (`## Rule Overrides`, unless the agent's calibration file documents a different home, e.g. skeptic's `## Example Dismissals`). The remaining body text is the drift content.
+1. Harvest: read `~/.claude/memory/calibration-<agent>.md` (FULL agent name, e.g. `calibration-decision-maker.md`). Each entry is a `### calibration:<agent>:<category>:<specific-slug>` heading and the body under it, up to the next heading. If the file does not exist, there is no drift. Discard any entry whose key does not start with `calibration:<agent>:`. Note: the key uses the full agent name (matching what subagents write), NOT the `<short-name>` used for the file path above. Keys whose second segment is not a known agent (legacy `calibration:pr-intel-*`, `calibration:style:*`, `calibration:user-improvement-stance`) are out of /calibrate scope; triage those by hand (remove or re-key).
+2. Parse each memory key. Standard form is 4-segment: `calibration:<agent>:<category>:<specific-slug>`; extract category and specific-slug. **3-segment fallback**: some emitters (blast-radius-reviewer, legacy skeptic entries) use `calibration:<agent>:<short-tag>` with no category segment; treat segment 3 as the specific-slug and route the entry to the agent's default section (`## Rule Overrides`, unless the agent's calibration file documents a different home, e.g. skeptic's `## Example Dismissals`). The remaining body text is the drift content.
 3. If no entries, output: "No unmerged calibration drift for <agent>. Calibration file is current as of last merge." and exit.
 
 ### Phase 3: Present and Decide
@@ -90,12 +90,12 @@ For each merge-accepted entry:
 - **Rationale**: <one line: why merged>
 ```
 
-3. Delete the source memory key: `bd forget "<full-key>"` (positional argument, not a flag; the `bd remember` command has no `--delete` option).
+3. Delete the source entry: remove its `### <full-key>` block from `~/.claude/memory/calibration-<agent>.md` with the Edit tool.
 
 For each reject-accepted entry:
 
 1. Append a one-line lookback entry (same format as merges, with **Action**: reject and **Rationale**: why rejected) so the producing agent's anti-re-emission contract holds (the calibration scaffolds promise rejected patterns are logged so agents stop re-emitting them).
-2. Delete the source memory key with `bd forget "<full-key>"`. Do not write to the calibration file itself.
+2. Delete the source entry's `### <full-key>` block from the topic file. Do not write to the calibration file itself.
 
 For each keep-accepted entry:
 
@@ -159,7 +159,7 @@ Then immediately replace `(no entries yet)` with the first entry.
 ## Rules
 
 - **Never write to calibration file without explicit user accept.** This skill is the human review gate. Auto-merge defeats the purpose.
-- **Always delete merged or rejected memory keys.** The calibration file (or the rejection) is the audit; the memory entry is intermediate state. Stale memory keys clutter `bd memories` queries.
+- **Always delete merged or rejected memory keys.** The calibration file (or the rejection) is the audit; the memory entry is intermediate state. Stale entries clutter the topic file.
 - **Lookback log is append-only.** Never edit or remove entries. Use the lookback log for the "what we learned" retrospective; reverts to the calibration file go through git.
 - **Refuse to write to project scratch without `.gitignore` coverage.** Hard refuse, not warn. Personal data in a checked-in path is the failure mode this skill exists to prevent.
 - **One agent per invocation.** Do not bulk-process across agents in one run. The user reviews one agent's drift at a time so they can attend to each.
@@ -169,11 +169,12 @@ Then immediately replace `(no entries yet)` with the first entry.
 To verify the loop closes from end to end, run the synthetic-drift fixture:
 
 ```bash
-# 1. Inject a known fixture entry
-bd remember --key="calibration:mx2-decision-maker:proceed-gate:fixture-test-do-not-merge" "FIXTURE: synthetic drift entry for end-to-end loop test. If this lands in the calibration file, the loop closes."
+# 1. Inject a known fixture entry: with the Edit tool, add to ~/.claude/memory/calibration-decision-maker.md
+#      ### calibration:decision-maker:proceed-gate:fixture-test-do-not-merge
+#      FIXTURE: synthetic drift entry for end-to-end loop test. If this lands in the calibration file, the loop closes.
 
 # 2. Confirm channel
-bd memories calibration:mx2-decision-maker:proceed-gate:fixture-test-do-not-merge
+grep -n "fixture-test-do-not-merge" ~/.claude/memory/calibration-decision-maker.md
 
 # 3. Run /calibrate
 # 4. Accept the fixture (the test path always accepts; in real use you'd reject)
@@ -184,11 +185,10 @@ grep "FIXTURE" ~/.claude/agents/calibration/decision-maker.md
 # 6. Verify lookback log gained an entry
 grep "fixture-test-do-not-merge" ~/.claude/agents/calibration/decision-maker.lookback.md
 
-# 7. Verify cleanup (the source memory key should be gone post-merge)
-bd memories calibration:mx2-decision-maker:proceed-gate:fixture-test-do-not-merge  # should be empty
+# 7. Verify cleanup (the source entry should be gone post-merge)
+grep -n "fixture-test-do-not-merge" ~/.claude/memory/calibration-decision-maker.md  # should print nothing
 
-# If still present, the skill run didn't call `bd forget`. Manually clean up:
-#   bd forget calibration:mx2-decision-maker:proceed-gate:fixture-test-do-not-merge
+# If still present, the skill run did not remove the entry. Remove its block by hand with the Edit tool.
 
 # 8. Cleanup test artifact: manually remove the FIXTURE entry from the calibration file
 ```

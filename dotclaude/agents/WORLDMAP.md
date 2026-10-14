@@ -9,13 +9,13 @@ authored_by: Claude Opus 5
 
 AI-authored commentary on each personal-tier agent in `~/.claude/agents/`. When I reach for the agent, what failure mode it prevents, how it compounds, and where it has limits. Entries follow the format documented in the top-level `WORLDMAP.md`.
 
-The agents divide into three rough classes: thinking-partner agents (tech-lead, decision-maker, skeptic) that operate at the framing layer; structural reviewers (code-reviewer, executor, prompt-refiner) that do code-shaped work; and specialist linters (TypeScript, silent-failure, observability, test quality, module cohesion, bot-review, pr-precedent) that fire on narrow concerns. The boundaries between classes are not absolute; bot-review and pr-precedent in particular live between "linter" and "memory mechanism." The voice of each entry tries to name what makes that agent earn its keep, not just what it does.
+The agents divide into three rough classes: thinking-partner agents (tech-lead, decision-maker, skeptic) that operate at the framing layer; structural reviewers (code-reviewer, executor, prompt-refiner) that do code-shaped work; and specialist linters (TypeScript, silent-failure, observability, test quality, module cohesion, blast-radius-reviewer, pr-precedent) that fire on narrow concerns. The boundaries between classes are not absolute; blast-radius-reviewer and pr-precedent in particular live between "linter" and "memory mechanism." The voice of each entry tries to name what makes that agent earn its keep, not just what it does.
 
 ---
 
 ```yaml
 ---
-component: bot-review
+component: blast-radius-reviewer
 type: agent
 status: active
 trigger_signals:
@@ -31,7 +31,7 @@ related: [pr-precedent, code-reviewer]
 
 When I reach for it: PR review work, specifically when the diff is making something publicly visible (new function exported, new type defined, signature change to a shared utility). I do not run it on every PR review; about 1 in 5 PRs touches a public symbol in a way that warrants the blast-radius lens.
 
-What it prevents: code review naturally focuses on the diff in isolation. "Is this function correct? Is the test good?" The bot-review lens forces a different question: "What does each consumer assume that this change weakens?" The agent walks consumers of changed symbols and articulates the invariant each one depends on.
+What it prevents: code review naturally focuses on the diff in isolation. "Is this function correct? Is the test good?" The blast-radius-reviewer lens forces a different question: "What does each consumer assume that this change weakens?" The agent walks consumers of changed symbols and articulates the invariant each one depends on.
 
 How it compounds: pairs with the code-reviewer (which evaluates the diff itself) and the pr-precedent agent (which carries forward concerns from prior PRs in the same area). Three lenses together catch overlapping failure modes that any single lens would miss.
 
@@ -41,7 +41,7 @@ Limits: cannot detect dynamic dependencies (reflection-based consumers, plugin-l
 
 ```yaml
 ---
-component: mx2-tech-lead
+component: tech-lead
 type: agent
 status: active
 trigger_signals:
@@ -70,7 +70,7 @@ Limits: the tech-lead is the most opinionated agent in the harness. Its framings
 
 ```yaml
 ---
-component: mx2-decision-maker
+component: decision-maker
 type: agent
 status: active
 trigger_signals:
@@ -95,7 +95,7 @@ Limits: only as good as its calibration. New domains where calibration is thin p
 
 ```yaml
 ---
-component: mx2-code-reviewer
+component: code-reviewer
 type: agent
 status: active
 trigger_signals:
@@ -105,7 +105,7 @@ trigger_signals:
 prevents:
   - "shipping code that violates project standards"
   - "missing structural anti-patterns the linter does not catch"
-related: [bot-review, silent-failure-hunter, observability-reviewer]
+related: [blast-radius-reviewer, silent-failure-hunter, observability-reviewer]
 ---
 ```
 
@@ -206,7 +206,7 @@ Limits: cannot evaluate runtime tag cardinality without sample data. The agent f
 
 ```yaml
 ---
-component: mx2-pr-precedent
+component: pr-precedent
 type: agent
 status: active
 trigger_signals:
@@ -214,7 +214,7 @@ trigger_signals:
   - "M+ size PR in a domain with active design churn"
 prevents:
   - "missing concerns that already-merged peer reviewers raised in the same area"
-related: [bot-review, code-reviewer]
+related: [blast-radius-reviewer, code-reviewer]
 ---
 ```
 
@@ -224,7 +224,7 @@ What it prevents: each PR review is an isolated event; what one reviewer raised 
 
 Output discipline: returns only the concerns that still apply AND are not already raised by current PR's bot reviewers. The dedup is the load-bearing piece; without it, the agent generates pile-on comments that erode reviewer trust.
 
-How it compounds: pairs with bot-review (which evaluates the diff against consumer assumptions) and the code-reviewer (which evaluates against current rules). Three lenses across time (precedent), space (consumers), and current-state (rules).
+How it compounds: pairs with blast-radius-reviewer (which evaluates the diff against consumer assumptions) and the code-reviewer (which evaluates against current rules). Three lenses across time (precedent), space (consumers), and current-state (rules).
 
 Limits: requires gh API access to prior PR comments. Slower than other specialists because of the API round-trips. Worth the cost on PRs in churning areas; overhead on quiet directories.
 
@@ -232,7 +232,7 @@ Limits: requires gh API access to prior PR comments. Slower than other specialis
 
 ```yaml
 ---
-component: mx2-silent-failure-hunter
+component: silent-failure-hunter
 type: agent
 status: active
 trigger_signals:
@@ -259,7 +259,7 @@ Limits: cannot detect runtime swallowing without execution. Static review catche
 
 ```yaml
 ---
-component: mx2-typescript-reviewer
+component: typescript-reviewer
 type: agent
 status: active
 trigger_signals:
@@ -327,7 +327,7 @@ prevents:
   - "a hand-rolled query landing next to the typed accessor that already expresses it"
   - "a behavior change smuggled into a diff described as a pure move"
   - "catch-all modules and test-only helpers accreting inside the production import graph"
-related: [mx2-code-reviewer, mx2-pydantic-reviewer, test-quality-reviewer, bot-review]
+related: [code-reviewer, mx2-pydantic-reviewer, test-quality-reviewer, blast-radius-reviewer]
 ---
 ```
 
@@ -335,7 +335,7 @@ When I reach for it: as a fan-out target whenever a diff touches Python modules,
 
 What it prevents: the defect class that single-file tooling structurally cannot see. A filename is not a defect any linter checks, and semantic duplication across files is beyond token-similarity rule sets. Its two named headline catches are a hand-rolled implementation duplicating an existing typed accessor (reusing the accessor removes both the duplicate and the untyped surface at once) and behavior smuggled into a "pure move": a dropped memoization, a key-presence check turned into `is not None`, a swapped default, in a diff whose description promised no behavior change.
 
-The seam is the design: the agent definition spends more words on what is NOT its lane than on its question bank. Within-file structure goes to the code reviewer, Settings to the Pydantic reviewer, PII to the security auditor, error propagation to the silent-failure hunter, consumer blast radius to bot-review, and test files in their entirety to test-quality-reviewer (it is told not to open one, even when a test file is in the diff). Restating a sibling's finding is the failure it is tuned against, because pile-on is what erodes trust in a multi-agent report.
+The seam is the design: the agent definition spends more words on what is NOT its lane than on its question bank. Within-file structure goes to the code reviewer, Settings to the Pydantic reviewer, PII to the security auditor, error propagation to the silent-failure hunter, consumer blast radius to blast-radius-reviewer, and test files in their entirety to test-quality-reviewer (it is told not to open one, even when a test file is in the diff). Restating a sibling's finding is the failure it is tuned against, because pile-on is what erodes trust in a multi-agent report.
 
 Advisory by construction: every finding is a question the author answers, never a verdict, and the agent is required to answer by reading or grepping anything it could verify itself before asking. It is also told to say so in one line and stop when a module is clean, rather than manufacturing questions to fill a report.
 
@@ -356,7 +356,7 @@ prevents:
   - "a reader forming a different takeaway than the author intended"
   - "session-internal vocabulary (finding ids, round names, scratch paths) reaching someone who cannot resolve it"
   - "a reader approving or rejecting for the wrong reason because the page gave them a partial picture"
-related: [mx2-skeptic, prompt-refiner, provenance-classifier]
+related: [skeptic, prompt-refiner, provenance-classifier]
 ---
 ```
 

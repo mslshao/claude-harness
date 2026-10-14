@@ -21,7 +21,7 @@ when adversarial check did not run.
 
 ```
 Agent(
-  subagent_type="mx2-decision-maker",
+  subagent_type="decision-maker",
   description="Proceed/iterate gate on ideate top-K",
   prompt="**MODE: IDEATION GATE.** You are gating a candidate winner
   from an ideation pass (not an autopilot checkpoint, not a launch
@@ -34,11 +34,12 @@ Agent(
 
   If you detect calibration drift during this invocation (your
   intuition disagrees with the formula, or the formula adjudicates a
-  case you think it should not), record the drift, keyed
-  `calibration:mx2-decision-maker:ideation:<topic>`, in this agent's
-  calibration memory topic file, with the topic and your reasoning.
-  Tag with `ideation:` so calibrate
-  reviews can keep ideation-specific calibration separate from
+  case you think it should not), return it under a heading
+  `Calibration drift` in your answer, keyed
+  `calibration:decision-maker:ideation:<topic>`, with the topic and
+  your reasoning. Write nothing yourself: the caller records it, since
+  a read-only dispatch forbids the write. The `ideation:` tag lets
+  calibrate reviews keep ideation-specific calibration separate from
   autopilot/launch calibration.
 
   The user has not yet seen any of this. Your job is to call PROCEED,
@@ -95,6 +96,8 @@ Agent(
     /converge, /challenge, human consultation)."
 )
 ```
+
+When the answer holds a `Calibration drift` heading, the caller appends it to the decision-maker's calibration memory topic file under its key (dev-73, 2026-10-08: the gate was told to write memory under a read-only brief).
 
 ## Phase 4b: Branch on Verdict
 
@@ -154,7 +157,7 @@ SUGGESTED_NEXT_SKILL. Common cases:
 - "Problem is actually a single approach, just unspecified" maps to
   suggest `/converge` directly.
 - "Need a tech-lead's read on the problem space" maps to suggest
-  dispatching `mx2-tech-lead` for sense-making.
+  dispatching `tech-lead` for sense-making.
 
 ## Phase 4c: Iteration Caps
 

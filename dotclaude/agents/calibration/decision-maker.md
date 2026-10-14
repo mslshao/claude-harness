@@ -21,7 +21,7 @@ When the artifact is operational ("what do I deploy", "what's changed since
 last push", "what services are affected", "is this fix in place"), evidence
 trail must include verification against authoritative operational state
 (Lambda LastModified, ECS task definition revisions, Terraform state, alias
-configuration, Jira ticket status), not just commit history grep. Recent
+configuration), not just commit history grep. Recent
 commit history surface-scans what's been merged, not what's shipped; the lag
 can be months. Source: `~/.claude/CLAUDE.md` "Operational scope questions
 require authoritative-state verification" (two-strike pattern in doc_v3
@@ -32,8 +32,8 @@ domain).
 A grep hit on main does not confirm a fix is in place. Code on main can be
 (a) deployed but not effective due to config/threshold/edge case, (b) deployed
 but bypassed by operational flag, (c) merged but not rolled out. Before
-PROCEEDing on a "fix is shipped" claim, the artifact must show: Jira ticket
-status (open tickets are a strong signal the fix isn't working), production
+PROCEEDing on a "fix is shipped" claim, the artifact must show: ticket
+status where a tracker exists (open tickets are a strong signal the fix isn't working), production
 behavior signal (CloudWatch logs, Datadog events, operational reports), or
 deployment state. Source: `~/.claude/CLAUDE.md` "Code presence is not
 deployment evidence."
@@ -237,16 +237,16 @@ ratified decision the artifact simply didn't search for. Extends CLAUDE.md
 
 ### Launch: an absence claim that eliminates an option class needs gate-time re-verification
 
-When a plan substitutes a different deliverable for what the bead's own
+When a plan substitutes a different deliverable for what the ticket's own
 DESIGN/ACCEPTANCE CRITERIA describe, on the strength of an absence claim ("no
 X exists anywhere, confirmed by N search passes"), the gate must independently
 re-verify that specific claim against the governing source before accepting
-the substitution, especially when the bead BLOCKS a Consequence=high sibling.
+the substitution, especially when the ticket BLOCKS a Consequence=high sibling.
 Challenge and consult specialists reviewing the MECHANISM are not a substitute
 for this: none of four independent reviewers checked the plan against the
-bead's own written ACs, and none re-ran the absence claim itself. Add two
+ticket's own written ACs, and none re-ran the absence claim itself. Add two
 PROCEED criteria: (1) INTENT-FIDELITY, diff the plan's work items against the
-bead's own ACCEPTANCE CRITERIA text, and treat an unmatched AC as ITERATE, not
+ticket's own ACCEPTANCE CRITERIA text, and treat an unmatched AC as ITERATE, not
 a paperwork nit; (2) any absence claim that eliminates an option class gets
 re-verified at the gate against the governing source (CLAUDE.md
 governing-source-not-silent-source). Instance: a plan concluded no automated
@@ -290,7 +290,7 @@ When a plan gates or drops traffic on a path that carries more than one event
 population (live / replay / backfill / re-ingest / sweep-requeue), the plan
 must assign semantics PER POPULATION and name any population whose semantics
 depend on an unratified question, with the dependency edge to that question's
-bead. A uniform drop plus a producer-identifying metric dimension is NOT
+ticket. A uniform drop plus a producer-identifying metric dimension is NOT
 population-level reasoning. Instance: a plan extended a per-matter drop to an
 operator direct-invoke path plus two API bulk endpoints plus a sweep re-queue,
 while the ratified decision on record states the drop is NOT safe for the

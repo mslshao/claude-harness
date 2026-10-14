@@ -17,7 +17,7 @@ or opine.
 ## Input
 
 The user provides one of:
-- **Explicit sources**: bead IDs, file paths, PR numbers, Jira/Confluence references
+- **Explicit sources**: file paths, PR numbers
 - **"from conversation"**: synthesize the recent discussion thread
 - **Mix**: some explicit sources plus conversation context
 
@@ -31,8 +31,6 @@ Collect all inputs using tools. Record what was gathered.
 |---|---|
 | File | Read |
 | PR | `gh pr view`, `gh pr diff` via Bash |
-| Jira | Atlassian MCP (`getJiraIssue`) |
-| Confluence | Atlassian MCP (`getConfluencePage`) |
 | Conversation | Identify relevant exchanges from context |
 | Code reference | Grep/Read to verify claims about code |
 
@@ -122,12 +120,12 @@ Use when N tickets/docs/PRs need to be reviewed together.
 ### Checkpoint
 
 Use when conversation context needs to be preserved before compaction.
-Produces bead-ready output.
+Produces output ready for a memory topic file or an `open-chores.md` checkbox.
 
 ```
 ## Checkpoint: [topic]
 
-**Title**: [bead-quality title, 5-12 words]
+**Title**: [a clear title, 5-12 words]
 **Type**: memory | decision | discovery
 **Description**: [2-3 sentences of context]
 
@@ -142,12 +140,11 @@ Produces bead-ready output.
 ```
 
 After producing a checkpoint, suggest: "Persist with a new checkbox in
-`open-chores.md` or `/bead-forge checkpoint` if this needs to survive compaction."
+`open-chores.md`, or a line in the matching `~/.claude/memory/` topic file
+plus its `MEMORY.md` index row, if this needs to survive compaction."
 
-Note: `/synthesize` produces formatted text you decide what to do with.
-`/bead-forge checkpoint` creates actual beads in the tracker. Use synthesize
-when you want to review the artifact first; use bead-forge directly when
-you know you want beads created immediately.
+Note: `/synthesize` produces formatted text you decide what to do with. Use it
+when you want to review the artifact before deciding where it lives.
 
 ## Rules
 

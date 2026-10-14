@@ -38,7 +38,7 @@ stays the canonical table), populate the `Provenance:` and per-finding
 that classification was inline rather than dispatched so the audit trail stays honest.
 This is NOT an exception to the ONLY-case rule above: the phase still runs and still
 renders, it just runs without a subagent. The observable contract is the rendered
-classification, not the dispatch (`stop-validate-pr-intel.sh` checks the header lines).
+classification, not the dispatch (`stop-validate-pr-intel.sh` checked the header lines; it is not installed on this machine).
 Observed twice on 2026-08-10 (PR #11442 rounds 1 and 2, under a session directive
 barring Agent calls), where the absence of this clause meant improvising the call and
 flagging the deviation to the user both rounds.
@@ -53,10 +53,10 @@ Each entry has:
 - `finding_id`: stable identifier. Construct as `<specialist_source>:<file>:<line>`
   when no explicit ID exists. Must be unique within the array.
 - `source`: specialist source if known. Valid values (canonical list):
-  - `mx2-code-reviewer`, `mx2-security-auditor`, `test-quality-reviewer`,
-    `mx2-devops-build-deploy`, `mx2-typescript-reviewer`, `mx2-silent-failure-hunter`,
-    `observability-reviewer`, `mx2-pr-precedent`, `mx2-git-historian`, `bot-review`,
-    `mx2-pydantic-reviewer`, `mx2-skeptic`, `module-cohesion-reviewer`
+  - `code-reviewer`, `security-review`, `test-quality-reviewer`,
+    `mx2-devops-build-deploy`, `typescript-reviewer`, `silent-failure-hunter`,
+    `observability-reviewer`, `pr-precedent`, `git-historian`, `blast-radius-reviewer`,
+    `mx2-pydantic-reviewer`, `skeptic`, `module-cohesion-reviewer`
   - `AC Compliance Check`, `Spec Compliance Check`, `Design Doc Compliance`
   - `sonarcloud-pre-check`, `checkov`
   - `pre-synthesis-analysis-patterns`

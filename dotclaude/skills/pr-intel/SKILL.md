@@ -1,6 +1,7 @@
 ---
 name: pr-intel
-description: Actionable PR intelligence briefing with specialist-backed analysis and draft review comments ready to post. Use when the user asks to review a PR in any phrasing - "review a PR", "analyze PR", "PR intel", "look at PR #123", "check this PR", "thoughts on #456", "can you go through this PR" - or needs a structured briefing before reviewing. Also triggers for self-review with --mine flag when user says "review my PR", "check my changes before I submit".
+description: >-
+  Actionable PR intelligence briefing with specialist-backed analysis and draft review comments ready to post. Use when the user asks to review a PR in any phrasing - "review a PR", "analyze PR", "PR intel", "look at PR #123", "check this PR", "thoughts on #456", "can you go through this PR" - or needs a structured briefing before reviewing. Also triggers for self-review with --mine flag when user says "review my PR", "check my changes before I submit".
 argument-hint: "[pr-number] [--mine] [--quick] [--once] [free-text review context]"
 allowed-tools: ["Bash", "Glob", "Grep", "Read", "Agent", "WebFetch", "Skill"]
 ---
@@ -42,12 +43,12 @@ This SKILL.md is always read in full. Sub-files load per the table; skipping a "
 |---|---|---|
 | every run | [output-formats.md](output-formats.md) (the output contract; never skippable, any mode, any size) | |
 | `--quick` | nothing further | all other sub-files |
-| default / `--once` / `--mine`, XS-S | [prior-reviews.md](prior-reviews.md) (if prior rounds exist), [compliance-checks.md](compliance-checks.md) (if Jira ticket or CI failures), [provenance-classification.md](provenance-classification.md), [bot-reactions.md](bot-reactions.md) (default mode only) | [dispatch.md](dispatch.md) (no specialist dispatch at XS/S, EXCEPT `has_terraform` with a net-new `.tf` OR `has_new_tf_resource` (a modified `.tf` that adds a `resource`/`module`/`data` block) OR `has_ci_workflow_change` (a changed `.github/workflows/*.ya?ml`): dispatch `mx2-devops-build-deploy` even at XS/S, since IaC/CI-workflow blast radius is decoupled from line count AND from whether the file is net-new; mirrors the Checkov net-new-tf-or-new-resource trigger and the size-independent `changes_public_surface` rule; and EXCEPT `adds_capability`: load dispatch.md for its orchestrator-owned Active Reuse-Search step, which runs even at XS/S with no specialist dispatch implied, since capability duplication is decoupled from line count and one motivating miss, PR #10944, was 21 lines), [synthesis.md](synthesis.md), [verification.md](verification.md), [diagrams.md](diagrams.md) |
+| default / `--once` / `--mine`, XS-S | [prior-reviews.md](prior-reviews.md) (if prior rounds exist), [compliance-checks.md](compliance-checks.md) (if CI failures), [bot-reactions.md](bot-reactions.md) (default mode only) | [dispatch.md](dispatch.md) (no specialist dispatch at XS/S, EXCEPT `adds_capability`: load dispatch.md for its orchestrator-owned Active Reuse-Search step, which runs even at XS/S with no specialist dispatch implied, since capability duplication is decoupled from line count and one motivating miss, PR #10944, was 21 lines), [synthesis.md](synthesis.md), [verification.md](verification.md), [diagrams.md](diagrams.md) |
 | default / `--once` / `--mine`, M+ | all of the above plus [dispatch.md](dispatch.md), [dispatch-mechanics.md](dispatch-mechanics.md), [synthesis.md](synthesis.md), [static-analyzers.md](static-analyzers.md) | [verification.md](verification.md) at M when no BLOCKING-class findings |
 | L+ | plus [verification.md](verification.md) | |
-| trigger-conditional, any size | [checkov.md](checkov.md) (`has_terraform` + net-new tf), [diagrams.md](diagrams.md) (M+ AND `multi_service`), [design-doc.md](design-doc.md) (Confluence link in body), [context.md](context.md) (migration/series triggers), [freshness.md](freshness.md) / [grounding.md](grounding.md) when those checks need their exact commands | |
+| trigger-conditional, any size | [checkov.md](checkov.md) (`has_terraform` + net-new tf), [diagrams.md](diagrams.md) (M+ AND `multi_service`), [context.md](context.md) (migration/series triggers), [freshness.md](freshness.md) / [grounding.md](grounding.md) when those checks need their exact commands | |
 
-The Stop-hook backstop (`stop-validate-pr-intel.sh`) still validates every render, so a misjudged reading path degrades to a caught retry, not a silent miss. Mandatory PHASES (provenance classification, bot reactions) are unaffected by reading paths; only reference depth varies.
+No Stop hook checks the render on this machine (`stop-validate-pr-intel.sh` is not installed; `~/.claude/rules/environment.md`, "Enforcement is partial"), so a misjudged reading path is a silent miss; check the render against `output-formats.md` yourself. Mandatory PHASES (provenance classification, bot reactions) are unaffected by reading paths; only reference depth varies.
 
 **Already-reviewed comment-only follow-up: verify the claims, skip the machinery.** A narrow carve-out, and every condition is required. When (a) the diff is comment-only or otherwise has provably zero plan/runtime impact, (b) THIS session already reviewed the parent change and so already holds the files, the ticket and the sibling-PR context, and (c) the follow-up exists to address a finding this session itself raised, then the substantive review is confirming the author's factual claims, not re-running the fan-out. Do that directly: verify each falsifiable claim in the PR description, confirm the no-impact property from the diff rather than asserting it (every changed line is a comment, and the semantically load-bearing values appear only as unchanged context), then render and post. State in the output that the full pass was not run AND why, so the choice is visible rather than silently skipped.
 
@@ -116,7 +117,7 @@ targets either way, so the first zero was meaningless until a control base spann
 
 ## Data Gathering
 
-**Pre-flight checklist.** Before Phase 0, confirm each of these was executed or explicitly deemed not applicable. Skipping a conditional step (e.g., Jira ticket hydration when no ticket is referenced) is fine; skipping a conditional step when the trigger IS present is the failure mode this checklist exists to prevent.
+**Pre-flight checklist.** Before Phase 0, confirm each of these was executed or explicitly deemed not applicable. Skipping a conditional step (e.g., prior-review loading when no prior rounds exist) is fine; skipping a conditional step when the trigger IS present is the failure mode this checklist exists to prevent.
 
 - [ ] PR metadata fetched
 - [ ] Run self-registered in the inject log (Skill-tool invocations; see Self-register the run)
@@ -125,10 +126,8 @@ targets either way, so the first zero was meaningless until a control base spann
 - [ ] Merge Base Freshness checked
 - [ ] **Prior review memories loaded** via a memory grep for `pr-<number>` (see [prior-reviews.md](prior-reviews.md))
 - [ ] **DynamoDB prior reviews loaded** (skipped if SSO not active) via `pr_review_state.list_reviews_for_pr` (see [prior-reviews.md](prior-reviews.md))
-- [ ] **Jira ticket hydrated** if `MX2-NNNNN` or similar appears in PR body
-- [ ] **Design doc hydrated** if any `<company>.atlassian.net/wiki/` URL appears in PR body (see lesson #11 in `reviewer-discipline.md`)
 - [ ] Inline review comments fetched if prior reviews exist (required for dedup)
-- [ ] PR Series context checked if Jira ticket was found
+- [ ] PR Series context checked if sibling PRs exist
 - [ ] Service Context extracted from CLAUDE.md or README
 
 Narrative details for each step follow below.
@@ -161,11 +160,11 @@ gh pr view <number> --json title --jq '.title' | sed 's/\xe2\x80\x94/-/g'
 ```
 
 The same applies to any upstream string quoted into the briefing (bot comment text,
-author reply text, Jira summary, commit messageHeadline): sanitize on echo, never
+author reply text, commit messageHeadline): sanitize on echo, never
 paste through.
 
 **Self-register the run** (required, once per invocation, alongside the metadata fetch):
-append this run to the inject log so `nudge-handrolled-review.sh` knows /pr-intel ran for
+append this run to the inject log so `nudge-handrolled-review.sh` (not installed on this machine) knows /pr-intel ran for
 this PR in this session. The UserPromptSubmit hook only logs runs the user typed; a
 Skill-tool invocation must log itself or later posts to this PR get a false nudge
 (three occurrences, 2026-07-15):
@@ -268,49 +267,18 @@ msgpack 3-array (`0x93`, `0xce` u32 repo, `0xcf` u64 review). Full recipe
 documented in `~/.claude/memory/`. Only after that fallback also fails, note it explicitly
 and flag in the output that bot dedup could not run.
 
-### Jira Ticket Hydration
+### Ticket and design-page hydration: not available here
 
-Scan the PR body for `MX2-\d+` references (or other known project prefixes). If
-found, hydrate the ticket using the procedure in
-[`../enrich/sources.md`](../enrich/sources.md) Section 1 (Jira Tickets), in parallel
-with other post-metadata fetches.
-
-**Without Jira hydration, the AC Compliance Check below cannot run, and the
-empty-ticket-blocking rule (template-boilerplate detection) silently passes.**
-
-Store the same fields named in `enrich/sources.md`: summary, status, assignee,
-priority, `description` AND `customfield_11220` (both render in the Jira UI as
-of ~2026-04-30; per project convention non-SF tickets put content in
-`description` while SF-specific tickets mirror to `customfield_11220` - check
-whichever has content), comments, and `issuelinks`. Plus, for review use:
-- **Acceptance criteria** (may live in the description body, or in a dedicated AC field)
-- **Issue type** (Story, Bug, Task; informs what "correct" looks like)
-
-If no ticket reference is found in the PR body, note this in Phase 0 as a
-description quality gap (same as today) but skip hydration. If the MCP call fails,
-note the failure and continue without ticket context. Do not block on Jira
-availability.
-
-### Design Doc Hydration & Spec Compliance Check
-
-After metadata is loaded, scan the PR body for Confluence links matching
-`<company>.atlassian.net/wiki/`. If found, hydrate the page body and comments (via
-`mcp__atlassian__getConfluencePage` + inline/footer comment calls) in parallel
-with Jira hydration, then compare the implementation against the spec: trace each
-behavioral specification in the diff, flag deviations (response shapes, parameters,
-routing, unhandled edge cases), and surface unresolved design-doc comments as open
-threads. Deviations are not automatically bugs; the goal is to let the reviewer ask
-"was this intentional?" This is the class of issue code-only review (all specialist
-agents) cannot detect. Produces a **Design Doc Compliance** output section; runs in
-default and `--mine`, skipped for `--quick`. If no Confluence link is found, skip
-silently. For the exact MCP calls (cloudId, page-ID extraction), the stored fields,
-and the deviation taxonomy, see [design-doc.md](design-doc.md).
+This company uses neither Jira nor Confluence (Michael, 2026-09-23 10:34 PDT), and
+this machine has no ticket or wiki tools. Skip ticket hydration and design-page
+hydration, and say so in Phase 0. The AC Compliance Check below has no ticket to
+trace against and is skipped the same way.
 
 ### PR Context (series, service, migration)
 
-After Jira hydration, run three context-gathering checks before specialist dispatch:
+After metadata is loaded, run three context-gathering checks before specialist dispatch:
 
-1. **PR Series Context**: when a Jira ticket was hydrated and sibling PRs exist,
+1. **PR Series Context**: when sibling PRs exist,
    classify new exports as referenced or unreferenced across the series.
 2. **Service Context**: scan for service-level CLAUDE.md / README in the changed
    paths and surface a 3-5 line orientation block.
@@ -325,12 +293,12 @@ when a peer PR consumes the export), service-level orientation is missing
 (review concerns about "sequencing risk" or "missing fallback" fire on
 already-resolved cutovers).**
 
-For trigger detection, tiered fetch logic, the bead-memories migration query
+For trigger detection, tiered fetch logic, the memory migration query
 patterns, downstream effects on specialist preamble / synthesis / Draft Review
 Summary, and the rationale for the authoritative-state principle, see
 [context.md](context.md).
 
-If no Jira ticket was hydrated, no migration signal is detected, and no
+If no sibling PRs exist, no migration signal is detected, and no
 service-level docs are found, all three checks degrade silently (note absence,
 do not block).
 
@@ -356,19 +324,17 @@ Compute these booleans from the diff for specialist dispatch:
   - added lines pass an API-response-derived value into markup: a `MarkdownRenderer`/`ReactMarkdown` prop, `dangerouslySetInnerHTML`, or JSX children, where the value came from a `fetch`/`authFetch`/`response.json()` in the same diff
   - added lines interpolate an API-response field into a string handed to a submit, send, ask, or prompt function (model output becoming the next turn's input)
 
-  Drives `mx2-security-auditor` INDEPENDENT of `security_files`, because the path regex is a poor proxy for this class. PR #11355 (2026-08-17) rendered LLM output and round-tripped it into the next prompt across 32 files under `ai-doc-chat/`, matched none of `auth|document|access|patient`, and the security lens was skipped in the fan-out. Run later as a separate round it produced the sharpest finding of that review: LLM-authored text can reach a fixed client-side routing prefix, and the `{{...}}` citation discipline covered only one of the fields that feed prompt construction. On a legal platform, model output is attacker-influenced input whenever the source documents are adversarial, which for discovery material and opposing-expert reports is the normal case, not the edge case.
+  Drives `security-review` INDEPENDENT of `security_files`, because the path regex is a poor proxy for this class. PR #11355 (2026-08-17) rendered LLM output and round-tripped it into the next prompt across 32 files under `ai-doc-chat/`, matched none of `auth|document|access|patient`, and the security lens was skipped in the fan-out. Run later as a separate round it produced the sharpest finding of that review: LLM-authored text can reach a fixed client-side routing prefix, and the `{{...}}` citation discipline covered only one of the fields that feed prompt construction. On a legal platform, model output is attacker-influenced input whenever the source documents are adversarial, which for discovery material and opposing-expert reports is the normal case, not the edge case.
 
   Calibration: expect this to fire on most `ai-doc-chat`, `bulk-chat`, `intake_agent`, and `llm` diffs. That is intended, and the auditor's explicit clean-result confirmation is cheap. If it proves noisy after ~10 firings, narrow the name half rather than deleting the two content halves, which are the part the path regex cannot reach.
 - **has_test_files**: changed files matching `*_test.py|test_*|conftest.py`
 - **has_terraform**: changed files matching `*.tf` or `*.hcl`
-- **has_new_tf_resource**: `has_terraform` is true AND an added line declares a new top-level Terraform block: `^\+(resource|module|data)\s+"`. Set by a MODIFIED `.tf` that appends a block, not only a net-new file. IaC blast radius (a new secret, a new plan-time `data` read against a shared multi-env stack) is decoupled from line count AND from whether the file is new, so this drives `mx2-devops-build-deploy` dispatch at any size, exactly like a net-new `.tf`. (PR #10554: a +18 modified `salesforce.tf` adding one `module` block gated a shared dev+prod secrets stack; the net-new-file trigger alone would have skipped the dispatch.)
-- **has_ci_workflow_change**: changed files matching `.github/workflows/*.ya?ml`, added OR modified. CI/CD workflow blast radius (secret exposure via `${{ secrets.* }}`, untrusted-actor trigger gating, `permissions:`/`id-token` scope, supply-chain via unpinned `uses:`) is decoupled from line count, exactly like `has_terraform`, so this drives `mx2-devops-build-deploy` dispatch at any size. (PR #10836: an XS +58 net-new `claude.yml` gated `ANTHROPIC_API_KEY` behind an author-association trigger guard and a write-capable OIDC app token; the XS-no-dispatch default would have skipped the devops lens on a security-sensitive file.)
 - **has_typescript_files**: changed files matching `*.ts|*.tsx|*.mts|*.cts` AND outside `src/gen-typescript/` (generated TS is excluded; review the generator instead)
 - **structural_risk_size**: diff > 200 lines OR > 5 files changed
 - **has_python_module_change**: changed files include a `src/python/**/*.py` that is added, deleted, or renamed, OR whose added lines declare a net-new top-level `def `/`class ` (column-0 on a `+` line). Drives `module-cohesion-reviewer` dispatch (cross-file cohesion lens). A changeset whose only Python changes are test files (`*_test.py|test_*|conftest.py`) does not set it unless production/test-only mixing is the concern.
 - **has_file_history**: count of merged PRs in last 180 days touching ANY file in the changeset (computed via `gh pr list --state merged --search "<file>" --limit 5` per top-3 changed files, cap at 3 per file). Boolean = aggregate count >= 3.
 - **has_pattern_precedent**: at least one file in changeset has >= 2 prior merged PRs in last 180 days AND the diff adds new public symbols. Symbol detection: added lines matching `^\+\s*(export |def |class |interface |type )`. Reuses the same `gh pr list` calls as `has_file_history`.
-- **changes_public_surface**: added/removed/modified lines declare a public symbol. Detection: lines matching `^[+-]\s*(def |async def |class |interface |type |export )`, OR `^[+-]\s*[A-Z_]+\s*[:=]` (constants, enum values), OR `^[+-]\s*\w+:\s*\w+` inside files matching `*Settings*` or Pydantic model classes (schema/Settings field changes). Excludes private symbols (leading underscore in Python, non-exported in TS). Drives `bot-review` dispatch (cross-file blast-radius lens). Size is a poor proxy for blast radius; an XS PR that changes a public type signature has higher downstream impact than an M PR refactoring internals.
+- **changes_public_surface**: added/removed/modified lines declare a public symbol. Detection: lines matching `^[+-]\s*(def |async def |class |interface |type |export )`, OR `^[+-]\s*[A-Z_]+\s*[:=]` (constants, enum values), OR `^[+-]\s*\w+:\s*\w+` inside files matching `*Settings*` or Pydantic model classes (schema/Settings field changes). Excludes private symbols (leading underscore in Python, non-exported in TS). Drives `blast-radius-reviewer` dispatch (cross-file blast-radius lens). Size is a poor proxy for blast radius; an XS PR that changes a public type signature has higher downstream impact than an M PR refactoring internals.
 - **adds_capability**: added lines introduce a NEW outbound capability rather than extending an existing one. Any of: an HTTP call (`requests.`, `httpx.`, `urllib.request`, `aiohttp`, `fetch(`); a subprocess invocation (`subprocess.`, `os.system`, `shell=True`); a queue or topic publish (`publish(`, `send_message(`, `put_events(`); a new route declaration (`@app.`, `@router.`, `APIRouter(`); a new CLI entry point (`argparse`, `click.`, a new `__main__` block); a system-package or image install (`apt-get install`, a Dockerfile `RUN` adding a binary); or a new raw SQL or warehouse query string. Test-only files alone do not set it. Compute at ALL sizes, XS included: it drives the orchestrator-owned Active Reuse-Search in [dispatch.md](dispatch.md), not a specialist dispatch, so the XS/S no-dispatch default does not apply (PR #10944, one of the motivating misses, was 21 lines). Pattern set is duplicated from the `adds_capability` row in `~/.claude/skills/review/SKILL.md` step 2, the canonical copy per docr-z3qw4; if the two drift, reconcile toward the /review copy.
 - **multi_service**: changed files (net-new only) span 2+ distinct top-level service directories. Service directory = first path segment after `src/python/mx2/`, `src/typescript/mx2/`, or `infra/`. Files outside these prefixes (root scripts, generated code) do not contribute. Drives the optional Sequence Diagram briefing section for M+ PRs. See [diagrams.md](diagrams.md).
 - **spot_check_eligible**: ALL of (a) size in {L, XL, 2XL, 3XL}, (b) net-new file count >= 10 AND median per-file diff lines <= 25 (mechanical-pattern proxy: many small uniform edits), (c) PR description contains a methodology statement detectable by regex (`script:|ran (the )?(command|script|tool)|applied (rule|codemod|transform)|using (yapf|ruff|isort|black|sed|jscodeshift|comby|grit)|migration script|codemod`). Drives the spot-check mode under Specialist Dispatch (the engineering lead's Code Review Guide #11: "focus your review on the methodology... spot-check a few instances"). Conservative-by-default: when any of (a)/(b)/(c) is uncertain, set to false (full-diff dispatch is the safe default; spot-check trades coverage for speed and that trade only makes sense when the mechanical pattern is unambiguous).
@@ -379,7 +345,7 @@ Compute these booleans from the diff for specialist dispatch:
 Before dispatching specialists, evaluate the PR description:
 - Is it present and non-boilerplate?
 - Does it explain intent (why), not just content (what)?
-- Is there a linked Jira ticket or meaningful context?
+- Is there meaningful context?
 
 Boilerplate detection patterns (any of these alone is sufficient to
 fail Phase 0):
@@ -390,7 +356,7 @@ fail Phase 0):
   Y / Refactors Z" without any "because", "to fix", "needed for", or other
   rationale connective
 - Single sentence < 30 chars
-- Empty body with only `Jira issue link: MX2-XXXX`
+- Empty body with only a ticket link
 
 If the description is absent or inadequate, **short-circuit**: produce a
 brief "send it back" briefing instead of full specialist dispatch. The
@@ -422,14 +388,14 @@ After Phase 0 description quality, run three pre-dispatch checks:
 1. **CI Status Check**: parse `statusCheckRollup` from PR metadata; if failures
    exist, fetch the last 3 merged PRs to classify each as PR-specific regression
    vs global flake.
-2. **AC Compliance Check** (when Jira ticket is available): trace each
+2. **AC Compliance Check** (when a ticket is available; this machine has no ticket system, so it is skipped): trace each
    acceptance criterion against the diff, flag deviations, and run the
    empty-ticket-blocking detector.
 3. **Static Analyzer Pre-Check** (always; specific sub-tools depend on what
    posted on the PR): query each available static analyzer for findings
    scoped to the PR. Three sub-tools today: SonarCloud (MCP available),
    Datadog code analysis (MCP via `search_pr_insights`), Sentry (no live
-   bot on MX2 PRs; static patterns ride in `mx2-code-reviewer` instead).
+   bot on MX2 PRs; static patterns ride in `code-reviewer` instead).
    the engineering lead's Code Review Guide #7 explicitly says review these findings
    and call out anything that should be blocking.
 
@@ -449,7 +415,7 @@ the deviation taxonomy, and the mode-irrespective always-runs invariant, see
 Three static analyzers post on MX2 PRs (or could): SonarCloud
 (`mcp__sonarqube__*`), Datadog code analysis (`mcp__datadog__search_pr_insights`),
 and Sentry (no live bot on MX2 PRs as of 2026-05-28; static patterns ride in
-`mx2-code-reviewer`). Surface their findings alongside specialist results so the
+`code-reviewer`). Surface their findings alongside specialist results so the
 reviewer sees the engineering lead's #7 in one place rather than scattered across bot comments.
 
 **Always runs** (mode-irrespective, like AC Compliance); `--quick` skips only the
@@ -477,7 +443,7 @@ Spot-Check Mode for large mechanical refactors (deterministic 3-file sample,
 the mandatory briefing-addition template, what stays full-diff, the
 one-step-more-conservative recommendation), and `--mine` Review-Cache Reuse
 (diff-identity HIT/MISS keying, the reuse roster, the always-re-dispatch
-`mx2-pr-precedent` rule, bead `docr-xvnr`), see
+`pr-precedent` rule), see
 [dispatch-mechanics.md](dispatch-mechanics.md).
 
 ### Dispatch
@@ -485,7 +451,7 @@ one-step-more-conservative recommendation), and `--mine` Review-Cache Reuse
 Evaluate dispatch triggers using the computed signals. Launch all triggered
 specialists **in parallel** via the Agent tool. This is NOT optional for default mode.
 
-**Active reuse-search precedes the fan-out.** When `adds_capability` fired, run the orchestrator-owned Active Reuse-Search in [dispatch.md](dispatch.md) BEFORE building specialist prompts, so its candidate-owner results ride into the `mx2-code-reviewer` and `module-cohesion-reviewer` prompts as grounding evidence. It runs at every size (including XS/S renders that dispatch no specialists), and its outcome always renders on the header `reuse-search:` line per output-formats.md.
+**Active reuse-search precedes the fan-out.** When `adds_capability` fired, run the orchestrator-owned Active Reuse-Search in [dispatch.md](dispatch.md) BEFORE building specialist prompts, so its candidate-owner results ride into the `code-reviewer` and `module-cohesion-reviewer` prompts as grounding evidence. It runs at every size (including XS/S renders that dispatch no specialists), and its outcome always renders on the header `reuse-search:` line per output-formats.md.
 
 **CRITICAL: All specialist agents MUST be foreground calls.** Do NOT use
 `run_in_background: true`. Send all Agent calls in a single message (parallel
@@ -526,6 +492,7 @@ the section is omitted in that case rather than fabricating relationships.
 
 ## Provenance Classification
 
+Since 2026-10-01, Draft Inline Comments hold merge blockers only (`~/.claude/rules/code-review-policy.md`).
 After Synthesis produces the finalized Draft Inline Comments list (and any
 substantive Draft Review Summary bullets that warrant classification), batch-dispatch
 the `provenance-classifier` agent to classify each finding as `speed-amplified`
@@ -539,7 +506,7 @@ happens REGARDLESS of size (XS/S/M/L/XL), regardless of specialist dispatch
 outcome, and regardless of finding count. Zero findings is still a valid input;
 the agent returns an empty classification array. The classifications drive the
 `Provenance:` and `Decision count:` lines in the Review Recommendation header
-(enforced by `stop-validate-pr-intel.sh`) and the per-finding `Classification:`
+(not hook-enforced on this machine: `stop-validate-pr-intel.sh` is not installed) and the per-finding `Classification:`
 line in each Draft Inline Comment briefing context.
 
 For the full dispatch contract (input schema, agent prompt construction,
@@ -613,20 +580,21 @@ anchor-grounding rule, which lives in a trigger-conditional sub-file that XS-S r
 
 **Attribution check before emitting (mandatory, every mode with inline comments).** Every
 drafted inline comment must open with a tool-attribution lede per output-formats.md's
-Tool-source attribution rule, and `block-unattributed-review-comment*.sh` blocks the post
-if one does not. Like the anchor check above, `/post-review` catches this only at Step 2.5,
+Tool-source attribution rule. On the codespace `block-unattributed-review-comment*.sh`
+blocked the post if one did not; those hooks are not installed on this machine, so the
+check below is the only one. Like the anchor check above, `/post-review` catches this only at Step 2.5,
 AFTER the briefing was rendered and the user read it, so a non-compliant draft means the
 comment text the user approved is not the text that gets posted (acute on the verb-named
 `/post-review <verb>` path, which posts without a second confirm). Validate the drafted
 bodies against the same `evaluate()` the hooks call, before emitting:
 
 ```bash
-python3 ~/.claude/scratch/scripts/check-review-attribution.py <payload.json>
+python3 ~/.claude/hooks/lib/check_review_attribution.py --payload-file <payload.json>
 ```
 
 A bare `{"comments":[{"path","line","body"}]}` payload is enough (`body`/`event` are not
-required; verified 2026-08-07). Expect the block to arrive at WRITE time rather than from
-the script: `block-unattributed-review-comment-file.sh` is a PostToolUse(Write) hook that
+required; verified 2026-08-07). On the codespace the block arrived at WRITE time rather than from
+the script (not on this machine, where the hook is not installed): `block-unattributed-review-comment-file.sh` is a PostToolUse(Write) hook that
 scans review-shaped JSON, so a non-compliant throwaway payload trips it before you get to
 run the checker. Either way the remedy is the same: rewrite the lede, do not defer to the
 post-time gate. output-formats.md:190 carries the first-token rule the checker enforces.
@@ -652,7 +620,7 @@ inconclusive; it is operator discretion and never gates the first-round verdict.
 Omit ANY section that would say "nothing to note." Always-present sections:
 Scope, Review Recommendation, Verdict, Draft Review Summary.
 
-Exception: when `mx2-security-auditor` was dispatched, include positive confirmation
+Exception: when `security-review` was dispatched, include positive confirmation
 even if clean: "Reviewed for: PII exposure, auth/authz, audit trails, encryption. No concerns identified."
 
 ## Principles
@@ -660,7 +628,7 @@ even if clean: "Reviewed for: PII exposure, auth/authz, audit trails, encryption
 - **Actionable output.** Every finding should help the reviewer take a specific action.
 - **High signal, no noise.** Only flag things with evidence. False positives erode trust.
 - **Two audiences per finding.** Briefing text (reviewer) and draft comment (PR author).
-- **Review the why, not just the what.** A PR is a claim that a change achieves a goal; the review's first job is to test that claim, not only to check that the surface code is well-built. Anchor on the goal (the description's why, the ticket intent), then ask whether the implementation achieves it AND whether it is the simplest path given what the deployment platform, runtime, framework, and existing services already provide. A clean specialist fan-out that never asks "does this mechanism need to exist at all?" will approve code that should not exist. Operationalized by the Goal-Fit & Mechanism Necessity design-review surface (synthesis.md) and the `mx2-skeptic` necessity question (dispatch.md); do not let surface-level polish substitute for the goal-fit question.
+- **Review the why, not just the what.** A PR is a claim that a change achieves a goal; the review's first job is to test that claim, not only to check that the surface code is well-built. Anchor on the goal (the description's why, the ticket intent), then ask whether the implementation achieves it AND whether it is the simplest path given what the deployment platform, runtime, framework, and existing services already provide. A clean specialist fan-out that never asks "does this mechanism need to exist at all?" will approve code that should not exist. Operationalized by the Goal-Fit & Mechanism Necessity design-review surface (synthesis.md) and the `skeptic` necessity question (dispatch.md); do not let surface-level polish substitute for the goal-fit question.
 - **Depth by default, speed on request.** Specialist dispatch is default. `--quick` for triage.
 - **Don't duplicate existing tools.** No `pants` runs. Posting is delegated to `/post-review`, never reimplemented. The briefing itself is never auto-posted, and `/pr-intel` performs no posting of its own; all posting is `/post-review` after your explicit OK.
 - **The engineering lead's priority order is the human-reviewer standard.** The engineering lead's
@@ -670,7 +638,7 @@ even if clean: "Reviewed for: PII exposure, auth/authz, audit trails, encryption
   then correctness-via-tests (NOT in-head execution), then static analyzers,
   then pragma review, then exception design, then large-refactor methodology.
   Phase 0 (description quality) implements item 1; the specialist dispatch
-  route (`mx2-code-reviewer` Design Judgment Checks) implements items 2-10.
+  route (`code-reviewer` Design Judgment Checks) implements items 2-10.
   When a Phase 0 short-circuit fires, the briefing stops at "send it back"
   without further specialist dispatch, matching the engineering lead's "don't waste your
   time reviewing without context."

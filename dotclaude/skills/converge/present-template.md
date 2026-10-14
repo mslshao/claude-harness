@@ -60,7 +60,7 @@ mechanism. One of:
   should be folded into <Y> as a feature of <Y>, not a new noun."
   (SCRAPPED_AND_REBUILT, canonical Fulfillment-vs-Coverage outcome)
 This section makes mechanism-vs-feature decisions visible BEFORE the
-user commits to beads. Omit when INPUT_MODE = problem-framed.]
+user commits to work items. Omit when INPUT_MODE = problem-framed.]
 
 ### Skeptic Lens
 [Verbatim 🔻 block from Phase 4.5. Always present (the pass is
@@ -102,6 +102,7 @@ refused to converge.]
 
 ---
 
-**Approve this plan?** Reply "yes" to create beads (with optional
-human gate on implementation), or provide feedback to revise.
+**Approve this plan?** Reply "yes" to record the work items in
+`open-chores.md` (with optional human gate on implementation), or
+provide feedback to revise.
 ```

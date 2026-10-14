@@ -3,7 +3,7 @@
 In `--mine` mode, the Review-Cache Reuse step (see
 [dispatch-mechanics.md](dispatch-mechanics.md)) may have already
 populated findings for the overlapping roster from a recent `/review` run on an
-unchanged diff (bead `docr-xvnr`). When that happens, only `mx2-pr-precedent`
+unchanged diff. When that happens, only `pr-precedent`
 dispatches here; the reused findings flow into Synthesis as if the agents had
 just returned. The triggers below still apply on a cache MISS or in default mode.
 
@@ -49,7 +49,7 @@ step, not a specialist. The question is not "is the new code correct?" but
 "should this code exist at all, or does something in the monorepo already
 own this capability?" That is `architecture.md` Reuse Across Boundaries,
 specifically its "If no boundary exists, build one; don't duplicate" bullet.
-Cross-author review is where this matters most: there is no bead or design
+Cross-author review is where this matters most: there is no ticket or design
 context to fall back on, so if the orchestrator does not run the search,
 nobody does (PR #10807, 2026-07-24: both reuse gaps surfaced only on a
 second pass, after the author was asked the why-not-how question).
@@ -116,7 +116,7 @@ silence is not an allowed third state (the outcome renders on the header
 
 - **Candidate owner found**: name it as `file:line`, state what it already
   does, and carry it into synthesis step 7b as a capability-duplication
-  Front Door finding. Pass the incumbent into the `mx2-code-reviewer` and
+  Front Door finding. Pass the incumbent into the `code-reviewer` and
   `module-cohesion-reviewer` prompts as evidence, appending: "Does an
   existing endpoint, service, or shared-library symbol already own this
   capability? Answer with a `file:line` for the incumbent, or state that
@@ -133,10 +133,10 @@ incumbent, or add a boundary to the incumbent is the author's call; this
 step exists to make sure the question is asked BEFORE the diff gets
 refined into a better version of the wrong thing.
 
-**Structural risks** → `mx2-code-reviewer` + `mx2-silent-failure-hunter`
+**Structural risks** → `code-reviewer` + `silent-failure-hunter`
 Trigger: diff > 200 lines OR > 5 files changed OR diff contains `try`/`except`/`raise`
 
-**Security & compliance** → `mx2-security-auditor`
+**Security & compliance** → `security-review`
 Trigger: changed files match `auth|security|token|jwt|permission|rbac|document|upload|
 download|access|audit|secret|credential|patient` OR diff contains `SecretStr|logger\.|
 \.info\(|\.error\(|\.exception\(` OR `renders_model_output: true`
@@ -148,27 +148,22 @@ reconstruct later.
 **Test quality** → `test-quality-reviewer`
 Trigger: PR includes files matching `*_test.py|test_*|conftest.py`
 
-**Infrastructure review** → `mx2-devops-build-deploy`
-Trigger: changed files match `*.tf|*.hcl|terragrunt.hcl` OR paths contain `infra/|module/`
-
-**CI/CD workflow security review** → `mx2-devops-build-deploy`
-Trigger: `has_ci_workflow_change: true` (changed files match `.github/workflows/*.ya?ml`). Use the CI-workflow prompt variant (see the `mx2-devops-build-deploy` prompt below), NOT the Terraform prompt.
-
-**TypeScript review** → `mx2-typescript-reviewer`
+**TypeScript review** → `typescript-reviewer`
 Trigger: `has_typescript_files: true` (changed files include `*.ts|*.tsx|*.mts|*.cts` outside `src/gen-typescript/`)
 Filter: scope diff to TS files only when prompting; the agent does not need Python diff.
-Coordination: when both `mx2-code-reviewer` and `mx2-typescript-reviewer` would fire, send each only its language-relevant files; do not dispatch both on the same file.
+Coordination: when both `code-reviewer` and `typescript-reviewer` would fire, send each only its language-relevant files; do not dispatch both on the same file.
+Repo rules: when `.agents/skills/vercel-react-best-practices/SKILL.md` is present at the head, pass that path in the prompt and ask that every React finding name the rule id it rests on (added by the app repository's PR #104, 2026-09-21); a rule whose violation is slower code is a 💡 SUGGESTION, never higher, since the harness's bar is objective incorrectness.
 
-**Git history regression** → `mx2-git-historian`
+**Git history regression** → `git-historian`
 Trigger: `structural_risk_size: true` AND `has_file_history: true` (M+ PRs touching files with 3+ prior PRs in 180 days)
 Filter: line ranges of changed files only. The agent runs git log/blame/show against the worktree.
 
-**Prior PR precedent** → `mx2-pr-precedent`
+**Prior PR precedent** → `pr-precedent`
 Trigger: `structural_risk_size: true` AND `has_pattern_precedent: true` (M+ PRs introducing new public symbols in directories with 2+ recent prior PRs)
 Filter: file path list only. The agent queries `gh` API server-side; no diff content is needed in the prompt.
 
-**Cross-file blast-radius** → `bot-review`
-Trigger: `changes_public_surface: true` OR `has_pattern_precedent: true`. The agent identifies consumers of changed public symbols and articulates the invariant each consumer assumes that the change weakens. Advisory only (severities limited to COMMENT/NOTE/SUGGESTION; never BLOCKING/CRITICAL). Filter: changed public-symbol declarations only + full file path list (the agent fetches consumers itself via Grep/Read on the worktree). Different from `mx2-pr-precedent` (prior-PR comments on same files), `mx2-code-reviewer` (line-level structural), and `mx2-silent-failure-hunter` (error propagation boundaries).
+**Cross-file blast-radius** → `blast-radius-reviewer`
+Trigger: `changes_public_surface: true` OR `has_pattern_precedent: true`. The agent identifies consumers of changed public symbols and articulates the invariant each consumer assumes that the change weakens. Advisory only (severities limited to COMMENT/NOTE/SUGGESTION; never BLOCKING/CRITICAL). Filter: changed public-symbol declarations only + full file path list (the agent fetches consumers itself via Grep/Read on the worktree). Different from `pr-precedent` (prior-PR comments on same files), `code-reviewer` (line-level structural), and `silent-failure-hunter` (error propagation boundaries).
 
 **Observability instrumentation review** → `observability-reviewer`
 Trigger: `has_observability_signal: true`. The signal is true when ANY of the following hold:
@@ -179,21 +174,13 @@ Trigger: `has_observability_signal: true`. The signal is true when ANY of the fo
 
 The four sub-rules are disjunctive. A single broad regex over-triggers (every new enum/exception dispatches) AND under-triggers (removing a `log.error` line that an alert depends on stays invisible). Conjunctive sub-rules narrow correctly.
 
-**Pydantic Settings review** → `mx2-pydantic-reviewer`
-Trigger: `has_pydantic_settings_signal: true`. The signal is true when ANY of the following hold:
-- Diff adds or modifies a class inheriting from `BaseSettings`, `pydantic_settings.BaseSettings`, or `Singleton`
-- Diff contains `os.environ.get`, `os.environ\[`, or `os.getenv\(` on changed lines (often a candidate for migration to Settings)
-- Diff adds or modifies a field on a class whose filename matches `*app_settings*`, `*settings*`, or `*config*` AND the class body contains `model_config` or `SettingsConfigDict`
-
-Focuses on configuration-management patterns: required fields with empty-string defaults (silent misbehavior), cross-service `AppSettings` imports (architecture violation per `architecture.md`), missing `__table_name__()` cross-service patterns, and `os.environ` usage that should be a Settings field. Different from `mx2-code-reviewer` (general structural review) and `mx2-security-auditor` (secrets handling).
-
-**Adversarial dissent** → `mx2-skeptic`
+**Adversarial dissent** → `skeptic`
 Trigger: `structural_risk_size: true` (M+ PR: > 200 lines OR > 5 files). Surfaces naive-but-unasked questions about scope, assumptions, and risk that other specialists miss because they are focused on their own domain. Advisory only; severity vocabulary limited to QUESTION (never BLOCKING/CRITICAL/COMMENT). Findings appear in their own subsection of the synthesis report under "Open questions", not folded into the main severity buckets. Designed as a safety net for fragmented attention (multi-window operational reality).
 
-Different from `bot-review` (cross-file consumer-invariant articulation; both are advisory but skeptic asks "what did you not consider" while bot-review asks "what does X consumer assume that breaks"). Different from `mx2-code-reviewer` (structural verdicts) and `mx2-silent-failure-hunter` (error-propagation verdicts) which produce judgments rather than questions.
+Different from `blast-radius-reviewer` (cross-file consumer-invariant articulation; both are advisory but skeptic asks "what did you not consider" while blast-radius-reviewer asks "what does X consumer assume that breaks"). Different from `code-reviewer` (structural verdicts) and `silent-failure-hunter` (error-propagation verdicts) which produce judgments rather than questions.
 
 **Module cohesion & coupling** → `module-cohesion-reviewer`
-Trigger: `has_python_module_change: true` (subject to the standard M+ specialist size gate; not dispatched on XS/S). Cross-file cohesion and coupling lens: which concern a module owns, name-vs-contents, production vs test-only helper separation, a hand-rolled query duplicating a typed accessor a shared module already exposes, cross-service reach-in past a published boundary, and dependency-direction violations. Resolves to the personal-tier variant (shadows the project agent), whose seam defers to the other specialists in this roster by name. Advisory only; every finding is an author-facing question, severity vocabulary limited to QUESTION/SUGGESTION/COMMENT (never BLOCKING/CRITICAL). Different from `mx2-code-reviewer` (within-file SRP), `bot-review` (consumer-invariant blast-radius across call sites), and `mx2-pydantic-reviewer` (Settings patterns): this agent owns the module-and-import-graph layer those do not. If skipped, note "module-cohesion-reviewer: skipped (no Python module changes)" in the output header. When `adds_capability` fired, append the Active Reuse-Search results and its cross-service reuse question (section above) to this agent's prompt AND to `mx2-code-reviewer`'s.
+Trigger: `has_python_module_change: true` (subject to the standard M+ specialist size gate; not dispatched on XS/S). Cross-file cohesion and coupling lens: which concern a module owns, name-vs-contents, production vs test-only helper separation, a hand-rolled query duplicating a typed accessor a shared module already exposes, cross-service reach-in past a published boundary, and dependency-direction violations. Resolves to the personal-tier variant (shadows the project agent), whose seam defers to the other specialists in this roster by name. Advisory only; every finding is an author-facing question, severity vocabulary limited to QUESTION/SUGGESTION/COMMENT (never BLOCKING/CRITICAL). Different from `code-reviewer` (within-file SRP) and `blast-radius-reviewer` (consumer-invariant blast-radius across call sites): this agent owns the module-and-import-graph layer those do not. If skipped, note "module-cohesion-reviewer: skipped (no Python module changes)" in the output header. When `adds_capability` fired, append the Active Reuse-Search results and its cross-service reuse question (section above) to this agent's prompt AND to `code-reviewer`'s.
 
 **Inline IaC analysis** → `checkov` (tool call, not subagent)
 Trigger: `has_terraform: true` AND (at least one net-new `*.tf` file exists OR `has_new_tf_resource`: a modified `.tf` added a `resource`/`module`/`data` block). The range-overlap filter (checkov.md) scopes modified-file findings to the added block, so pre-existing resources are not re-flagged.
@@ -216,15 +203,13 @@ Do NOT send the full diff to every specialist. Filter by relevance:
 - **All specialists**: exclude files flagged `already_on_main` by Merge Base Freshness
 - **Security auditor**: only auth/PII/audit/document files + PR description
 - **Test reviewer**: only test files + the source files they test
-- **mx2-code-reviewer**: only implementation files (non-test, non-config)
-- **mx2-silent-failure-hunter**: only files containing try/except/raise patterns
-- **mx2-devops-build-deploy**: only Terraform/HCL/terragrunt files, infra directory changes, or `.github/workflows/*.ya?ml`
-- **mx2-git-historian**: line ranges of changed files only (the agent runs git log/blame for context)
-- **mx2-pr-precedent**: file path list only (the agent queries gh API server-side; no diff content needed)
+- **code-reviewer**: only implementation files (non-test, non-config)
+- **silent-failure-hunter**: only files containing try/except/raise patterns
+- **git-historian**: line ranges of changed files only (the agent runs git log/blame for context)
+- **pr-precedent**: file path list only (the agent queries gh API server-side; no diff content needed)
 - **observability-reviewer**: only files matching the observability sub-rules above (exception-class diffs, metric-emission hunks, observability `*.tf` files, enum/Literal additions) PLUS any sibling `*.tf` in the same service directory PLUS the PR description (for alert references)
-- **bot-review**: changed public-symbol declarations only (lines matching the `changes_public_surface` regex from `SKILL.md` Dispatch Signals) PLUS the full file path list. Mirrors `mx2-pr-precedent`'s "file path list only" filter shape, NOT the full diff. The agent fetches consumers itself via Grep/Read on the worktree; sending the full diff saturates context on the M+ PRs the agent is most useful for.
-- **mx2-skeptic**: PR description + file path list + summarized diff overview (first 50 lines of each file's diff). The agent asks questions about intent and assumptions; it does not need exhaustive code context. Sending the full diff saturates without improving question quality. Include the Jira ticket AC if available.
-- **mx2-pydantic-reviewer**: only files matching the pydantic_settings sub-rules above (Settings class diffs, os.environ patterns, *settings* / *config* filename diffs) PLUS sibling settings files in the same service directory (to detect duplicate field declarations or cross-service `AppSettings` import attempts).
+- **blast-radius-reviewer**: changed public-symbol declarations only (lines matching the `changes_public_surface` regex from `SKILL.md` Dispatch Signals) PLUS the full file path list. Mirrors `pr-precedent`'s "file path list only" filter shape, NOT the full diff. The agent fetches consumers itself via Grep/Read on the worktree; sending the full diff saturates context on the M+ PRs the agent is most useful for.
+- **skeptic**: PR description + file path list + summarized diff overview (first 50 lines of each file's diff). The agent asks questions about intent and assumptions; it does not need exhaustive code context. Sending the full diff saturates without improving question quality. Include the ticket AC if one is available.
 - **module-cohesion-reviewer**: changed implementation `.py` files (non-test) PLUS the full file path list of the changeset. The agent reads whole modules and greps the worktree itself to confirm cohesion and duplication, so it needs the path map more than the full diff. Exclude test-only files unless production/test-only mixing is the concern.
 
 ## Specialist Prompt Preamble
@@ -271,13 +256,13 @@ orchestrator verifies. (Covers resumed/re-purposed sessions where tool-roster
 enforcement can lapse; a 2026-07 pilot had a resumed reviewer apply its own findings.)
 ```
 
-When Jira ticket context is available, append this to the preamble:
+When ticket context is available (never on this machine, which has no ticket system), append this to the preamble:
 
 ```
 TICKET CONTEXT: This PR implements <ticket key> (<ticket summary>).
 
 Acceptance Criteria from the ticket:
-<ticket AC, verbatim from Jira>
+<ticket AC, verbatim from the ticket>
 
 When evaluating the code, check whether it satisfies these criteria. If you notice
 the implementation diverges from a criterion (handles a broader or narrower scope,
@@ -288,7 +273,7 @@ are not automatically bugs - they may be intentional - but they should be surfac
 
 ## Specialist-Specific Prompts
 
-### mx2-code-reviewer
+### code-reviewer
 ```
 <scope preamble>
 
@@ -311,7 +296,7 @@ an internal Confluence page):
    coverage on new branches)
 6. Correctness via tests, NOT in-head execution (if tests missing, flag the
    gap; do not trace control flow to convince yourself it works)
-7. Static analyzer findings (SonarCloud + Datadog code analysis pre-checks ride on this; Sentry static patterns ride in mx2-code-reviewer)
+7. Static analyzer findings (SonarCloud + Datadog code analysis pre-checks ride on this; Sentry static patterns ride in code-reviewer)
 8. Pragma / override justification (Pragma Justification check)
 9. Exception design (raise the condition, not the handling)
 10. Large-refactor methodology (was the methodology stated?)
@@ -327,7 +312,7 @@ Files changed (diff):
 <filtered implementation diff>
 ```
 
-### mx2-silent-failure-hunter
+### silent-failure-hunter
 ```
 <scope preamble>
 
@@ -362,7 +347,7 @@ Files changed (diff):
 <files containing try/except/raise>
 ```
 
-### mx2-security-auditor
+### security-review
 ```
 <scope preamble>
 
@@ -422,40 +407,13 @@ Test files (diff):
 <filtered test diff>
 ```
 
-### mx2-devops-build-deploy
-```
-<scope preamble>
-
-When the changed files are `.github/workflows/*.ya?ml` (`has_ci_workflow_change`), review for WORKFLOW SECURITY, not Terraform: untrusted-trigger / secret-exposure surface (which events run with secrets; is untrusted PR-head checkout possible on them), `author_association`/actor gating, `GITHUB_TOKEN` permission scope and `id-token` usage, `concurrency` semantics, unpinned `uses:` SHAs on secret-bearing steps, and operational foot-guns (missing `timeout-minutes`). Skip the Terraform/HCL checks that follow.
-
-Review infrastructure changes in PR #<number> for Terraform/HCL correctness.
-Check for: missing variable pass-through to child modules, duplicate HCL keys
-(silently keeps last value), missing environment configs (CD but no beta/prod),
-EventBridge subscription completeness, and terragrunt dependency injection gaps.
-Resolve every hardcoded external reference in the diff (endpoint/DNS URL, ARN,
-account ID, secret ARN, API gateway ID) to the account/env it actually targets:
-grep infra for per-env existence (infra/{service}/{env}) and the account IDs in
-the env terragrunt files, and use Datadog span aws_account/env tags where reachable.
-Confirm it matches the env being deployed. A non-prod env pointing at a prod
-endpoint, or a per-env module inheriting a shared-account default it cannot reach
-cross-account, is BLOCKING. Sweep sibling fields of the same kind (every
-*_dns_name, every *_secret_arn) before concluding, not just the one that caught
-your eye.
-Return structured FINDING format with evidence categories. Use Read to examine
-child module variables.tf when checking pass-through. Use Glob to verify
-environment config completeness across infra/{service}/ directories.
-
-Files changed (diff):
-<filtered terraform/hcl/terragrunt diff>
-```
-
-### mx2-git-historian
+### git-historian
 ```
 <scope preamble>
 
 For changed lines in PR #<number>, detect:
 1. Regression-of-recent-fix: lines authored within 90 days in commits referencing
-   Jira bug tickets (MX2-NNNN with type=Bug) or containing [bug]/[fix]/regression/hotfix
+   a bug ticket or containing [bug]/[fix]/regression/hotfix
 2. Flip-flop pattern: line ranges rewritten 3+ times in the last 60 days
 
 Apply the hard false-positive filters from your agent definition. Do NOT detect
@@ -469,7 +427,7 @@ Files changed (line ranges):
 <changed file paths and line ranges>
 ```
 
-### mx2-pr-precedent
+### pr-precedent
 ```
 <scope preamble>
 
@@ -527,8 +485,7 @@ DIFF-VISIBLE finding worth surfacing even when the diff alone looks correct.
 Return findings in structured FINDING format with evidence categories. Use Grep
 to verify exception-class references against infra/ Terraform; use Read to
 confirm trace propagation calls at queue boundaries. Do NOT flag log-only
-silent failures (route to mx2-silent-failure-hunter); do NOT review Terraform
-correctness (route to mx2-devops-build-deploy).
+silent failures (route to silent-failure-hunter).
 
 PR context: <body>
 
@@ -536,7 +493,7 @@ Files changed (filtered to observability triggers + sibling *.tf):
 <filtered diff>
 ```
 
-### bot-review
+### blast-radius-reviewer
 ```
 <scope preamble>
 
@@ -550,8 +507,8 @@ missing any of the three.
 Severity vocabulary is hard-constrained to COMMENT/NOTE/SUGGESTION; do NOT emit
 BLOCKING or CRITICAL. Filter "consumer references this" noise; only surface "consumer
 assumes X that this change weakens." Do NOT flag line-level structural concerns (route
-to mx2-code-reviewer), prior-PR comment recurrences (route to mx2-pr-precedent), or
-silent-error-propagation (route to mx2-silent-failure-hunter).
+to code-reviewer), prior-PR comment recurrences (route to pr-precedent), or
+silent-error-propagation (route to silent-failure-hunter).
 
 Use FINDING format from your agent definition (changed_symbol_file/line/excerpt,
 consumer_file/line/excerpt, invariant, severity, evidence, verification,
@@ -568,41 +525,7 @@ Full file path list:
 ```
 
 
-### mx2-pydantic-reviewer
-```
-<scope preamble>
-
-Review Pydantic Settings classes and configuration patterns in PR #<number>
-against MX2 conventions (`.claude/rules/architecture.md` Configuration
-Management section). Focus on:
-
-- Required fields declared with `= ""` or other empty defaults (silent
-  misbehavior at runtime; should be required with no default for fail-fast)
-- Cross-service `AppSettings` imports (architecture violation: see
-  `architecture.md` "Cross-service isolation")
-- Cross-service DynamoDB access without a standalone dyntastic model
-  pointing at the local service's `AppSettings`
-- `os.environ.get` patterns that should be migrated to Settings fields
-- Magic strings or numbers that should be Settings fields
-- Missing `default_factory` on dynamic values (timestamps, UUIDs) where a
-  module-level default would evaluate at import time
-
-Use Read to inspect the full Settings file and Grep to find call sites
-before flagging. Use Glob to detect sibling Settings files in the service
-directory that might have duplicate or conflicting field declarations.
-
-Return findings in structured FINDING format with evidence categories.
-Do NOT flag general type safety (route to mx2-code-reviewer), secrets/PII
-handling (route to mx2-security-auditor), or architectural trade-offs at the
-service-design level (route to mx2-tech-lead manually if needed).
-
-PR context: <body>
-
-Files changed (filtered to Settings/config patterns):
-<filtered diff>
-```
-
-### mx2-skeptic
+### skeptic
 ```
 <scope preamble>
 
@@ -623,7 +546,7 @@ Examples of question shapes you should produce (not exhaustive):
 - "Did anyone confirm that X is actually true?" (assumption surfacing)
 - "What happens if Y occurs and we're not handling it here?" (edge case)
 - "Why is this in this PR rather than a follow-up?" (scope)
-- "Is the bead/Jira AC actually satisfied, or just partially?" (intent vs implementation)
+- "Is the ticket AC actually satisfied, or just partially?" (intent vs implementation)
 - "Has anyone checked whether this regresses the case from MX2-NNNN?" (history)
 
 Constraints:
@@ -647,7 +570,7 @@ Existing specialist findings and PR comments (for dedup):
 <list of findings from prior specialists in this pr-intel run + PR comments>
 
 PR context: <body>
-Jira AC (if available): <ticket AC>
+Ticket AC (if available): <ticket AC>
 
 PR overview (summarized diff):
 <first 50 lines of each file's diff>
@@ -668,10 +591,9 @@ accessor a shared module already exposes, cross-service reach-in past a publishe
 boundary, dependency-direction violations.
 
 Not yours (other specialists in this run own them; do not restate): within-file SRP
-and call-site readability (`mx2-code-reviewer`), Settings and config
-(`mx2-pydantic-reviewer`), PII and secrets (`mx2-security-auditor`), test
+and call-site readability (`code-reviewer`), PII and secrets (`security-review`), test
 meaningfulness (`test-quality-reviewer`), error propagation
-(`mx2-silent-failure-hunter`), consumer-invariant blast-radius (`bot-review`).
+(`silent-failure-hunter`), consumer-invariant blast-radius (`blast-radius-reviewer`).
 Anything a single-file linter (Sonar, Copilot, pylint, mypy) catches is not yours.
 
 Verify before asking: read the full module, grep for the accessor you claim is

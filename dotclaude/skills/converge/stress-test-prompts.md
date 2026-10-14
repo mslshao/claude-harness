@@ -12,7 +12,7 @@ plan from Phase 2.
 The Challenge subagent extracts and stress-tests assumptions underlying
 the draft plan. Dispatch explicitly as
 `Agent(subagent_type="general-purpose", description="Challenge draft plan", prompt=...)`;
-do NOT leave the type implicit (`mx2-tech-lead` is forbidden in this
+do NOT leave the type implicit (`tech-lead` is forbidden in this
 roster per `decision:tech-lead-not-in-automation-2026-04-30`). The prompt
 provides the draft plan and instructs the subagent to:
 
@@ -105,7 +105,7 @@ Include in EACH specialist's prompt:
 > migration - does this plan omit?).
 > BEFORE forming findings, check `open-chores.md` for any item in
 > the same domain. A ratified architectural
-> decision in a sibling bead supersedes the draft plan; surface that
+> decision in a sibling item supersedes the draft plan; surface that
 > contradiction explicitly rather than producing findings that
 > re-litigate a closed question.
 >
@@ -116,7 +116,7 @@ Include in EACH specialist's prompt:
 > Do not assume the user's prescription is the right mechanism just
 > because they prescribed it. Specifically check: (a) is this a new
 > noun or a feature of an existing noun? (b) does this mechanism
-> contradict any ratified architectural decision in the bead memories?
+> contradict any ratified architectural decision in `~/.claude/memory/`?
 > (c) is this mechanism over-engineered or under-engineered for the
 > problem scope?
 
@@ -128,7 +128,7 @@ calls.** Do not serialize, and do not interpose a coordinator subagent.
 
 ## Phase 4.5: Skeptic Lens
 
-After Phase 4 produces the converged plan, dispatch `mx2-skeptic`
+After Phase 4 produces the converged plan, dispatch `skeptic`
 with the converged plan as input. The skeptic asks naive, dumb, or
 obvious-but-unasked questions designed to surface risks the consensus
 consult and challenge passes assumed away. Output is advisory; format
@@ -136,7 +136,7 @@ is the agent's standard `🔻` prefix block.
 
 ```
 Agent(
-  subagent_type="mx2-skeptic",
+  subagent_type="skeptic",
   description="Adversarial stress-test of converged plan",
   prompt="Ask naive, dumb, or obvious-but-unasked questions about this
   converged plan. The plan has passed challenge + consult; your job is
@@ -181,7 +181,7 @@ the recommended plan.
 **Dismissal capture (orchestrator duty)**: when the user dismisses a
 Skeptic Lens concern with reasoning ("not a real concern", "covered by
 X"), record it before moving on:
-in this agent's calibration memory topic file, keyed `calibration:mx2-skeptic:dismissal:<short-tag>` (dated: `<pattern>. <why dismissed>. <how to recognize next time>.`).
+in this agent's calibration memory topic file, keyed `calibration:skeptic:dismissal:<short-tag>` (dated: `<pattern>. <why dismissed>. <how to recognize next time>.`).
 The skeptic cannot observe dismissals (they happen after it returns);
 this step is the only thing that makes its calibrate-or-fade loop real. If the agent returns `🔻 No concerns from this
 lens`, still include the section with that exact line so the user

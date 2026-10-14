@@ -1,7 +1,7 @@
 ---
 name: compound
-description: "Improvement loop: scan a just-completed work unit for session friction signals (blocked tool calls, redo edits, manual user actions a skill could automate, round-trip confirms), generate concrete buildable improvements grounded in those signals, and build the change directly (with present-and-confirm gate) or dispatch a build subagent. Falls back to habit-memory capture only when no buildable improvement exists. Use after a PR merges, a /launch ships, a bead closes, a multi-step investigation wraps, or a substantial work unit just shipped. The proactive sibling to /reflect (correction-triggered). Trigger phrases: '/compound', 'extract patterns', 'what did we learn from that', 'identify improvements', 'capture this workflow', 'compound that', 'what was friction here', 'pattern-capture'. Distinct from /handoff (cold-start prompt for the NEXT session) and a direct memory-topic-file write (no synthesis, no dedup, no build path)."
-argument-hint: "[optional: short hint about what just finished, e.g. 'launch of docr-XXXX' or 'PR #YYYY merged' or 'early' if mid-session]"
+description: "Improvement loop: scan a just-completed work unit for session friction signals (blocked tool calls, redo edits, manual user actions a skill could automate, round-trip confirms), generate concrete buildable improvements grounded in those signals, and build the change directly (with present-and-confirm gate) or dispatch a build subagent. Falls back to habit-memory capture only when no buildable improvement exists. Use after a PR merges, a chore closes, a multi-step investigation wraps, or a substantial work unit just shipped. The proactive sibling to /reflect (correction-triggered). Trigger phrases: '/compound', 'extract patterns', 'what did we learn from that', 'identify improvements', 'capture this workflow', 'compound that', 'what was friction here', 'pattern-capture'. Distinct from /handoff (cold-start prompt for the NEXT session) and a direct memory-topic-file write (no synthesis, no dedup, no build path)."
+argument-hint: "[optional: short hint about what just finished, e.g. 'launch of docr-XXXX' or 'PR #YYYY merged' or 'early' if mid-session; '--candidates-only' for a fleet run]"
 ---
 
 # Compound
@@ -12,7 +12,7 @@ This skill is the **proactive** half of pattern capture. Its reactive sibling is
 
 ## Why this exists
 
-The pattern-capture pipeline had a coverage gap. `/reflect` catches mistakes (correction-triggered, writes to `correction:*` memories and rule files). `/bead-forge` checkpoint mode preserves in-flight conversation context against compaction. `/handoff` produces a cold-start prompt for ONE specific next session.
+The pattern-capture pipeline had a coverage gap. `/reflect` catches mistakes (correction-triggered, writes to `correction:*` memories and rule files). A `project`-type memory topic file preserves in-flight conversation context against compaction. `/handoff` produces a cold-start prompt for ONE specific next session.
 
 The previous `/compound` tried to fill the rest of the gap with three static socratic questions ("what was non-obvious?", "would you repeat it?", "what would speed it up?"). In practice this produced habit memories that captured "something" without a goal, drained into workflow.md slowly, and rarely changed behavior. The promotion gate worked; the input signal did not.
 
@@ -23,18 +23,29 @@ The new shape: scan the session transcript for actual friction signals, ground e
 Manual only in v1. Triggers:
 
 - User explicitly types `/compound` or asks "identify improvements", "what was friction here", "extract the pattern", "what's reusable".
-- After a substantial completion signal (draft PR published, `/launch` returned, bead closed, multi-step investigation wrapped) AND the session contains observable friction (hook fires, redo edits, manual user actions, round-trip confirms).
+- After a substantial completion signal (draft PR published, `/launch` returned, chore closed, multi-step investigation wrapped) AND the session contains observable friction (hook fires, redo edits, manual user actions, round-trip confirms).
 - After a multi-exchange session where the user deliberately landed on a non-obvious technique that would replicate.
 
 The "early" arg signals the work is mid-flight but the current sub-unit just shipped; that is a valid invocation point.
 
 ## When NOT to use
 
-- **Every PR or bead close.** Routine work without friction signals has nothing to compound.
+- **Every PR or chore close.** Routine work without friction signals has nothing to compound.
 - **The work was a correction.** Use `/reflect`. /compound captures what worked or what could work better; /reflect captures what failed and codifies the avoidance.
 - **The next-session handoff is what is needed.** Use `/handoff`. /handoff produces a cold-start prompt for one specific successor; /compound produces edits to durable surfaces that affect many future sessions.
 - **A specific fact, not a pattern or improvement.** Write it directly to a memory topic file.
-- **Mid-flight checkpoint of conversation context.** Use `/bead-forge` in memory checkpoint mode. /compound is for shipped work, not in-progress analysis.
+- **Mid-flight checkpoint of conversation context.** Write a `project`-type memory topic file with its index row. /compound is for shipped work, not in-progress analysis.
+
+## Fleet mode (`--candidates-only`)
+
+A peer session cannot answer the accept gates, so one invocation with `--candidates-only` in its arguments, or a dispatch that says "candidates only", is one unit with no question.
+
+- **Runs as written:** steps 1 to 4. The anchor comes from the argument or the dispatch, and each candidate keeps its grounding citation and its dedup line.
+- **Skipped:** step 5's present-and-confirm gate (`Apply? (y/n/edit/skip)`) and step 5b's habit-memory write. Nothing is written to a durable surface, as the Hard constraint below already says.
+- **Output:** one file at the path the dispatch names, such as `compound-<date>/<name>.md`. It holds at most five candidates ranked by what each prevents, each with its bucket, destination, friction signal and dedup line, then a Reflections section. The dispatching session merges what Michael approves.
+- **The merge's failure ledger:** the merging session runs `python3 ~/.claude/scratch/scripts/failure-ledger.py import-board ~/.claude/scratch/sdlc-orchestration/BOARD-<date>.md > <merge dir>/ledger-candidates.tsv`, then `failure-ledger.py import-hooks <date> >> <merge dir>/ledger-candidates.tsv`. It fills each `?`, deletes each row that is not a failure, runs `failure-ledger.py add --from <merge dir>/ledger-candidates.tsv`, and names the appended ids in MERGE.md under "Failure ledger". Neither import appends; only that `add` writes (C27, `c27-failure-log/DESIGN-v2.md`).
+
+Source: the 2026-10-10 compound merge, decision 10 (dev-42 [230dc3], whose invocation said "candidates only, apply nothing" and found no such mode in this file); dispatch contract clause 24.
 
 ## Workflow
 
@@ -52,8 +63,6 @@ gh pr list --author @me --state all --limit 5 --json number,title,state,updatedA
 
 **External (MCP)**:
 
-- **Jira**: tickets I created, edited, or commented on recently. JQL: `assignee = currentUser() AND updated >= -1d`. Tool: `mcp__atlassian__searchJiraIssuesUsingJql`.
-- **Confluence**: pages I edited in the last day. CQL: `contributor = currentUser() AND lastmodified > now("-1d")`. Tool: `mcp__atlassian__searchConfluenceUsingCql`.
 - **Slack**: my recent messages where a technique, design, or bugfix approach got worked out. Query: `from:me` over the last 6 hours. Tool: `mcp__plugin_slack_slack__slack_search_public_and_private`.
 
 Cross-reference against conversation context. If the user passed an anchor in the argument hint, take it and skip detection.
@@ -74,9 +83,9 @@ Inspect the session transcript for observable friction signals. These are the gr
 | **Tool retry** | A tool call failed, I retried with a fix. Look for error responses followed by a corrected call. | Validate the input shape before calling; or document the schema gotcha. |
 | **Recurring memory hit** | Same `correction:*` or `habit:*` memory referenced multiple times in the session. | Promote the memory: codify as a rule (if correction), promote to workflow.md (if habit with 2nd observation). |
 | **Skill gap** | I worked around a missing skill capability (e.g., batched calls manually because the skill is single-item). | Extend the skill; or mirror as a personal-tier override that adds the capability. |
-| **Manual cross-reference** | I built a cross-link by hand (Jira issue links, design-doc-to-ticket map, parent-child structure). | Automate as part of the originating skill (e.g., file Blocks links when creating sibling tickets). |
+| **Manual cross-reference** | I built a cross-link by hand (issue links, design-doc-to-ticket map, parent-child structure). | Automate as part of the originating skill (e.g., file Blocks links when creating sibling tickets). |
 
-For each signal observed, name it specifically: cite the turn or tool call where it appeared, what the round-trip cost was, what the buildable fix is. The output of step 2 is a list of grounded candidates, not generic questions.
+For each signal observed, name it specifically: cite the turn or tool call where it appeared, what the round-trip cost was, what the buildable fix is. A signal that rests on a refused or failed tool call quotes the command verbatim, as it was sent, never a description of it. A control built from a paraphrase can pass the very check that refused the original (dev-47, 2026-09-23: nine spellings of a described refusal all passed the base hook). The output of step 2 is a list of grounded candidates, not generic questions.
 
 **Empty signal case**: if the scan finds no friction signals OR all signals are duplicates of existing rules/memories, the session was routine and no improvement is captureable. Stop the workflow, OR fall through to step 5b (habit-memory fallback) if conversation context surfaces a pattern worth recording as a soft signal.
 
@@ -95,15 +104,10 @@ Then dedup at every tier so we do not double-write or duplicate existing coverag
 KW_TEXT="<2-3 keywords as a space-separated phrase>"
 KW_GREP="<same keywords as a pipe-separated regex>"
 
-# Unrestricted keyword search FIRST: the two prefix searches below cover habit: and correction:
-# only, so alone they are blind to gotcha:, project:, design: and every other namespace. Run one
-# per keyword; bd memories does not fuzzy-match a joined phrase. A tool or field name IS the
-# keyword, so search it verbatim.
-bd memories "$KW_TEXT"
-for k in $KW_TEXT; do echo "--- $k ---"; bd memories "$k"; done
-bd memories habit:                                                                    # habit-tier
-bd memories correction:                                                                # correction-tier (recurring slips)
-bd list --label=memory --status=open --json -n 0 | jq -r '.[] | "\(.id) \(.title)"'   # forge memory beads
+# Search the memory store one keyword at a time, since a joined phrase does not match.
+# A tool or field name IS the keyword, so search it verbatim.
+for k in $KW_TEXT; do echo "--- $k ---"; grep -rilE "$k" ~/.claude/memory/ ~/.claude/rules/; done
+grep -iE "$KW_GREP" ~/.claude/memory/open-chores.md                                   # open chores
 grep -iE "$KW_GREP" ~/.claude/projects/-workspaces-main/memory/workflow.md
 grep -riE "$KW_GREP" ~/.claude/projects/-workspaces-main/memory/*.md
 grep -riE "$KW_GREP" /workspaces/main/.claude/rules/
@@ -119,7 +123,7 @@ Adjudication on match:
 
 - **Match in `.claude/rules/` or CLAUDE.md**: the rule exists. If the friction shows the rule is being violated by another path, the build target is a NEW enforcement layer (hook, lint, gate), NOT another memory. Surface: "rule exists at `<file:line>`; build a structural enforcement that catches the same violation at a different point in the flow."
 - **Match in `workflow.md`**: pattern is codified. If the candidate is a refinement or extension, edit the workflow.md row. If it is a distinct surface, file separately.
-- **Match in topic file or memory bead**: surface as near-duplicate. Offer: refine, extend, or distinct entry.
+- **Match in a topic file or an open chore**: surface as near-duplicate. Offer: refine, extend, or distinct entry.
 - **Match in habit-tier memory, aged 30+ days**: this is a second observation. Two options: (a) promote to workflow.md row citing the original entry, OR (b) fold both into a rule via /reflect so the pattern becomes always-loaded behavior. Option (b) is the in-flow drain path.
 - **Match in habit-tier memory, recent (<30 days)**: refine or extend; do not create a new sibling.
 - **No match anywhere**: novel. Continue to Route.
@@ -131,12 +135,12 @@ The improvement determines its own destination. Match the friction shape to the 
 | Friction shape | Destination | Notes |
 |---|---|---|
 | PreToolUse hook fires for stakeholder-facing text | A pre-output lint script (callable, not a hook) at `~/.claude/scratch/scripts/` or similar. Hook stays as backstop. | Single source of truth on the wordlist between hook and pre-check. |
-| Recurring MCP-edit gotcha (field nulled, link missed) | New section in the relevant memory file (`memory/jira.md`, `memory/github-api.md`, etc.) | Reference the section from the relevant `/jira` or `/pr` skill so future invocations load the gotcha. |
+| Recurring MCP-edit gotcha (field nulled, link missed) | New section in the relevant memory file (`memory/github-api.md`, etc.) | Reference the section from the relevant skill so future invocations load the gotcha. |
 | Skill missing a capability the work needed | Mirror as personal-tier override (`~/.claude/skills/<skill>/SKILL.md`) with the addition; project version stays untouched (use `~/.claude/commands/<name>.md` only when the project artifact is itself a command). | Name-overlap convention from CLAUDE.md. |
 | Recurring convention question I had to ask | Section addition to the topic file or skill so the next instance does not ask. | Update MEMORY.md index if a new topic file is created. |
 | Project-wide rule violation pattern | Hand off: propose the rule edit and route the landing through `/reflect` conventions (worktree + PR) | Rule files are `/reflect`-owned per the Hard constraint below; `/compound` proposes, never writes `.claude/rules/` directly. |
 | Automation that could replace a manual user step | New skill, hook, or agent. | Larger build; dispatch a subagent unless the surface is tiny. |
-| No buildable improvement, but the work surfaced a pattern worth recording as soft signal | Step 5b fallback: habit-memory bead via /bead-forge memory mode. | Same as the previous /compound primary path. |
+| No buildable improvement, but the work surfaced a pattern worth recording as soft signal | Step 5b fallback: a habit line in a memory topic file. | Same as the previous /compound primary path. |
 
 The user adjudicates the destination if multiple are plausible. The skill never auto-decides between surfaces.
 
@@ -157,7 +161,7 @@ For each candidate that passed dedup, propose the concrete edit:
 **Destination**: <file path, hook name, or skill name>
 **Build size**: <S/M/L>
 **Dedup**: <novel | refines existing match at <path>>
-**Outward artifacts**: <none | OPENS A PR | FILES A JIRA TICKET | PUBLISHES A PAGE | SENDS A MESSAGE>
+**Outward artifacts**: <none | OPENS A PR | PUBLISHES A PAGE | SENDS A MESSAGE>
 
 ### Edit
 
@@ -181,22 +185,18 @@ When multiple candidates exist, present them sequentially (not bundled) so the u
 
 When no buildable improvement exists at the end of step 4 OR all candidates were skipped, AND the session surfaced a pattern worth recording, fall through to the previous /compound primary path:
 
-- Invoke `/bead-forge` in memory checkpoint mode with the pattern as a memory-labeled bead.
-- After forge returns the bead ID, run `bd remember --key='habit:<topic>' '<date>: <one-line summary> (see docr-XXXX)'`.
-- Forge Phase 2b auto-creates the topic file under the bead's domain label if needed.
-- Forge Phase 5 appends to chronological log.md.
+- Add a dated line, `habit:<topic>: <date>: <one-line summary>`, to the matching topic file under `~/.claude/memory/` with the Edit tool.
+- If no topic file fits, start one with the frontmatter spec and add its `MEMORY.md` index row in the same turn.
 
 The fallback exists so soft-signal patterns are not lost when the friction-scan finds nothing buildable. The promotion gate (second observation, workflow.md row) still applies.
-
-On `/bead-forge` failure: capture as lightweight `bd remember --key='habit:<topic>' '[REFORGE-PENDING <date>] <one-line summary>'`. The SessionStart drain hook upgrades the entry on a future session.
 
 ## Distinctions
 
 | Skill | Trigger | Primary output | Fallback output |
 |---|---|---|---|
-| `/compound` (this skill) | Manual, after successful work with observable friction signals | Concrete edit to a durable surface (hook, skill, memory, rule) | Habit-memory bead via /bead-forge |
+| `/compound` (this skill) | Manual, after successful work with observable friction signals | Concrete edit to a durable surface (hook, skill, memory, rule) | A habit line in a memory topic file |
 | `/reflect` | Behavioral, on user correction matching prior `correction:*` memory | `correction:*` memory + rule files in `.claude/rules/` | (none; correction always produces an edit) |
-| `/bead-forge` checkpoint mode (direct) | Manual or proactive, during in-flight deep analysis | Memory-labeled bead capturing conversation context | (none; this IS the capture) |
+| A `project`-type memory topic file | Manual or proactive, during in-flight deep analysis | The file, capturing conversation context | (none; this IS the capture) |
 | `/handoff` | Session winding down | A copy-paste cold-start prompt for the NEXT session | (none) |
 | Direct memory-file write | Anywhere | A single memory topic-file entry | (none; lightweight, no synthesis) |
 
@@ -224,7 +224,7 @@ Do not retune the scan heuristics until 10+ invocations of data are in. The drai
 
 Habit-tier captures from step 5b without a drain become stagnant inventory. Two drain surfaces, both unchanged from the previous version:
 
-1. **SessionStart auto-retire hook** (`~/.claude/hooks/auto-retire-stale-habits.sh`). Runs at most once per UTC day. Closes `habit:*`-referenced beads aged 90+ days without higher-tier citation.
+1. **SessionStart auto-retire hook**: not installed on this machine (`auto-retire-stale-habits.sh` is not under `~/.claude/hooks/`), and beads is gone (`~/.claude/rules/environment.md`), so the only drain here is the second one.
 2. **In-flow folding during step 3 dedup**. When dedup surfaces an aged habit match, offer the fold-to-rule option in addition to refine/distinct.
 
 The new flow generates fewer habit-memory entries because the primary route is buildable changes, so drain pressure is lower than the previous version.
@@ -253,7 +253,7 @@ Do not produce a long summary. The value is in the edits, not the conversation.
 
 ## Hard constraint
 
-Do not write to durable surfaces (hooks, skills, memory files, rule files, settings.json, bead memory keys) without explicit user accept. Each "Proposed improvement" block is the gate; no silent writes.
+Do not write to durable surfaces (hooks, skills, memory files, rule files, settings.json) without explicit user accept. Each "Proposed improvement" block is the gate; no silent writes.
 
 Do not write to `correction:*` keys or any file under `.claude/rules/`. Both surfaces are `/reflect`-owned. If the friction signal is correction-shaped (user explicitly corrected the agent), the correct skill is `/reflect`, not this one.
 

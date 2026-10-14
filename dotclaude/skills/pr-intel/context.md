@@ -4,7 +4,7 @@ This file documents three context-gathering checks that run after PR metadata
 hydration but before specialist dispatch. Each surfaces facts the reviewer needs
 to evaluate design decisions in context.
 
-1. **PR Series Context**: sibling PRs in the same Jira ticket; prevents false
+1. **PR Series Context**: sibling PRs in the same delivery; prevents false
    orphan-export findings.
 2. **Service Context**: CLAUDE.md / README orientation for the service the PR
    touches; gives external reviewers enough background.
@@ -14,7 +14,7 @@ to evaluate design decisions in context.
 
 ## PR Series Context
 
-When a Jira ticket was hydrated, check for sibling PRs that form a multi-PR delivery.
+Check for sibling PRs that form a multi-PR delivery.
 This prevents false "orphan export" findings when one PR introduces code that a sibling
 consumes.
 
@@ -22,7 +22,7 @@ consumes.
 - `gh pr list --search "<ticket-key>" --state open` returns >1 PR (including this one)
 - PR description contains series language: "part N", "PR X of Y", or numbered references
 
-**Skip condition**: No Jira ticket found AND no series language in description.
+**Skip condition**: no series language in the description and no other open PR found by the search above.
 
 **Tier 1 (always when multi-PR detected):**
 1. Fetch file lists for each sibling PR:
@@ -69,15 +69,14 @@ If found, read the file and extract a brief orientation for the reviewer:
 - What does this service/pipeline do (1-2 sentences)
 - Key dependencies (DynamoDB tables, S3 buckets, upstream/downstream services)
 - Known gotchas or design constraints
-- Links to Confluence design docs or Datadog dashboards
+- Links to design docs or dashboards
 
 Present this as a **Service Context** block at the top of the output, before Scope.
 Keep it to 3-5 lines. The goal is to give an external reviewer enough context to
 evaluate design decisions without having to read the entire service codebase.
 
 If no contextual docs are found, note the absence ("No CLAUDE.md or README found
-for this service") and infer what you can from the diff, PR description, and Jira
-ticket. This is a degraded mode, not a failure.
+for this service") and infer what you can from the diff and the PR description. This is a degraded mode, not a failure.
 
 For PRs spanning multiple services, include context for each.
 
@@ -85,9 +84,9 @@ For PRs spanning multiple services, include context for each.
 
 > Permanent as of 2026-07-02 (2026-07-01 audit: revisit never ran, check in active use).
 
-If the PR's title, body, or linked Jira epic chain references an active
+If the PR's title or body references an active
 migration (signals: tokens like "migration", "cutover", "v3", "matters",
-"backfill"; Jira ticket whose epic is a migration epic; PR title prefix that
+"backfill"; PR title prefix that
 matches a known migration code-path rename), load the migration's operational
 state from memory **before forming review concerns**:
 

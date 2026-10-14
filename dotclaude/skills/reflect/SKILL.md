@@ -1,6 +1,6 @@
 ---
 name: reflect
-description: "Invoked when a user correction matches a prior correction in beads memory (two-strike pattern). Reads the target artifact, checks for existing coverage, proposes a single targeted edit. Do NOT invoke directly - the behavioral trigger in CLAUDE.md handles invocation."
+description: "Invoked when a user correction matches a prior correction recorded in memory (two-strike pattern). Reads the target artifact, checks for existing coverage, proposes a single targeted edit. Do NOT invoke directly - the behavioral trigger in CLAUDE.md handles invocation."
 argument-hint: "[correction context + matched prior memory]"
 ---
 
@@ -8,14 +8,15 @@ argument-hint: "[correction context + matched prior memory]"
 
 Propose a single, targeted improvement to a rule, skill, or agent definition based
 on a recurring user correction. This skill is invoked by the Reflection Trigger in
-CLAUDE.md when a correction matches a prior correction in beads memory.
+CLAUDE.md when a correction matches a prior correction recorded in memory.
 
 ## Input
 
 The invoking context provides:
 - The current correction (what the user said, what went wrong)
-- The matched prior memory (key and value). `bd memories` returns a TRUNCATED preview;
-  run `bd recall <key>` for the full value before counting anything. A long-lived
+- The matched prior memory (key and value), found by searching `~/.claude/memory/`
+  and `~/.claude/rules/` (`grep -rilE '<keywords>' ~/.claude/memory/ ~/.claude/rules/`)
+  and reading the matching topic file in full before counting anything. A long-lived
   correction key often records several prior recurrences and an earlier resolution,
   and the count changes the recommendation: a rule that was already sharpened once
   and recurred anyway is a signal to go mechanical, not to sharpen again.
@@ -72,8 +73,8 @@ keywords related to the correction. Record the result:
 ```
 ## Proposed Rule Update
 
-**Trigger**: You corrected [topic] (occurrence N, counted from the full `bd recall`
-value, not assumed; priors: [dates]; prior resolutions: [what was already tried])
+**Trigger**: You corrected [topic] (occurrence N, counted from the full topic-file
+content, not assumed; priors: [dates]; prior resolutions: [what was already tried])
 **Target**: `[file path]` line [N]
 **Collision check**: [existing coverage quote or "no existing coverage found"]
 
@@ -98,19 +99,18 @@ debugging) are project-tier, so worktree + PR is the default; surface that in th
 proposal rather than implying a direct edit.
 
 - **y**: Apply per the target's tier above (direct Edit for personal-tier; worktree +
-  PR for project-tier). Then record the resolution. **`bd remember` on an existing key
-  REPLACES the whole value silently** (verified 2026-08-19 with a write-then-rewrite
-  probe), so the bare form `bd remember --key="<same key>" "<date>: Resolved"` DESTROYS
-  the matched memory, which is usually a detailed multi-recurrence record and the most
-  valuable artifact in this loop. Two cases:
-  - **Same topic as the matched memory**: append, never replace. `bd recall <key> > FILE`
-    in ONE call, append the resolution line to FILE, then `bd remember --key="<key>"
-    "$(cat FILE)"` in a SEPARATE call (a state-creating write must not share an
-    invocation with a blockable `bd` command, per CLAUDE.md Tool Usage).
+  PR for project-tier). Then record the resolution in the matching `~/.claude/memory/`
+  topic file. **A blind overwrite of a topic file destroys its existing record**, so use
+  the Edit tool to append or target a specific line, never the Write tool to replace the
+  whole file; the matched entry is usually a detailed multi-recurrence record and the
+  most valuable artifact in this loop. Two cases:
+  - **Same topic as the matched memory**: read the topic file in full, then append the
+    resolution line with Edit. Never a blind overwrite.
   - **A distinct variant**, where the matched memory is the nearest relative but governs
-    a different mechanism: use a NEW key and leave the matched memory untouched. Say
-    which case applies in the Present block, since the occurrence count and the
-    recommendation both hinge on recurrence-vs-new-class.
+    a different mechanism: add a new entry (or start a new topic file, with its
+    `MEMORY.md` index row added in the same turn) and leave the matched memory
+    untouched. Say which case applies in the Present block, since the occurrence count
+    and the recommendation both hinge on recurrence-vs-new-class.
 - **edit**: Accept the user's modifications, apply the revised edit, update memory.
 - **n**: Discard. Do NOT save a date-stamped recurrence memory if an umbrella memory (`correction:<domain>:<topic>`) plus structural enforcement (hook, linter, gate, formatter) are both already in place; recurrence tallies entrench adversarial framing without changing default behavior (CLAUDE.md Reflection Trigger step 5). If the same correction recurs after /reflect concludes "no edit", surface it back to the user as a mechanical question (which different enforcement layer would catch this?), not as another dated memory. The exception: save a recurrence memory only if the prior memory is missing context that would meaningfully sharpen future matching (a new structural variant, a new context category), and the surplus is genuinely additive rather than performative.
 

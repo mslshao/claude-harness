@@ -1,419 +1,290 @@
 ---
 name: babysit-pr
-description: Autonomous PR-iteration loop. Polls a draft PR on a paced cadence, classifies incoming comments (bot vs human, mechanical vs substantive), auto-remediates mechanical bot suggestions via a pre-staged worktree, replies inline, and escalates human reviewer feedback to the user. Use when stepping away from an open draft PR and wanting the loop to handle bot noise + small mechanical fixes without losing context. Trigger phrases include "babysit this PR", "watch PR #N", "auto-iterate on PR", "/babysit-pr".
-argument-hint: "<pr-number> [--authorize-force-push] [--allow-published] [--window <duration>] [--stop]"
-allowed-tools: ["Bash", "Glob", "Grep", "Read", "Edit", "Write", "ScheduleWakeup", "CronCreate"]
+description: >-
+  Watch loop for an author session watching the published pull request it opened. Polls on a paced cadence and reads review threads through GraphQL. Classifies Devin's findings, reviewer peers' messages and human comments. Fixes what is mechanical or clearly right as a new commit with a normal push and one inline reply. Sends every judgment call to the orchestrator by SendMessage and keeps polling. Ends at merge or close with a last report. Trigger phrases include "babysit this PR", "watch PR #N", "watch the PR you published", "/babysit-pr".
+argument-hint: "<pr-number> --clone <path> --branch <head branch> --orchestrator <name> [--above <branch,...>] [--window-end <UTC>] [--cadence <seconds>] [--state <file>] [--inherit <file>] [--stop]"
+allowed-tools: ["Bash", "Glob", "Grep", "Read", "Edit", "Write", "ScheduleWakeup", "CronCreate", "SendMessage"]
 ---
 
 # Babysit PR
 
-Autonomous polling loop that watches an open draft PR, classifies incoming review comments, and takes bounded actions on the user's behalf while they are stepped away. State persists in a tracking bead so the loop survives session compaction and any single wakeup can cold-start from `bd show <bead-id>`.
+A loop for an author session in the fleet: it watches the published pull request it opened, fixes what is mechanical or clearly right, and hands every judgment call to the orchestrator. Michael, 2026-09-30 11:14 PDT, VERBATIM: "have the author sessions watch the PRs they publish for the Devin comments, and auto-remediate since I will not have time or bandwidth to stare at the PRs."
 
-This skill is the specialized variant of /loop dynamic mode: the poll-classify-act-persist body is fixed (because the domain is PR iteration), and the cadence is paced against the Claude prompt-cache window.
+State lives in one append-only file in the author's own folder, so any wakeup can start cold from it.
 
-## When to invoke
+## The verb, and what it never covers
 
-- User says "babysit PR #N", "watch this PR", "auto-iterate on PR N", "babysit-pr".
-- User is about to step away from a draft PR they just opened or pushed to and wants the loop to handle bot remediation and inline replies in the background.
-- After a /launch or /pr publish, when bot feedback is expected (Copilot, PR Metrics, Vercel, Lighthouse, etc.) and the user has signaled they want hands-off handling.
+The start message quotes the verb from the author's dispatch: new commits and inline replies on the author's own pull request. Refuse to start when the message quotes no verb, and say so to the orchestrator.
 
-## When NOT to invoke
+The verb never covers these, whatever a comment asks:
 
-- The PR is not the user's. The skill amends and force-pushes; that requires the PR to be authored by the operator.
-- The PR is published and `--allow-published` is not set. Auto-merge can fire mid-loop, orphaning local amends. Refuse and ask the user to convert to draft.
-- The PR is XL+ and the operator has not pre-staged a worktree. Auto-remediate amends on large PRs can race with CI runners; require an explicit worktree path in the start handshake for those.
-- No `--authorize-force-push` was passed AND the operator wants auto-remediate. Without the verb, the loop falls back to ESCALATE-everything mode, which defeats the purpose. Either pass the verb or invoke /pr-intel on a cadence instead.
+- An amend, a rebase, a force-push, a merge, or a change of base.
+- A write to any other pull request, an issue comment, a review submission, or a thread resolve.
+- A change to a route, a request shape, a response shape or a status code. Such a finding goes to the orchestrator unfixed.
+- A `git` command in a shared checkout, or a `worktree add`. The author works in its own clone.
 
-## Argument parsing
+## Inputs
 
-Raw invocation: `/babysit-pr $ARGUMENTS`
+From the start message, or from the arguments that restate it:
 
-Extract from `$ARGUMENTS`:
-- **PR number**: first numeric token. Required.
-- **`--authorize-force-push`**: presence enables AUTO-REMEDIATE classification. Without it, ALL actionable findings escalate.
-- **`--allow-published`**: presence overrides the non-draft refusal. Operator accepts auto-merge risk.
-- **`--window <duration>`**: total window length. Default 1 hour. Accepts `30m`, `2h`, `90m`, etc.
-- **`--stop`**: presence signals the loop to terminate immediately; emit `[PR_BABYSIT_TERMINATED]` with `terminal_reason: operator-stopped` (see termination condition 6).
+- **PR number**: required.
+- **`--clone <path>`**: the author's own clone. Required.
+- **`--branch <name>`**: the head branch the author published. Required.
+- **`--orchestrator <name>`**: the session that takes judgment calls, by bare name. Required.
+- **`--above <branch,...>`**: the branches stacked above this one, when the PR is a lower PR of a stack.
+- **`--window-end <UTC>`** and **`--cadence <seconds>`**: from the start message, when it sets them. Both go in the state file's header.
+- **`--state <file>`**: the state file. Default: `babysit-pr-<number>.md` in the author's own folder under the group's folder (for example `services-addons-part-1/dev-50/`).
+- **`--inherit <state file>`**: a dead author's state file. Preflight step 3 copies its `processed_reviews`, `processed_issue_comments`, `reply_ids` and `escalations` into the cycle 0 block.
+- **`--stop`**: end the watch now, with the last report.
 
-If no PR number is found and the current branch has an associated PR, infer it via `gh pr view --json number,isDraft --jq '.number'`. Otherwise stop and ask.
+A wakeup re-enters with the PR number and `--state` only; everything else comes from the state file's header.
 
-## Stack mode (multiple PR numbers)
+## Rig mode
 
-When the invocation passes more than one numeric token (a Graphite stack, e.g. `/babysit-pr 10059 10043 10044`), watch the whole stack from ONE tracking bead, polling every PR each cycle. Keep `processed_issue_comments` / `processed_inline_comments` / `processed_reviews` as per-PR maps keyed by number. The single-PR loop body otherwise runs unchanged.
+When the environment sets `BABYSIT_OUT_DIR`, the session is under the test rig (`babysit-fix-2026-09-30/dev-53/RIG.md`). Then:
 
-- **Auto-remediate only the tip** (the branch with no descendants). A mechanical fix on a downstack PR requires amending its commit and then restacking plus force-pushing every descendant; that exceeds the single-file/single-hunk bound and is a stack operation, not an amend. Classify any downstack fix ESCALATE even when the suggestion is mechanical. Only the tip can be auto-amended safely.
-- **The operator's own reply-wrappers are not human reviews.** Posting an inline reply creates a review-submission wrapper (`PRR_*`) authored by the operator; that is the loop's own action, not reviewer feedback. SILENT-IGNORE it, do not ESCALATE it as a human review.
-- **Allowlisted-bot delete-and-repost churn is noise.** SonarCloud and similar bots delete and re-post their summary comment on every CI run, so the latest issue-comment ID churns each cycle. Treat an allowlisted-bot re-post as no new activity for the quiet-state backoff; only genuinely new inline/review activity (or a non-allowlisted commenter) re-tightens the cadence.
+- The PR is `$BABYSIT_PR`, the clone is `$BABYSIT_WORKTREE`, and the state file is `$BABYSIT_OUT_DIR/state.md`.
+- The branch is the clone's current branch, and the orchestrator is written `<orchestrator>`.
+- Each escalation message is appended to `$BABYSIT_OUT_DIR/escalation.txt` instead of sent.
+- The next wakeup is written as one line to `$BABYSIT_OUT_DIR/wakeup.txt` instead of scheduled.
+- Skip the GraphQL read and take the REST read in Step 2 directly. A GraphQL query goes out as a POST, which the rig counts as a refused write.
+- Owner and repository come from the PR's `url`, since the clone's origin is the rig's bare repository.
+- Everything else runs as written. Replies still go through `gh`, which the rig captures.
 
 ## Preflight
 
-Run these checks in order before scheduling the first wakeup. Fail fast on any blocker.
+Run it on the first start and again after every wakeup, since the machine may have slept.
 
-### 1. PR metadata fetch
+First, when the state file exists, read its last block. When the newest block is `[PR_BABYSIT_TERMINATED]`, run no preflight and no cycle, and schedule nothing. Read the PR once. Reply in one line with the end reason, and say that a restart needs a new window from the orchestrator or Michael.
 
-```bash
-gh pr view <number> --json number,title,author,isDraft,state,baseRefName,headRefName,headRefOid,url
-```
-
-Confirm `state == "OPEN"`. If the PR is MERGED or CLOSED, refuse. If `isDraft == false` and `--allow-published` is not set, refuse with a one-line explanation of the auto-merge orphan-branch risk and a recommendation to mark as draft (`gh pr ready --undo <number>`).
-
-### 2. Authorship gate
-
-Confirm the PR author matches the operator (`gh api user --jq '.login'`). The skill writes to the PR branch; foreign-authored PRs are out of scope.
-
-### 3. Authorization confirmation
-
-If `--authorize-force-push` is present, record it in the tracking bead and proceed in AUTO-REMEDIATE mode for mechanical fixes.
-
-If absent, surface to the user once:
-
-> Force-push not pre-authorized. The loop will ESCALATE every actionable finding (no auto-amend). To enable auto-remediate of mechanical bot suggestions, restart with `--authorize-force-push`. Proceed in escalate-only mode?
-
-Wait for explicit confirmation. Do not silently drift between modes.
-
-### 4. Worktree staging
-
-Use a dedicated worktree at the PR's HEAD so amends do not touch the operator's main checkout. Three reuse cases come first, checked in order; create a new worktree only as a last resort.
-
-**Reuse priority:**
-
-1. **Agent-spawned worktree** under `.launch-worktrees/` for the same branch. When babysit follows /autopilot OR /launch, a worktree (`autopilot-<bead-id>`, `launch-<bead-id>-<ts>`, or `launch-<ts>`) already exists on the PR's head branch. Reuse it. Adding a second worktree for the same branch fails with `fatal: '<branch>' is already used by worktree at '<path>'`. Resolve via `git worktree list` and match by branch.
-2. **Prior babysit worktree** at `/tmp/babysit-pr-<number>` from an earlier session on the same branch. Reuse after confirming the branch matches.
-3. **Any other existing worktree already on the target branch**, regardless of where it lives (e.g. a `/pr`-authored worktree at `.claude/worktrees/<name>` from earlier in the same session, or a manually created one). Run `git worktree list` and match by branch BEFORE assuming case (4) applies; skipping this check is what produces the `fatal: '<branch>' is already used by worktree` error case (1) warns about. Reuse whatever path it resolves to.
-4. **Fresh worktree** at `/tmp/babysit-pr-<number>` if none of (1)-(3) exist:
+### 1. The pull request
 
 ```bash
-WORKTREE_DIR=/tmp/babysit-pr-<number>
-git worktree add "$WORKTREE_DIR" <headRefName> 2>&1
+gh pr view <n> -R <o>/<r> --json number,title,state,isDraft,headRefName,headRefOid,baseRefName,url,author
 ```
 
-Record the resolved path in the bead. All amends go there. The main checkout stays untouched.
+- `state` must be `OPEN`. A merged or closed PR goes to Termination.
+- `isDraft` is recorded and never gates the watch.
+- `headRefName` must equal the branch the start message names. Every fleet session shares one GitHub login, so the login proves nothing about which session owns the branch.
+- Run every `gh pr view` with `-R <o>/<r>`, the pair from `git -C <clone> remote get-url origin`. A session's working directory is often not a repository, and `gh` then fails.
 
-### 5. Tracking bead
-
-Create a bead to hold the state blocks:
+### 2. The clone
 
 ```bash
-bd create --title="babysit-pr #<number>: <pr-title-truncated-50ch>" --description="Babysit loop tracking bead for PR #<number>. State blocks appended below as the loop progresses." --type=task --priority=3 --label=babysit-pr
-bd update <new-bead-id> --claim
+git -C <clone> rev-parse --abbrev-ref HEAD          # must print <branch>
+git -C <clone> status --porcelain                   # must print nothing
+git -C <clone> fetch -q origin <branch>
+git -C <clone> merge --ff-only origin/<branch>      # the clone is at the published head
 ```
 
-Save the bead id. Every cycle's state block is recorded as a `bd comment` on the bead (NOT a `bd update --notes`). Reason: `--notes` REPLACES the field's content; it does not append. Reconstructing existing notes via shell pipe and re-passing them is fragile and silently truncates on syntax errors, wiping the audit trail. `bd comment` is append-only and is the correct channel for cycle-by-cycle logging. Use `--notes` only for description-level edits where replacing the whole content is intended.
+When the lead pushed the branch from another clone, the author's clone may not have it yet. Fetch it and switch to it first: `git -C <clone> fetch -q origin <branch> && git -C <clone> switch -q <branch>`.
 
-### 6. Initial state block
+A dirty clone, another branch, or a head that cannot fast-forward is an escalation, and no fix runs until the orchestrator answers.
 
-Post the cycle-0 state block (see State Schema below) as a `bd comment` on the bead. This is the cold-start anchor; any subsequent wakeup parses the latest `[PR_BABYSIT_STATE]` comment via `bd show <bead-id>` and resumes. Bead `description` should hold the one-time setup context (PR number, mode, authorization basis, worktree path); per-cycle state goes in comments.
+One head move is not an escalation: another session force-pushed an approved restack, and the orchestrator's message names it. Back up the local head (`git -C <clone> branch backup/<branch>-<sha8> HEAD`), then `git -C <clone> checkout -B <branch> origin/<branch>`, and grep the new head for the line your last commit added. After a restack run `scratch/scripts/pr-checks/manifest-ref-check.sh <clone>`. Run the execution `memory-apply` after the last rebase, never before it (2026-10-01: `records_ref` named an abandoned commit twice).
 
-### 7. Schedule first wakeup
+A pull request that reads CONFLICTING with an unchanged head gets `git -C <clone> merge-tree --write-tree --name-only HEAD origin/<base>` once, and the conflict list is saved in the state file. A later cycle compares against it, so a conflict that moved is named. The command is read-only and writes no ref.
 
-```
-ScheduleWakeup(
-  delaySeconds=270,
-  reason="babysit-pr #<number>: first poll, cache-warm cadence",
-  prompt="/babysit-pr <number>"
-)
-```
+A new memory record takes its id from the clone's own `pnpm memory:new`, which since #196 (merged 2026-10-02T17:40Z, e96a649e) mints a random `MEM-xxxxxxxx` hex id; `docs/memory/records/SCHEMA.md` there says nothing mints the old `MEM-nnnn` shape any more, and existing records keep theirs. Until then `pnpm memory:new` numbered from the clone's own tree and gave MEM-0302 to #171 and #192 at once (2026-10-01), which `next-mem-id.sh` guarded against; that script is retired to `~/.claude/retired/2026-10-02/` because it cannot name a valid new id under the random scheme (dev-13, 2026-10-02).
 
-The 270-second cadence sits just under the 300-second prompt-cache TTL so each wakeup re-enters with a warm cache. See Anti-pattern 5 for the rationale; do not regress to 300 or 600 even though those values appear in older docs.
+When `node_modules` is missing, run `pnpm install --frozen-lockfile` in the clone once, so the checks in Step 5 can run.
 
-**Harness fallback** (applies to every wakeup in this skill): ScheduleWakeup is a main-loop tool documented as /loop pacing machinery; it works when called directly today (verified 2026-06-09) but is not guaranteed across harness versions. If the ScheduleWakeup call is rejected or the tool is absent, schedule the wakeup with a CronCreate one-shot instead: `CronCreate(cron="<minute> <hour> <dom> <month> *", recurring=false, prompt="/babysit-pr <number>")` pinned 4-5 minutes out (compute the fields from the current local time; cron is minute-granular, so the cache-warm 270s precision degrades to ~240-300s, which is acceptable). Do not silently drop the wakeup; if neither tool is available, say so and stop the loop cleanly.
+### 3. The state file
 
-Note: the prompt is the same `/babysit-pr <number>` invocation. The skill re-enters preflight, detects the existing bead via `bd search "babysit-pr #<number>"`, skips re-creation, and jumps to the loop body. Idempotency is load-bearing because the cold-start re-entry must work the same as a hot continuation.
+Create it with the Write tool on the first start, with a header: PR number and URL, branch, clone, orchestrator, the branches above, the window end and cadence when set, and the verb quoted. After that, append each block with the Edit tool after a Read. A shell redirect into a `.md` under `~/.claude/` is refused by a hook, and it would skip the pronoun and dash hooks.
 
-Then end the turn. The loop body runs on the next wakeup.
+On the first start, append the cycle 0 block (State schema below), then run the first cycle at once rather than waiting for a wakeup. With `--inherit`, the cycle 0 block starts from the inherited file's four lists named under Inputs. On a wakeup the file already exists: append nothing here and go to Each cycle.
 
-## Loop body
-
-Each wakeup runs these steps in order. The body must complete inside one turn so the cache stays warm; if any step exceeds the budget, defer it to the next wakeup with a note in the state block.
+## Each cycle
 
 ### Step 1: Load state
 
-```bash
-bd show <bead-id>
-```
+Read the state file and take the newest `[PR_BABYSIT_STATE]` block.
 
-Parse the most recent `[PR_BABYSIT_STATE]` block. Extract `window_end`, `last_check_ts`, `processed_issue_comments`, `processed_inline_comments`, `processed_reviews`, `escalations`, `actions_taken`, `classification_policy`.
+### Step 2: Fetch
 
-If `now >= window_end`, jump to Termination (window expired).
-
-### Step 2: Fetch fresh PR state
-
-In parallel:
+Step 2 calls `~/.claude/scratch/scripts/babysit-read.sh <o>/<r> <n> <state file>`, which runs every read below in one call. It prints the head, the tally and the ids that are new against the newest `[PR_BABYSIT_STATE]` block. A non-zero exit is a failed read, never a quiet cycle. Rig mode keeps its REST path: the script tries GraphQL first, which the rig counts as a refused write. The reads it makes:
 
 ```bash
-# CI status + metadata
-gh pr view <number> --json state,isDraft,mergeable,statusCheckRollup,reviewDecision,headRefOid
-
-# Issue-level comments (Vercel, PR Metrics, Mergify, Lighthouse, SonarQube, Datadog, etc.)
-gh pr view <number> --json comments --jq '.comments[] | {id: .id, author: .author.login, body: .body, createdAt: .createdAt}'
-
-# Inline review comments (Copilot, Sentry, human reviewers)
-gh api /repos/<owner>/<repo>/pulls/<number>/comments \
-  --jq '[.[] | {id: .id, user: .user.login, path: .path, line: .line, body: .body, in_reply_to_id: .in_reply_to_id, created_at: .created_at}]'
-
-# Reviews (approve/request-changes events)
-gh pr view <number> --json reviews --jq '.reviews[] | {id: .id, author: .author.login, state: .state, submittedAt: .submittedAt}'
+gh pr view <n> -R <o>/<r> --json state,mergeable,statusCheckRollup,reviewDecision,headRefOid
+gh pr view <n> -R <o>/<r> --json statusCheckRollup --jq '[.statusCheckRollup[] | ((.conclusion | select(. != null and . != "")) // .status // .state)] | group_by(.) | map("\(.[0])=\(length)") | join(" ")'
+gh api repos/<o>/<r>/pulls/<n>/reviews --jq '[.[] | {id, user: .user.login, state, body, submitted_at}]'
+gh api repos/<o>/<r>/issues/<n>/comments --jq '[.[] | {id, user: .user.login, body, updated_at}]'
 ```
 
-If the PR has merged or closed between wakeups, jump to Termination (merged/closed).
+The second line is the check tally, and it is the cycle's `ci_snapshot`. A status context has only `state`, so the Devin row reads null without the last fallback. An empty-string conclusion reads as absent, so a running check shows its status instead of an empty key.
 
-### Step 3: Identify new activity
-
-Diff three independent streams against the previously-processed sets in state:
-- Fresh issue-level comment IDs vs `processed_issue_comments`
-- Fresh inline review comment IDs vs `processed_inline_comments`
-- Fresh review submission IDs (`reviews[].id`) vs `processed_reviews`
-
-All three feed the classification step. Reviews must be diffed separately because a reviewer can submit APPROVED / CHANGES_REQUESTED / COMMENTED at review level without leaving any comment, and that submission flips `reviewDecision` invisibly to a comment-only loop. Already-processed IDs are ignored.
-
-### Step 4: Classify each new comment
-
-Walk the classification matrix (see below). Each comment produces exactly one verdict:
-
-- **SILENT-IGNORE**: bot status update with no actionable signal. Mark as processed; take no action.
-- **REPLY-ONLY**: bot suggestion that does not warrant a code change (e.g., a Copilot stylistic suggestion the operator's rules already cover). Post a one-line reply with rationale.
-- **AUTO-REMEDIATE**: mechanical fix the loop can apply confidently (em-dash, typo, missing import, simple lint fix). Apply in the worktree, amend, force-push, reply with action taken. Only allowed if `--authorize-force-push` was set.
-- **ESCALATE**: human reviewer comment, non-mechanical bot suggestion, or any actionable finding when `--authorize-force-push` is absent. Add to `escalations` in state; do NOT auto-act. Surface in the wakeup output so the operator sees it on return.
-
-### Step 5: Take action
-
-For each AUTO-REMEDIATE:
-1. Read the relevant file in `$WORKTREE_DIR`.
-2. Apply the edit using Edit tool.
-3. Run any cheap local check: `pants check <path>` for Python, `pnpm lint` for TS. If the check fails, abort this remediation and reclassify as ESCALATE with a note ("local check failed: <output>").
-4. `git -C "$WORKTREE_DIR" commit --amend --no-edit`.
-5. `git -C "$WORKTREE_DIR" push --force-with-lease`.
-6. Reply inline (see Reply mechanism below) with: "Applied: <one-line description>. Commit: <new-sha-short>."
-
-For each REPLY-ONLY:
-- Post the reply with the rationale. Keep it terse (one or two sentences). No bead IDs, no personal paths.
-
-For each ESCALATE:
-- Add to `escalations` array in state. Include comment id, author, snippet, and a one-line "why escalated" note.
-
-### Step 6: Persist state
-
-Append a new `[PR_BABYSIT_STATE cycle=N]` block as a comment on the bead with:
-- `last_check_ts: <now>`
-- Updated `processed_issue_comments`, `processed_inline_comments`, and `processed_reviews`
-- Updated `actions_taken` (entries for each AUTO-REMEDIATE and REPLY-ONLY this cycle)
-- Updated `escalations` (entries for each ESCALATE this cycle)
-- `ci_snapshot: <success_count> SUCCESS / <failure_count> FAILURE / <pending_count> PENDING`
-- `review_state: <one-line summary, e.g. "approved by <reviewer-handle>; awaiting <reviewer-handle>">`
+The review threads, through GraphQL, since only GraphQL says whether a thread is resolved:
 
 ```bash
-bd comment <bead-id> "[PR_BABYSIT_STATE cycle=N]
-...block contents...
-"
+gh api graphql -F o=<o> -F r=<r> -F n=<n> -f query='query($o:String!,$r:String!,$n:Int!){repository(owner:$o,name:$r){pullRequest(number:$n){reviewThreads(first:100){nodes{isResolved isOutdated comments(first:50){nodes{databaseId author{login} body path line originalLine lastEditedAt replyTo{databaseId}}}}}}}}'
 ```
 
-Use `bd comment` (append-only) rather than `bd update --notes` (replace). The cycle log is the audit trail; replacing it on each cycle loses the prior cycles' state if anything goes wrong with the shell-pipe reconstruction.
+The head moves. `babysit-read.sh` prints one `OFF-HISTORY` line when `origin/<branch>` is not a descendant of the clone's head: stop and read what moved before any push. To wait for a push by another session, run `~/.claude/scratch/scripts/pr-head-sync.sh -R <o>/<r> --wait <sha> <seconds> <clone> <n>`. It polls the live head, so no poll loop is typed by hand. (2026-10-01: six poll loops in one evening, and a round named bfc61ac0 when the PR sat at cc1e034a.)
 
-### Step 7: Decide next wakeup
+**REST fallback.** When the GraphQL read fails, read `gh api repos/<o>/<r>/pulls/<n>/comments` instead. Treat every thread as unresolved, use `updated_at` where the GraphQL read gives `lastEditedAt`, and write `threads: rest-fallback` in the cycle's block.
 
-If `escalations` was populated this cycle: STOP. Do not schedule another wakeup. The operator must adjudicate before the loop continues.
+A comment's line is `line`, or `originalLine` (`original_line`) when the comment is outdated and `line` is null.
 
-Default cadence is `270 seconds` (cache-warm; sits just under the 300-second prompt-cache TTL). This is both the steady-state value and the post-traffic value; there is no separate "adaptive band" because 270 is already the cache-warm maximum. If new comments arrived in the cycle that just ran, the next cycle still fires at 270; no need to drop lower (under 60 burns cache without benefit; the bot publishing rate rarely exceeds one comment per 270s anyway).
+GraphQL gives a bot's login without the `[bot]` suffix that REST gives: Devin is `devin-ai-integration` in one and `devin-ai-integration[bot]` in the other (read on #162, 2026-09-30). Match a bot login with the suffix removed. `lastEditedAt` is null on a comment never edited. A comment's `databaseId` is the REST `id`.
 
-**Quiet-state backoff (dead-wait widening).** If the last 3 cycles were all no-op (zero new issue comments, inline comments, and reviews; zero auto-remediations; zero escalations) AND the only non-SUCCESS checks are operational gates (`check_reviewers`, mergify config, branch-protection awaiting an out-of-band action) AND no human review is pending, the loop is in a pure wait-on-human state: nothing it polls for can change without a human action it cannot take. Widen the cadence to `1200 seconds`, re-tightening to `270` the first cycle that surfaces ANY new activity. Rationale: each wakeup re-injects the full SKILL.md (a fixed per-cycle token cost, independent of the conversation prompt-cache), so in a no-traffic state fewer cycles is net cheaper than cache-warm re-entry. This is NOT the post-traffic "adaptive band" the 270s value replaced; it is a dead-wait widening for when cadence cannot affect the outcome. The window-end rule below still caps the final wakeup.
+### Step 3: New activity
 
-If `now + 270 >= window_end`: schedule the final wakeup at `max(60, window_end - now)` so the loop terminates cleanly on the window. The 60-second floor avoids the under-60 cache-thrash anti-pattern even when the window is closing.
+A comment, review or issue comment is new when its id is not in the state, or when its `lastEditedAt` differs from the one stored. Devin edits its comments in place under the same id, so an id alone misses the change.
 
-```
-ScheduleWakeup(
-  delaySeconds=270,
-  reason="babysit-pr #<number>: cycle N+1, <ci-status-summary>",
-  prompt="/babysit-pr <number>"
-)
-```
+Skip a resolved thread. A thread whose last comment is Devin's reply opening "✅ **Resolved**" is done.
 
-### Step 8: Emit wakeup output
+Findings from reviewer peers arrive in the conversation as cross-session messages naming this PR. Each one not yet in `peer_findings` is new activity too.
 
-One-line status: cycle, new-comments-count, actions-taken-count, escalations-count, next-wakeup-in-seconds. If `escalations` was populated, list each one with the operator's name and the snippet so the operator sees it immediately on return.
+A finding this loop already fixed can come back edited, since Devin moves its comments to the new head after a push. It can also come back rewritten: on #206 Devin replaced a fixed finding's body with a second finding on the fix (dev-27, 2026-10-06). So read the comment's current body, and its earlier bodies in `userContentEdits { nodes { editedAt diff } }` on the comment's node. When the body still describes the finding the head fixed, mark it DONE and act no further. When it describes something else, it is a new FINDING under the old id.
 
-End the turn.
+### Step 4: Classify
 
-## Classification matrix
+First match wins.
 
-Walk this matrix top-to-bottom for each new comment. First match wins.
-
-### Bot allowlist: SILENT-IGNORE by default
-
-These bots post status updates that do not warrant a reply or an action. Mark as processed; take no action.
-
-| Bot login | Comment type | Action |
+| # | What it is | Verdict |
 |---|---|---|
-| `vercel[bot]` | Preview deploy URL | SILENT-IGNORE |
-| `pr-metrics-bot` (or similar metrics bots) | PR size / file count metrics | SILENT-IGNORE |
-| `mergify[bot]` | Mergify config status | SILENT-IGNORE |
-| `lighthouse-ci[bot]` | Lighthouse audit results | SILENT-IGNORE |
-| `sonarqube[bot]` | Quality gate status | SILENT-IGNORE |
-| `datadog[bot]` | Datadog deploy or monitor status | SILENT-IGNORE |
-| `github-actions[bot]` (CodeQL aggregate only) | CodeQL summary, not specific findings | SILENT-IGNORE |
+| 1 | A reply this loop posted (its id is in `reply_ids`), or an empty COMMENTED review by the PR's author, which wraps such a reply | IGNORE |
+| 2 | A status bot: `github-actions[bot]`, `linear-code[bot]`, `vercel[bot]` and the like; its delete-and-repost churn is no new activity | IGNORE |
+| 3 | A Devin review (`devin-ai-integration`, with or without `[bot]`); its body is a wrapper | IGNORE, but read the flag count first (below) |
+| 4 | A Devin reply opening "✅ **Resolved**" | DONE: mark its thread done |
+| 5 | A Devin top-level inline comment (no `in_reply_to_id`, or `replyTo` null) | FINDING |
+| 6 | A reviewer peer's finding by SendMessage | FINDING |
+| 7 | A comment or review by a person on GitHub | ESCALATE; never reply |
+| 8 | Anything else | ESCALATE |
 
-Specific CodeQL FINDINGS (inline, not the aggregate summary) are not in this allowlist; route them through the general matrix below.
+**The flag count.** A Devin review body reading "**Devin Review** found N potential issues" names how many findings to expect. Sometimes the body says the flags were not posted on this PR, or fewer than N inline comments exist. Then ESCALATE once with the count and the review's link. The findings get read in Devin's app instead of nowhere.
 
-### General classification matrix
+**Triage first, by consequence** (Michael, 2026-10-01 12:16 PDT; `~/.claude/rules/code-review-policy.md`, "Our own pull requests"). Before the FIX test, every Devin FINDING on a pull request this harness wrote gets two lines in the state file under its id: what it affects (an interaction a person has with the screen, a contract a caller or a route depends on, or an expectation a spec, a story or a record sets), and how badly that thing breaks if the finding is right. A finding with a real consequence goes on to FIX or ESCALATE as below, and the message or the commit names the two lines. A finding with no consequence goes to the orchestrator as a Decision with the two lines and a drafted reply (what it affects, and why that does not break); the reply posts only on the orchestrator's `decline`. No finding is ignored, and none is fixed only because a bot said so.
 
-For activity not matched by the bot allowlist:
+**A FINDING is fixed only when every one of these holds:**
 
-1. **Author is a human reviewer (not a bot)**: ESCALATE. Always. Applies to inline comments, issue-level comments, AND review submissions (APPROVED, CHANGES_REQUESTED, COMMENTED at review level). A human can flip `reviewDecision` to APPROVED with no comment; that submission is still an ESCALATE because the operator needs to know the gate moved. Humans get adjudicated by the operator; the loop does not reply to humans without explicit authorization in the start handshake.
+- It is mechanical or clearly right: a typo, a one-hunk `suggestion` fence, a missing import, a lint fix, or a defect the comment shows at its line with one obvious correction.
+- It touches only files this PR already changes.
+- It touches no route under `src/app/api/`, no request or response shape, and no status code.
+- It changes no test's expected value, and it needs no design choice.
 
-2. **Author is a bot AND comment is an inline code suggestion**:
-   - **Convention check (run first for naming/structure/placement suggestions)**: Before classifying a suggestion about test file placement, BUILD target placement, module naming, directory layout, or import ordering, read the worktree CLAUDE.md hierarchy (`./CLAUDE.md`, `./src/python/mx2/CLAUDE.md`, `./src/python/mx2/<service>/CLAUDE.md`). Bot reviewers (Copilot especially) infer conventions from existing legacy files, not from rule files; the canonical convention lives in CLAUDE.md. If the rule contradicts the suggestion, classify REPLY-ONLY with a rule-citation decline (do not escalate).
-   a. **Suggestion is mechanical AND `--authorize-force-push` is set**: AUTO-REMEDIATE.
-      - Mechanical patterns: em-dash replacement, simple typo, missing import, single-line lint fix, redundant whitespace, simple rename suggested by Copilot when the new name is unambiguous.
-      - All mechanical patterns must pass: change is single-file, single-hunk, and local pre-check (pants/pnpm) is green after the edit.
-   b. **Suggestion is mechanical AND `--authorize-force-push` is NOT set**: ESCALATE. Note in state that auto-remediate would have applied if pre-authorized.
-   c. **Suggestion is not mechanical (refactor, behavior change, multi-file)**: REPLY-ONLY with a one-line "tracking; will address in a follow-up" or ESCALATE if the change is sufficiently substantive. When in doubt, ESCALATE.
+Anything else is ESCALATE. When in doubt, ESCALATE.
 
-3. **Author is a bot AND submission is a review-decision update** (approve, request-changes, commented-at-review-level): SILENT-IGNORE (state captured in `review_state`). The `copilot-pull-request-reviewer` bot's COMMENTED submissions and `github-code-quality` review noise live here.
+### Step 5: Act
 
-4. **Anything else**: ESCALATE. Default to safety.
+**FIX.**
+
+1. Edit the file in the clone with the Edit tool. A code comment the fix adds is two lines at most and says nothing about waves, lanes or tasks.
+2. Run `pnpm typecheck`, `pnpm lint`, and the narrowest test covering the file, from the clone. A fix that changes behaviour first gets a test seen red at the finding's line. A text-only fix runs typecheck and lint. The commands for each repository are in `~/.claude/rules/build-commands.md`, which no longer loads in every session.
+3. When a check fails, restore the file (`git -C <clone> restore <file>`) and ESCALATE with the failing output.
+4. Commit it as a new commit and push it as a fast-forward:
+
+```bash
+git -C <clone> add -- <file>
+git -C <clone> commit -q -m "<what the fix does, in the active voice>"   # plus the session's attribution lines
+git -C <clone> push -q origin HEAD:<branch>
+```
+
+5. A rejected push is never forced. ESCALATE with the output, and make no further fix on this PR until the orchestrator answers.
+6. Reply inline once, to the comment fixed, naming the commit:
+
+```bash
+gh api -X POST repos/<o>/<r>/pulls/<n>/comments/<comment id>/replies -f body="Fixed in <sha7>: <what changed, one clause>." --jq .id
+```
+
+Record the printed id in `reply_ids`, so the next cycle reads the reply as the loop's own.
+
+A peer's finding gets no PR reply; send that peer one line by SendMessage naming the commit instead.
+
+7. With `--above` set, tell the orchestrator by SendMessage: the fix's commit and branch, and that the branches above do not have it. Never rebase them.
+
+**ESCALATE.** Send the orchestrator one message per judgment call, by bare name, and keep polling:
+
+```
+Decision PR #<n>: comment <id> by <author> at <path>:<line> needs a judgment: <link>. "<first sentence of the comment>". No fix made; the watch continues.
+```
+
+The link is the comment's `html_url`, or the PR URL with `#discussion_r<id>`.
+
+### Step 6: Persist
+
+Append a `[PR_BABYSIT_STATE cycle=N]` block with the Edit tool. Never rewrite an earlier block.
+
+### Step 7: Next wakeup
+
+| Since the last push | Delay |
+|---|---|
+| Under 15 minutes (Devin re-reviews 4 to 12 minutes after a push) | 300 s |
+| Later, with new activity this cycle | 300 s |
+| Later, quiet | 900 s |
+| Three quiet cycles in a row | 1800 s |
+
+With `--cadence` set, it takes the place of the table. With a window set, ask for the smaller of the delay and the window end minus now. A wakeup that lands on the window end is the last read. A new ScheduleWakeup replaces the pending one.
+
+```
+ScheduleWakeup(delaySeconds=<delay>, reason="babysit-pr #<n>: cycle N+1", prompt="/babysit-pr <n> --state <state file>")
+```
+
+When ScheduleWakeup is refused or absent, use a one-shot `CronCreate` at the same delay, rounded to the minute. When neither exists, tell the orchestrator by SendMessage and stop. A wakeup is not a monitor: the machine sleeps with Windows, so a late wakeup reads live state before it trusts the file.
+
+### Step 8: One line out
+
+Two short sentences. The first gives the cycle and what changed, or "quiet". The second gives the next wakeup in local time and UTC. Counts go in a sentence of their own. Then end the turn.
+
+## Termination
+
+The watch ends on any of these, with a `[PR_BABYSIT_TERMINATED]` block and one SendMessage to the orchestrator giving the last state: head sha, fixes made, escalations still open.
+
+1. **Merged** (`state == "MERGED"`): `terminal_reason: pr-merged`.
+2. **Closed** (`state == "CLOSED"`): `terminal_reason: pr-closed`.
+3. **Stopped** (`--stop`, or the orchestrator says stop): `terminal_reason: operator-stopped`.
+4. **Window expired**, only when the start message set a window: `terminal_reason: window-expired`.
+
+An escalation never ends the watch. A code-quality check failing for three cycles after this loop's own push is an escalation, not a stop. Operational gates that wait on a person (a reviewer requirement, a branch-protection rule) are noted in `ci_snapshot` and never escalated.
 
 ## State schema
 
-Each cycle appends a `[PR_BABYSIT_STATE cycle=N]` block to the tracking bead's notes. The format is plain key:value with arrays in JSON-style for parseability:
-
 ```
-[PR_BABYSIT_STATE cycle=0]
-mode: <auto-remediate | escalate-only>
-window_start: <ISO-8601 UTC>
-window_end: <ISO-8601 UTC>
-worktree_for_amends: <path>
-pr_number: <number>
-pr_url: <url>
-authorization_basis: <one-line: "operator passed --authorize-force-push at start" or "escalate-only mode">
-last_check_ts: <ISO-8601 UTC>
-ci_snapshot: <N SUCCESS / N FAILURE / N PENDING>
-review_state: <one-line summary>
-processed_issue_comments: [<id1>, <id2>, ...]
-processed_inline_comments: [<id1>, <id2>, ...]
-processed_reviews: [<id1>, <id2>, ...]
-escalations: []
-actions_taken: []
-classification_policy:
-  - bot-allowlist status updates: SILENT-IGNORE
-  - bot inline suggestions (mechanical): AUTO-REMEDIATE (if authorized) / ESCALATE (if not)
-  - bot inline suggestions (non-mechanical): REPLY-ONLY or ESCALATE
-  - human review: ESCALATE
+[PR_BABYSIT_STATE cycle=N]
+ts: <ISO-8601 UTC>
+pr: <number> <url>
+branch: <head branch>   clone: <path>   above: [<branch>, ...]
+orchestrator: <name>
+verb: "<the verb as quoted>"
+head: <sha>   threads: graphql | rest-fallback
+ci_snapshot: <the Step 2 tally line, for example NEUTRAL=2 SKIPPED=2 SUCCESS=11>
+review_state: <one line>
+processed_inline: {<id>: <lastEditedAt>, ...}
+triage: {<id>: {affects: "<interaction | contract | expectation, named>", breaks: "<how badly, one clause>", verdict: <FIX | ESCALATE | DECLINE-ASKED>}, ...}
+processed_reviews: [<id>, ...]
+processed_issue_comments: {<id>: <updated_at>, ...}
+reply_ids: [<id>, ...]
+peer_findings: [{from: <session>, about: <first words>, verdict: <FIX | ESCALATE>, commit: <sha7 or none>}, ...]
+done_threads: [<first comment id>, ...]
+pushes: [{sha: <sha7>, ts: <ts>}, ...]
+actions_taken: [{comment: <id>, commit: <sha7>, reply: <id>}, ...]
+escalations: [{comment: <id>, author: <login>, link: <url>, sent: <ts>}, ...]
+quiet_cycles: <n>
+next_wakeup: <seconds>
 ```
 
-Subsequent cycles (cycle=1, 2, ...) carry forward and update `last_check_ts`, `ci_snapshot`, `review_state`, the processed arrays, and append to `escalations` and `actions_taken`. Each escalation and action entry includes the comment id and a one-line description so the operator can audit on return.
+`[PR_BABYSIT_TERMINATED]` holds `ts`, `terminal_reason` and the one-line summary sent to the orchestrator.
 
-Terminal state uses `[PR_BABYSIT_RESOLVED]` (operator returned and adjudicated) or `[PR_BABYSIT_TERMINATED]` (window expired, PR merged/closed, etc.) with `ts`, `terminal_reason`, and a one-line summary.
+## Replies
 
-## Reply mechanism
+Before every post, check the body and escalate instead of posting when a check fails:
 
-### Inline replies (responding to a specific code-line comment)
-
-```bash
-gh api -X POST /repos/<owner>/<repo>/pulls/<number>/comments/<parent-comment-id>/replies \
-  -f body="<reply text>"
-```
-
-### Issue-level replies (general PR comment)
-
-```bash
-gh pr comment <number> --body "<comment text>"
-```
-
-### Keep bd and gh in separate bash calls
-
-Each cycle both posts to the PR (`gh`) and logs state (`bd comment`). Never put a `bd`
-invocation and a `gh` invocation in the same bash command line: `block-personal-tier-vocab.sh`
-(PreToolUse Bash) scans `gh` command lines for personal-tier vocab (`bd`, skill names) and
-hard-DENIES the call, forcing a re-issue. Run the `gh` reply/post and the `bd` state-log as
-two separate Bash tool calls.
-
-### Sanitization (mandatory before every post)
-
-Before any `gh` call that writes to the PR, run the reply body through these checks. Block the post and reclassify as ESCALATE if any check fails:
-
-1. **No em-dash (U+2014)**: replace with colon, semicolon, or sentence break. The hook will block the post anyway, but the skill should not even attempt a post with em-dashes.
-2. **No bead IDs**: grep for `docr-[a-z0-9]+` and strip or rephrase.
-3. **No personal-tier paths**: grep for `~/.claude/`, `/home/vscode/.claude/`, `memory/feedback_*`, `memory/incident-guardrails`, `memory/reviewer-trust-bands`. Strip.
-4. **No PRIVATE-marked memory references**: grep for `(PRIVATE)`, `CONFIDENTIAL`. Strip.
-5. **No `/skill-name` references that are personal-only**: confirm any `/skill-name` referenced is listed in `ls /workspaces/main/.claude/commands/ /workspaces/main/.claude/skills/`. If not, rephrase to a mechanism description.
-6. **Length cap**: hard limit 500 characters per reply. Longer rationales become an ESCALATE.
-
-### Reply tone
-
-- One or two sentences. Specific to what was done or why no action.
-- No greetings, no signoffs, no AI-fluff ("Great catch!", "Thanks for the suggestion!").
-- For AUTO-REMEDIATE: state the change and the new commit SHA.
-- For REPLY-ONLY: state the rationale terselly, citing the rule that governs the decision when one exists. Do NOT cite personal-tier rule paths; describe the mechanism instead.
-
-## Termination conditions
-
-The loop terminates in any of:
-
-1. **Window expired** (`now >= window_end`): emit final state block as `[PR_BABYSIT_TERMINATED]` with `terminal_reason: window-expired`. Do not schedule another wakeup.
-2. **PR merged** (`state == "MERGED"`): emit `[PR_BABYSIT_TERMINATED]` with `terminal_reason: pr-merged`. Note any orphaned local amends in the worktree as a follow-up for the operator.
-3. **PR closed** (`state == "CLOSED"` and not merged): emit `[PR_BABYSIT_TERMINATED]` with `terminal_reason: pr-closed`.
-4. **Escalations populated this cycle**: emit the cycle's `[PR_BABYSIT_STATE]` block, do not append a TERMINATED block (the loop is paused, not done). Skip the next wakeup; the operator resumes via a fresh `/babysit-pr <number>` after adjudicating.
-5. **Code-quality CI fails persistently**: if 3+ consecutive cycles show FAILURE on the same **code-quality** check (Python Tests, Python Lint, TypeScript checks, CodeQL findings, SonarQube quality gate, etc.), ESCALATE and pause. Do not silently keep polling. Code-quality failures indicate a real regression the operator needs to see.
-
-   **Exclude operational-gate checks** from this rule. Operational checks (`check_reviewers` from the Require Reviewers workflow, `mergify` config validation, `lighthouse-budget` thresholds, branch-protection requirements that haven't been met) sit in FAILURE state by design until the operator performs an out-of-band action (assigns reviewers, fixes a mergify rule, etc.). Their FAILURE is steady-state, not a regression, and re-running the loop will not change anything until the operator acts. Note operational FAILUREs in the cycle's `ci_snapshot` for visibility, but do NOT trip the persistent-failure escalation on them.
-
-   The distinguishing question: "would this check pass automatically if we just waited and re-ran the workflow, or does the operator need to do something specific to the repo or PR to make it pass?" If the latter, it's operational; skip the escalation.
-6. **Operator explicitly stops**: if the operator types `/babysit-pr <number> --stop` or sends a stop signal, emit `[PR_BABYSIT_TERMINATED]` with `terminal_reason: operator-stopped`.
-
-After termination, clean up ONLY a worktree this skill created. If the worktree was REUSED (Step 4 case 1 = an agent-spawned `.launch-worktrees/` worktree, or case 2 = a prior babysit worktree), do NOT remove it: it belongs to /launch, /autopilot, or a future babysit run. Remove only a fresh worktree this run created (Step 4 case 3), at the resolved path recorded in the bead:
-
-```bash
-# only when this run CREATED the worktree (Step 4 case 3); use the recorded path "$WORKTREE_DIR", not a hardcoded /tmp path
-git worktree remove "$WORKTREE_DIR" --force 2>&1 || true
-```
-
-The bead stays open until the operator closes it manually (the audit trail is the point).
+1. No em dash (U+2014).
+2. No personal path (`~/.claude/`, a memory file name) and no skill name that exists only on this machine.
+3. 500 characters at most.
+4. One or two sentences: what changed and the commit. No greeting, no thanks, no sign-off.
 
 ## Anti-patterns
 
-Failures observed during the 2026-05-11 prototype session. The skill must guard against these.
+- **Amend and force-push.** The skill before 2026-09-30 amended and force-pushed. Here every fix is a new commit, so the reviewers' history stays readable and no verb beyond Michael's is needed.
+- **Stopping on the first escalation.** A stopped loop leaves Devin's later findings unread while nobody watches. Send the call and keep polling.
+- **An id-only diff.** Devin rewrites a comment in place, so an id diff reads an edited finding as old.
+- **Replying to a person.** A human reviewer's comment is the orchestrator's to route; the loop never answers it.
+- **Personal-tier leakage.** A reply reaches the team; scrub it (Replies, above).
+- **State in `/tmp`.** It is reaped within a day; the author's folder is durable.
 
-### 1. Transitive authorization of force-push
+## Related
 
-Verbal "auto-remediate any comments" or "fix the bot feedback" does NOT authorize force-push transitively. The verb must be in the start invocation as `--authorize-force-push`. The auto-mode classifier will correctly block mid-loop force-pushes that lack the verb (see CLAUDE.md `correction:workflow:force-push-in-agent-prompt`).
-
-Mitigation: pre-flight authorization handshake. If `--authorize-force-push` is absent, the loop falls back to ESCALATE-only mode and tells the operator explicitly in the wakeup output.
-
-### 2. Auto-merge mid-loop on published PRs
-
-Published (non-draft) PRs can satisfy merge requirements mid-loop and auto-merge. Mid-cycle merge orphans any local amend in the worktree; the operator returns to a follow-up PR cycle instead of a clean iteration.
-
-Mitigation: refuse on non-draft PRs unless `--allow-published` is set. When the flag IS set, surface the auto-merge risk in the start handshake and check `state == "OPEN"` at the top of every loop cycle.
-
-### 3. Personal-tier leakage in PR-bound replies
-
-Reply bodies must scrub bead IDs, personal-tier paths, PRIVATE-marked memory references, and personal-only `/skill-name` mentions. Shared artifacts (PR comments) reach the team and possibly external reviewers; references that only resolve inside `~/.claude/` confuse readers and leak personal config geography.
-
-Mitigation: mandatory sanitization step before every `gh` write call. See Reply mechanism above.
-
-### 4. State written to volatile locations
-
-Per-session state files in `/tmp/` or in conversation memory disappear on compaction. The next wakeup or a cold-start session loses the loop history.
-
-Mitigation: state lives in the tracking bead's notes (durable across compactions and sessions). The worktree is the only `/tmp/` location used, and it can be recreated from `headRefName` if lost.
-
-### 5. Cache-window thrashing
-
-The prompt-cache TTL is 300 seconds. Sleeping past 300 incurs a cache miss; sleeping at exactly 300 incurs the miss without amortizing it (worst-of-both); sleeping under 60 burns cache constantly for no benefit.
-
-Mitigation: cadence is `270 seconds` for every wakeup, steady-state or post-traffic alike. 270 sits just under the TTL so each cycle re-enters cache-warm; there is no longer a separate steady-state-vs-adaptive split (the older 600/300 numbers in pre-2026-05 versions of this doc are obsolete). Final wakeup at window close uses `max(60, window_end - now)` to honor the under-60 floor.
-
-The one sanctioned widening is the Step 7 quiet-state backoff (`1200s` after 3 consecutive no-op cycles in a pure wait-on-human state): there the per-cycle skill-doc re-injection cost dominates and cache-warmth is moot, so fewer-but-colder cycles win. It re-tightens to `270s` on the first new activity.
-
-## Principles
-
-- **Idempotent re-entry**: every wakeup re-loads state from the bead and runs the same loop body. Cold-start and hot continuation are indistinguishable.
-- **Bounded blast radius**: only mechanical, single-file, single-hunk auto-remediations. Anything substantive escalates.
-- **Loud on escalation, quiet on no-op**: SILENT-IGNORE is genuinely silent. ESCALATE always surfaces in the wakeup output so the operator sees it immediately on return.
-- **Authorization gates are explicit**: force-push verb is pre-collected; non-draft override is an explicit flag. No silent drift into more-permissive modes.
-- **Durable state, ephemeral compute**: state in beads, compute in the worktree. Either can be recreated from the other.
-
-## Related skills
-
-- `/loop` (dynamic mode): the generic version of this pattern. /babysit-pr is the specialized variant where the loop body is fixed and the cadence is paced against PR comment traffic.
-- `/pr-intel`: one-shot PR briefing. /babysit-pr reuses /pr-intel's data-gathering patterns (gh api inline comments, statusCheckRollup parsing, bot identification) but adds the loop + auto-remediate layer.
-- `/autopilot remediate`: heavier autonomous pipeline with mx2-decision-maker gating. Use for full automation including bead-state, PR-creation, and remediation across multiple iterations. /babysit-pr is the lightweight variant for one open PR.
+- `/pr-intel`: one read of a PR, no loop.
+- `/loop` in dynamic mode: the generic loop this one specializes.

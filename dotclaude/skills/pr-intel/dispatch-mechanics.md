@@ -66,8 +66,8 @@ not, and the shared worktree is unsafe the moment one of them edits.
 
 **The tool grant does not tell you which ones mutate; the PROMPT does.** Every
 reviewer in the roster is granted exactly `Bash, Glob, Grep, Read` with no
-`Edit`/`Write` (verified 2026-08-17 across `mx2-silent-failure-hunter`,
-`test-quality-reviewer`, `mx2-code-reviewer`, `mx2-skeptic`), and `Bash` alone is
+`Edit`/`Write` (verified 2026-08-17 across `silent-failure-hunter`,
+`test-quality-reviewer`, `code-reviewer`, `skeptic`), and `Bash` alone is
 enough to rewrite a file. So "read-only agent" is a statement about what you asked
 for, never about what it was handed. Three standing instructions authorize mutation:
 SKILL.md's "Empirical execution beats precedent-citation on disputed test behavior"
@@ -96,7 +96,7 @@ prompt-injection attempt.
 2026-08-17, PR #11386: `test-quality-reviewer` inverted
 `if endpoint == dynamo_target.DEFAULT_LOCAL_ENDPOINT:` to `!=` at `run_local.py:91`
 as a legitimate red-green-revert, in the shared worktree.
-`mx2-silent-failure-hunter` had that file open, received the file-changed notice
+`silent-failure-hunter` had that file open, received the file-changed notice
 showing the inverted branch, and opened its report by flagging a fabricated
 system-reminder and a suspected injection instructing it to stay quiet. The
 orchestrator relayed that to the user as a security event needing an agent-safety
@@ -152,9 +152,9 @@ context if it needs to grep.
 **What does NOT change in spot-check mode.**
 - Static Analyzer Pre-Check still runs on the full PR (the analyzers
   already scoped themselves to the PR).
-- AC Compliance Check still runs on the full PR (Jira ACs apply to the
+- AC Compliance Check still runs on the full PR (ticket ACs apply to the
   whole change, not the sample).
-- bot-review (cross-file blast-radius) still receives the full file list
+- blast-radius-reviewer (cross-file blast-radius) still receives the full file list
   (it's looking for consumer-invariant breakage; the sample would hide
   consumers).
 - Phase 0 description quality still gates first (without a methodology
@@ -176,7 +176,7 @@ the briefing and specialists receive the full filtered diff as before.
 
 In `--mine` mode, before dispatching specialists, check for a reusable `/review`
 cache so an immediately-preceding `/review` on the same unchanged diff does not
-pay for a full re-dispatch (bead `docr-xvnr`). Default mode (reviewing another
+pay for a full re-dispatch. Default mode (reviewing another
 author's PR) NEVER reads the cache: there is no local `/review` run for a diff
 you did not produce.
 
@@ -198,15 +198,15 @@ you did not produce.
    matter how much wall-clock elapsed); the 2h TTL is only a secondary guard
    against reusing findings produced by a since-edited agent definition.
 4. **On HIT**: reuse the cached `findings` for every overlapping specialist
-   (mx2-code-reviewer, test-quality-reviewer, observability-reviewer,
-   mx2-silent-failure-hunter, mx2-security-auditor, mx2-devops-build-deploy,
-   mx2-typescript-reviewer, mx2-git-historian, bot-review, mx2-skeptic,
-   mx2-pydantic-reviewer, module-cohesion-reviewer). Do NOT re-dispatch them. STILL dispatch the
-   pr-intel-only specialist absent from any `/review` run: `mx2-pr-precedent`
+   (code-reviewer, test-quality-reviewer, observability-reviewer,
+   silent-failure-hunter, security-review,
+   typescript-reviewer, git-historian, blast-radius-reviewer, skeptic,
+   module-cohesion-reviewer). Do NOT re-dispatch them. STILL dispatch the
+   pr-intel-only specialist absent from any `/review` run: `pr-precedent`
    (queries `gh` server-side). Feed the reused findings into Synthesis exactly
    as if the agents had just returned. Print one line before synthesis:
-   `Reused N specialist findings from /review at <timestamp> (diff unchanged); re-dispatching: mx2-pr-precedent.`
-   LIMITATION: `/review` prompts lack the per-specialist Jira-AC-deviation lens
+   `Reused N specialist findings from /review at <timestamp> (diff unchanged); re-dispatching: pr-precedent.`
+   LIMITATION: `/review` prompts lack the per-specialist ticket-AC-deviation lens
    that pr-intel adds. The synthesis-layer spec-vs-diff trace (Phase 0.5) still
    runs and covers intent drift; full per-specialist AC re-dispatch on HIT is
    deferred.

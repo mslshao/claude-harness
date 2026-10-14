@@ -22,17 +22,15 @@ output from Phase 1 against this routing table:
 
 | Keyword pattern | Specialist |
 |-----------------|------------|
-| `security`, `auth`, `pii`, `audit`, `secret` | `mx2-security-auditor` |
+| `security`, `auth`, `pii`, `audit`, `secret` | `security-review` |
 | `observability`, `metric`, `log`, `trace`, `datadog`, `monitor` | `observability-reviewer` |
-| `error`, `exception`, `silent`, `failure`, `retry` | `mx2-silent-failure-hunter` |
-| `terraform`, `lambda`, `ecs`, `deploy`, `infra`, `build` | `mx2-devops-build-deploy` |
-| `settings`, `config`, `pydantic`, `env` | `mx2-pydantic-reviewer` |
-| `typescript`, `react`, `nextjs`, `frontend`, `ui` | `mx2-typescript-reviewer` |
-| `pr`, `review`, `precedent`, `prior` | `mx2-pr-precedent` |
+| `error`, `exception`, `silent`, `failure`, `retry` | `silent-failure-hunter` |
+| `typescript`, `react`, `nextjs`, `frontend`, `ui` | `typescript-reviewer` |
+| `pr`, `review`, `precedent`, `prior` | `pr-precedent` |
 | `test`, `tests`, `pytest`, `mock`, `coverage`, `refactor`, `test-architecture` | `test-quality-reviewer` |
-| (any code-structure problem) | `mx2-code-reviewer` |
+| (any code-structure problem) | `code-reviewer` |
 
-**Default specialist** (always include): `mx2-tech-lead`. The tech lead
+**Default specialist** (always include): `tech-lead`. The tech lead
 handles sense-making across the problem space and produces the
 broadest-shape approaches.
 
@@ -40,10 +38,10 @@ broadest-shape approaches.
 is 5 AND a second domain-relevant specialist is clearly indicated.
 
 **Fallback** (when domain-matcher returns noise or no clear specialists
-map): Use the default pair `mx2-tech-lead` + `mx2-code-reviewer`, with
+map): Use the default pair `tech-lead` + `code-reviewer`, with
 each agent asked for 2 approaches (yielding 4 total). When the
-approach-count target is 5, add `mx2-pr-precedent` for a third broad
-lens. Do NOT include `mx2-skeptic` in the divergence roster; that
+approach-count target is 5, add `pr-precedent` for a third broad
+lens. Do NOT include `skeptic` in the divergence roster; that
 agent is reserved for the post-ranking pass in Phase 3c, and conflating
 the two invocations produces ambiguous routing.
 
@@ -62,12 +60,16 @@ which biases the pool toward elaborate approaches; without a simple
 anchor on the table, the ranking cannot pick simple even when simple is
 correct.
 
-Source it explicitly: instruct `mx2-tech-lead` (always in the roster)
+Source it explicitly: instruct `tech-lead` (always in the roster)
 to make ONE of its approaches the minimal-viable candidate, steelmanned
 like any other (the strongest case for the ~80% version, not a strawman
 set up to lose). After collection, if no candidate is a genuine
 minimal-viable, the orchestrator synthesizes one and adds it to the pool
-before Phase 3 ranking. It counts toward the 3-5 target and is the
+before Phase 3 ranking. A candidate labelled zero-code or "do nothing
+new" changes no production code shape. The orchestrator reads each such
+deliverable against its label first. One that changes production code is
+merged into the nearest approach, and a strict one takes its slot (dev-73,
+2026-10-08). It counts toward the 3-5 target and is the
 reference point for the Phase 3 right-sizing flag.
 
 Each specialist gets:

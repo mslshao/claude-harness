@@ -20,11 +20,11 @@ Detail on CRITICAL and WARNING findings (skip SUGGESTION unless asked):
 
 🚨 CRITICAL: [Issue] (`file.py:line`)
 [What's wrong, who flagged it, what to do]
-Flagged by: mx2-security-auditor, mx2-code-reviewer
+Flagged by: security-review, code-reviewer
 
 ⚠️ WARNING: [Issue] (`file.py:line`)
 [Description]
-Flagged by: mx2-code-reviewer
+Flagged by: code-reviewer
 
 💡 SUGGESTION: [Issue] (`file.py:line`)
 [Description]

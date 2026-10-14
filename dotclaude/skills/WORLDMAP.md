@@ -393,7 +393,7 @@ related: [decision-maker, reflect]
 
 When I reach for this: the SessionStart hook tells me unmerged calibration entries exist. The skill reads each agent's calibration memory topic file, presents each entry with the current calibration file state, lets the user keep/merge/reject per entry. On merge it writes to the agent's calibration file and the audit log, then deletes the source memory key.
 
-What it prevents: a frozen calibration system. Subagents (mx2-decision-maker today, others later) cannot write directly to their calibration files (the subagent sandbox restricts writes to the project workspace). Without this skill, the calibration channel is unidirectional: subagents emit drift, nothing reads it, nothing merges it. The skill is what makes calibration a learning loop.
+What it prevents: a frozen calibration system. Subagents (decision-maker today, others later) cannot write directly to their calibration files (the subagent sandbox restricts writes to the project workspace). Without this skill, the calibration channel is unidirectional: subagents emit drift, nothing reads it, nothing merges it. The skill is what makes calibration a learning loop.
 
 How it compounds: with `decision-maker` (which emits drift entries) and `reflect` (which fires on corrections to update structural rules). Three feedback mechanisms for three scales of change: per-decision (calibration), per-rule (reflect), per-component (manual edit).
 

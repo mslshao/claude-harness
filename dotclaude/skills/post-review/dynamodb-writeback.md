@@ -22,7 +22,7 @@ aws sts get-caller-identity --profile dev 2>&1 >/dev/null
 If nonzero, log:
 > DynamoDB write-back skipped (SSO not active; run `aws sso login --profile dev` to enable)
 
-and stop. Step 5 (beads memory) is the durable record either way.
+and stop. Step 5 (the memory topic file) is the durable record either way.
 
 **Step 6b: Write the review record.**
 

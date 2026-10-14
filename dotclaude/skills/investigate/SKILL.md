@@ -1,6 +1,6 @@
 ---
 name: investigate
-description: (personal; shadows the project-tier `investigate` and takes precedence) Delta vs the project version: beads-aware downstream routing (/bead-forge fix planning, /consult multi-specialist) instead of the generic ticket/SME handoff. Structured investigation of production errors. Use when investigating any production error, Lambda failure, unexpected behavior, or silent regression, especially when an error message or stack trace is pasted into the conversation. Traces backward from the failure point through call path, git history, AWS deploy state, and Datadog signals to identify contributing factors and the leading hypothesis. Produces a structured investigation document with file:line citations ready to paste into Jira or Slack. Does NOT propose fixes (investigation only). Use before /bead-forge (fix planning) or /consult (multi-specialist review) when contributing factors are not yet known. Also trigger on phrases like "what's causing this", "prod issue", "error in Lambda", "why is X failing", "this error started after", and, when a concrete error, failing behavior, or production signal is in scope, "find the bug", "what's broken", "debug this".
+description: (personal; shadows the project-tier `investigate` and takes precedence) Delta vs the project version: downstream routing to /consult (multi-specialist review) for fix planning, instead of the generic ticket/SME handoff. Structured investigation of production errors. Use when investigating any production error, Lambda failure, unexpected behavior, or silent regression, especially when an error message or stack trace is pasted into the conversation. Traces backward from the failure point through call path, git history, AWS deploy state, and Datadog signals to identify contributing factors and the leading hypothesis. Produces a structured investigation document with file:line citations ready to paste into Slack. Does NOT propose fixes (investigation only). Use before /consult (multi-specialist review) when contributing factors are not yet known. Also trigger on phrases like "what's causing this", "prod issue", "error in Lambda", "why is X failing", "this error started after", and, when a concrete error, failing behavior, or production signal is in scope, "find the bug", "what's broken", "debug this".
 ---
 
 # investigate
@@ -207,8 +207,8 @@ For each question from Phase 2, answer it with evidence. Cite files and line num
 
 ### Next Steps
 
-- If fixing: open `/bead-forge` with this investigation to decompose the fix into work items
-- If communicating: the Findings section above is ready to paste into a Jira comment or Slack message
+- If fixing: use this investigation to plan work items (a new checkbox in `open-chores.md`, or `/consult` for multi-specialist fix planning)
+- If communicating: the Findings section above is ready to paste into a Slack message
 
 ---
 
@@ -218,7 +218,7 @@ Do not propose a fix, draft a PR, write code, or describe what a fix "would look
 
 The reason: fix proposals made before the investigation is fully documented are guesses. Even a correct guess bypasses the verification step and makes the fix harder to explain to others. Investigation first; fixes belong in a separate skill invocation.
 
-If asked what to do after the investigation, point to `/bead-forge` or `/consult`.
+If asked what to do after the investigation, point to `/consult` for multi-specialist fix planning.
 
 ## Confidence calibration
 

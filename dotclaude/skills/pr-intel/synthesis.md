@@ -174,7 +174,7 @@ provenance-classification.md):
     Findings sent to the agent must include:
     - `finding_id`: stable identifier (specialist source + file:line is
       sufficient when no explicit ID exists)
-    - `source`: specialist source if known (e.g., `mx2-code-reviewer`,
+    - `source`: specialist source if known (e.g., `code-reviewer`,
       `silent-failure-hunter`, `sonarcloud-pre-check`, `checkov`), OR null
       when the finding came from an inline pipeline step without a source tag
     - `evidence`: VERIFIED / DIFF-VISIBLE / QUESTION
@@ -194,7 +194,7 @@ provenance-classification.md):
       that /post-review writes to a memory topic file (post-review SKILL.md Step 5)
 
     The agent owns the classifier table (its prompt is the canonical
-    reference). Override behavior (mx2-code-reviewer findings that turn out
+    reference). Override behavior (code-reviewer findings that turn out
     to be bot-surfaced based on text mentions of Sonar/Copilot, etc.) lives
     in the agent's decision flow. Do not re-classify the agent's output.
 
@@ -220,24 +220,22 @@ provenance-classification.md):
 
     | Source | Default classification | Override rule |
     |---|---|---|
-    | `mx2-code-reviewer` | speed-amplified | bot-surfaced if VERIFIED via cross-file Grep beyond changed files |
-    | `mx2-security-auditor` | speed-amplified | bot-surfaced if VERIFIED via audit-log call-graph traversal |
+    | `code-reviewer` | speed-amplified | bot-surfaced if VERIFIED via cross-file Grep beyond changed files |
+    | `security-review` | speed-amplified | bot-surfaced if VERIFIED via audit-log call-graph traversal |
     | `test-quality-reviewer` | speed-amplified | bot-surfaced if VERIFIED via test fixture/factory cross-reference |
-    | `mx2-devops-build-deploy` | speed-amplified | bot-surfaced if VERIFIED via cross-environment Terraform sweep |
-    | `mx2-silent-failure-hunter` | bot-surfaced | speed-amplified only if finding is reachable from the single-file diff |
+    | `silent-failure-hunter` | bot-surfaced | speed-amplified only if finding is reachable from the single-file diff |
     | `observability-reviewer` | bot-surfaced | bot-surfaced (cross-stack Terraform + code analysis) |
-    | `mx2-pr-precedent` | bot-surfaced | bot-surfaced (historical PR comment retrieval) |
-    | `mx2-git-historian` | bot-surfaced | bot-surfaced (git log/blame historical analysis) |
-    | `bot-review` | bot-surfaced | bot-surfaced (cross-file blast-radius is the agent's whole job) |
+    | `pr-precedent` | bot-surfaced | bot-surfaced (historical PR comment retrieval) |
+    | `git-historian` | bot-surfaced | bot-surfaced (git log/blame historical analysis) |
+    | `blast-radius-reviewer` | bot-surfaced | bot-surfaced (cross-file blast-radius is the agent's whole job) |
     | `module-cohesion-reviewer` | bot-surfaced | speed-amplified only if the smell is reachable from the single-file diff (e.g. a filename that lies about its contents) |
-    | `mx2-pydantic-reviewer` | bot-surfaced | speed-amplified only if finding is reachable from the single-file diff |
-    | AC Compliance Check | bot-surfaced | bot-surfaced (Jira AC trace required reading the ticket) |
+    | AC Compliance Check | bot-surfaced | bot-surfaced (the AC trace required reading the ticket) |
     | Spec Compliance / Design Doc | bot-surfaced | bot-surfaced (multi-page design doc synthesis required) |
     | SonarCloud Pre-Check | bot-surfaced | bot-surfaced (external system finding) |
     | Datadog Code Analysis Pre-Check | bot-surfaced | bot-surfaced (external system finding via `search_pr_insights`) |
     | Inline IaC (Checkov) | bot-surfaced | bot-surfaced (tool-only) |
     | Pre-Synthesis Analysis Patterns (Pydantic frozen, pre-existing pattern, error path reachability, opaque constants) | speed-amplified | bot-surfaced if pattern detection required cross-file resolution |
-    | `mx2-skeptic` | (not classified - questions, surfaced separately) | n/a |
+    | `skeptic` | (not classified - questions, surfaced separately) | n/a |
 
     **Deterministic override (applies after the classifier returns).** For findings
     whose source is an external system or document trace (SonarCloud, Datadog Code
@@ -253,7 +251,7 @@ provenance-classification.md):
 
     The rule the table encodes: bot-surfaced iff the verification path
     required live-state verification (MCP calls to AWS, Datadog, etc.),
-    high-volume document synthesis (Jira AC, design docs at 10+ pages,
+    high-volume document synthesis (ticket AC, design docs at 10+ pages,
     prior-PR archaeology), or cross-file blast-radius pattern matching.
     Speed-amplified iff the finding is reachable from careful single-file
     diff inspection (the bot got there faster, but the reviewer could have
@@ -278,7 +276,7 @@ provenance-classification.md):
       dict access (`response["matter_id"]`), `| None` on collections
       (`list[T] | None`, `dict[K,V] | None`), `bool | None`, same model
       representing multiple independent concepts/states. Surfaced by
-      `mx2-code-reviewer` Design Judgment Checks (None-Abuse Semantics,
+      `code-reviewer` Design Judgment Checks (None-Abuse Semantics,
       Literal-Key Dict Detection, Domain model misfit).
     - **Large-refactor methodology gap**: diff > 500 lines + > 5 files + a
       mechanical edit pattern repeated across files + the PR description
@@ -371,8 +369,8 @@ provenance-classification.md):
     output fatigue. This is the same class of failure that moved provenance classification
     to a top-level phase; step 11b addresses it within synthesis by making the check
     explicit and numbered rather than prose-buried, a partial fix with known residual skip
-    risk on fatigued runs (the Stop-hook overlap-check in stop-validate-pr-intel.sh is the
-    fatigue-proof structural backstop). The 9304 anti-pattern is canonical: the
+    risk on fatigued runs (the Stop-hook overlap-check in stop-validate-pr-intel.sh was the
+    fatigue-proof structural backstop; it is not installed on this machine). The 9304 anti-pattern is canonical: the
     `sqlworkbench:ListDatabases` question rendered in BOTH the body's numbered list AND
     inline:37 with ~80% prose overlap. The 9646 instance (2026-06-04) is the recurrence
     that forced promotion: a body paragraph previewed an inline finding and was
@@ -411,8 +409,8 @@ it before posting.
 
 **Correction-memory surfacing**: when listing unmerged `correction:*`
 corrections (manual triage or future helper), order by trust band of the
-source attribution. `correction:*` entries are memory-topic-file entries, not
-beads; source attribution lives in the memory body as a `Source: <handle>`
+source attribution. `correction:*` entries are memory-topic-file entries;
+source attribution lives in the memory body as a `Source: <handle>`
 first line. Band-A first, Band-C and bots last. See the private file's
 "How to surface unmerged corrections" section for the concrete
 query.
@@ -482,14 +480,14 @@ These four patterns (3-6) catch the class of false positive where the finding is
 technically correct but misleading (3-5), and the class of true positive that the
 synthesizer currently underweights (6).
 
-## bot-review Findings: Fix-this Delegation Links
+## blast-radius-reviewer Findings: Fix-this Delegation Links
 
-When rendering `bot-review` findings into Draft Inline Comments or the Draft Review
+When rendering `blast-radius-reviewer` findings into Draft Inline Comments or the Draft Review
 Summary, append a delegation link so the reviewer or PR author can one-click hand the
 fix to a fresh Claude session. Adopted from the Anthropic GHA `claude-code-action`
-review pattern (see decision bead `docr-59ev` item 8).
+review pattern.
 
-For each `bot-review` finding, build the link as:
+For each `blast-radius-reviewer` finding, build the link as:
 
 ```
 [Fix this →](https://claude.ai/code?q=<URI_ENCODED_INSTRUCTIONS>&repo=<company>/docr)
@@ -507,11 +505,11 @@ changed the contract such that <invariant>.
 ```
 
 Append the link at the END of the Draft Inline Comment (after the prose), and at the
-END of each `bot-review` entry in the Draft Review Summary. Other specialists' findings
+END of each `blast-radius-reviewer` entry in the Draft Review Summary. Other specialists' findings
 do NOT get this link by default; they propose fixes inline rather than delegating.
 
-The link preserves `bot-review`'s advisory-only stance (no proposed fix in the
-comment text itself) while making the finding actionable. If `bot-review` produced no
+The link preserves `blast-radius-reviewer`'s advisory-only stance (no proposed fix in the
+comment text itself) while making the finding actionable. If `blast-radius-reviewer` produced no
 findings, no Fix-this link appears anywhere.
 
 ## Unverified-Assertion Containment + Cross-System Investigation
@@ -781,8 +779,8 @@ Unanswered-ness is not a severity multiplier. Note the round count once
 ("third round asking") and leave the recommendation where the finding class puts
 it. Recurrence: #9101 2026-05-27, #10143 2026-06-26, #11625 2026-08-14 (round 3,
 two paperwork findings, zero blocking, every technical finding already answered,
-recommendation was Comment). Mechanically enforced by the paperwork-gate check in
-`~/.claude/hooks/stop-validate-pr-intel.sh`.
+recommendation was Comment). The paperwork-gate check in `~/.claude/hooks/stop-validate-pr-intel.sh`
+enforced this where that hook ran; it is not installed on this machine.
 
 **Settled-type carve-out.** The Comment default assumes the smell is
 UNSETTLED and would ripple: the author re-shapes the type, surrounding code
@@ -865,14 +863,14 @@ Patterns to detect:
    reliability of data from another service. Signal: "What does this service do
    if the upstream data is late, missing, or shaped differently than expected?"
 
-7. **Framing fit (ticket-vs-diff drift).** When a Jira ticket frames the problem
+7. **Framing fit (ticket-vs-diff drift).** When a ticket frames the problem
    as X but the diff implements Y, or implements a narrower slice of X without
    acknowledging the scope shift, the framing has drifted. Signal: "The ticket
    describes retry on Salesforce sync (multiple call sites); the diff adds
    tenacity to one. Is the rest in scope, or has the problem been re-scoped?"
    Detected when AC compliance shows partial coverage, or when the diff's surface
    area is meaningfully smaller or different from what the ticket described.
-   Requires Jira ticket context; degrade silently when no ticket is hydrated.
+   Requires ticket context, which this machine has no source for; degrade silently when no ticket is hydrated.
 
 8. **Self-classification defensibility.** When a PR makes claims about its own
    risk profile in the description or title prefix ("XS", "no behavior change",
@@ -936,13 +934,13 @@ high-consequence finding regardless of severity.
 
 ## Bot-Review Dismissal Capture (calibration loop)
 
-bot-review findings are calibrated through user dismissals, and the agent
+blast-radius-reviewer findings are calibrated through user dismissals, and the agent
 cannot observe them (dismissal happens in this conversation after it returns).
-When the user dismisses a bot-review-sourced finding WITH reasoning, record it
+When the user dismisses a blast-radius-reviewer-sourced finding WITH reasoning, record it
 before moving on: in this agent's calibration memory topic file, keyed
-`calibration:bot-review:<short-tag>` (dated: `<pattern>. <why dismissed>. <how to recognize next time>.`).
+`calibration:blast-radius-reviewer:<short-tag>` (dated: `<pattern>. <why dismissed>. <how to recognize next time>.`).
 
 One entry per distinct pattern (same key overwrites; that is the dedup).
-Likewise for mx2-skeptic dismissals when the skeptic was in the dispatch:
-`calibration:mx2-skeptic:dismissal:<short-tag>`. `/calibrate --agent <name>`
+Likewise for skeptic dismissals when the skeptic was in the dispatch:
+`calibration:skeptic:dismissal:<short-tag>`. `/calibrate --agent <name>`
 is the review gate that merges these into the agent's calibration file.

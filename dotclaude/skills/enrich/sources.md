@@ -1,111 +1,36 @@
 # Enrichment Sources
 
 Shared reference for context-gathering tools and bounds. Referenced by
-`/enrich` SKILL.md and `/pr-intel` SKILL.md (Section 1, Jira hydration).
+`/enrich` SKILL.md.
 
 ## Quick Reference
 
 | Source | Tool | Bounds | Fallback |
 |--------|------|--------|----------|
-| Jira ticket | Atlassian MCP `mcp__atlassian__getJiraIssue` | Last 5 comments | Large-ticket extraction script |
 | AWS context | `mcp__aws__call_aws` | 1 service, last 1h errors | Skip if no service identifier |
 | Datadog context | `mcp__datadog__*` | Last 24h hot tier | Skip if no service identifier |
 | GitHub PR | `gh pr view` (CLI) | Changed files list | `gh api` for review comments |
 | Codebase | Grep + Read | Max 8 files read | Skip if no references found |
 
-## 1. Jira Tickets
+## 1. Tickets: not available here
 
-```
-mcp__atlassian__getJiraIssue
-  cloudId: <atlassian-cloud-id>
-  issueIdOrKey: MX2-XXXXX
-  fields: ["summary", "status", "assignee", "priority", "description", "customfield_11220", "comment", "issuelinks"]
-  responseContentFormat: markdown
-```
+This company uses neither Jira nor Confluence (Michael, 2026-09-23 10:34 PDT), and
+this machine has no ticket tools. Skip ticket hydration and say so in the briefing.
 
-**Extract:** summary, status, assignee, priority, linked tickets (`issuelinks`),
-last 5 comments. Read BOTH `customfield_11220` and `description`; both render
-in the Jira UI as of ~2026-04-30. Per project convention (see
-[/workspaces/main/.claude/commands/jira.md](/workspaces/main/.claude/commands/jira.md),
-MX2-NNNNN): non-Salesforce issue types put canonical content in `description`
-with `customfield_11220` blanked to empty ADF; Salesforce-specific issue types
-mirror the same content in both fields. Use whichever field has content; if
-both are populated, prefer `description` for non-SF types and either for SF
-types (they should match).
+## 2. Open Chores
 
-**Linked-issue sweep (when `issuelinks` is non-empty):** for each linked issue
-(relates to / blocks / is blocked by), fetch status plus the most recent 2-3
-comments (same `getJiraIssue` call, fields `["summary", "status", "comment"]`).
-If a linked issue's findings contradict or supersede the target ticket's latest
-framing, surface a flagged **CONTRADICTION** line at the top of the briefing,
-citing both sources (ticket + comment date each). Rationale: MX2-NNNNN sat
-blocked ~6 weeks re-asserting a hypothesis its "relates to" sibling MX2-NNNNN
-had falsified in comments on 2026-05-19; the falsification was invisible from
-the target ticket alone. **Bounds:** max 3 linked issues, most recently updated
-first; note the count if more exist.
+**Related open items (always, for any input type):**
+Extract keywords from the primary source (ticket summary, PR title) and scan
+`~/.claude/memory/open-chores.md` for matching lines.
 
-**ADF parsing for `customfield_11220`:** This field always returns ADF JSON
-regardless of `responseContentFormat`. Extract plain text using the recursive
-`extract_text` helper from the large-ticket script below (lines 45-52): walk
-`content` arrays, collect every `text` string, join with spaces.
+**Bounds:** Note how many matching lines were found, if any.
 
-**Bounds:** Last 5 comments only. Older comments rarely contain actionable context
-for a briefing. If needed, the user can ask for more.
-
-**Large ticket handling:** When `getJiraIssue` output exceeds token limits, it
-gets saved to a temp file. Extract fields with:
+## 3. Memory Topic Files
 
 ```bash
-cat <saved-file> | python3 -c "
-import json, sys
-data = json.load(sys.stdin)
-text = data[0]['text'] if isinstance(data, list) else data['text']
-parsed = json.loads(text)
-print('Summary:', parsed['fields']['summary'])
-print('Status:', parsed['fields']['status']['name'])
-print('Assignee:', parsed['fields'].get('assignee', {}).get('displayName', 'Unassigned'))
-comments = parsed.get('fields', {}).get('comment', {}).get('comments', [])
-for c in comments[-5:]:
-    def extract_text(node):
-        if isinstance(node, str): return node
-        texts = []
-        if 'text' in node: texts.append(node['text'])
-        for child in node.get('content', []): texts.append(extract_text(child))
-        return ' '.join(texts)
-    print(f'{c[\"author\"][\"displayName\"]} ({c[\"created\"]}):')
-    print(extract_text(c['body']))
-    print('---')
-"
-```
-
-## 2. Beads
-
-**Primary source (when input is a bead ID):**
-```bash
-bd show <id>
-```
-Extract: title, description, acceptance criteria, design notes, dependencies,
-comments. If the bead references a Jira ticket (in title or description),
-also fetch that ticket via Jira source above.
-
-**Related beads (always, for any input type):**
-```bash
-bd search <keywords-from-primary-source>
-```
-Take the top 5 results. For each, run `bd show <id>` to load context. Prioritize:
-- Beads with status `in_progress` or `open` (active work)
-- Beads with category labels: `memory`, `decision`, `discovery` (context-rich)
-- Beads that share dependency chains with the primary source
-
-**Bounds:** Top 5 search results. If more exist, note the count in the briefing
-("15 related beads found, showing top 5").
-
-## 3. Beads Memories
-
-```bash
-bd memories <service-name>
-bd memories <domain-keyword>
-bd memories <ticket-id>
+grep -rilE '<service-name>' ~/.claude/memory/ ~/.claude/rules/
+grep -rilE '<domain-keyword>' ~/.claude/memory/ ~/.claude/rules/
+grep -rilE '<ticket-id>' ~/.claude/memory/ ~/.claude/rules/
 ```
 
 Run 1-3 keyword searches based on what the primary source references. Use the
@@ -238,7 +163,7 @@ Do NOT stand up a worktree for enrichment (that is `/pr-intel`'s job); `git show
 against the fetched ref is enough for the read-only characterization enrich does.
 
 **File paths:** Extract `src/python/mx2/...` or similar path patterns from
-ticket descriptions, bead design notes, or PR changed files. Read those files.
+ticket descriptions or PR changed files. Read those files.
 
 **Service entry points:** If the primary source names a service, grep for:
 ```
@@ -255,12 +180,11 @@ than 8 files are relevant, note what was skipped.
 
 ## Graceful Degradation
 
-If any source fails (MCP unreachable, `bd` command errors, CLI errors, grep finds nothing),
+If any source fails (MCP unreachable, CLI errors, grep finds nothing),
 include a marker in the output and continue with remaining sources:
 
 ```
-[UNAVAILABLE: Jira - MCP returned error: <brief message>]
-[UNAVAILABLE: Beads - bd search returned no results for "<keywords>"]
+[UNAVAILABLE: Open Chores - no matching lines in open-chores.md for "<keywords>"]
 [UNAVAILABLE: AWS - function not found or credentials unavailable]
 [UNAVAILABLE: Datadog - no results returned for service "<service-name>"]
 [UNAVAILABLE: Codebase - no file references found in primary source]

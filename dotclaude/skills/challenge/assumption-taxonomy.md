@@ -229,7 +229,7 @@ Determined by coupling: how many plan elements depend on this assumption.
 - **HIGH**: 3+ plan elements depend on it. If wrong, significant rework.
 - **LOW**: 0-2 plan elements depend on it. If wrong, localized fix.
 
-*Example*: "We'll use Pydantic models for all DTOs"; every bead references this
+*Example*: "We'll use Pydantic models for all DTOs"; every work item references this
 pattern → HIGH. "The log level should be INFO"; only the observability config
 references it → LOW.
 
