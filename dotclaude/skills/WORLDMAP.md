@@ -1,7 +1,7 @@
 ---
 component: dotclaude/skills
 type: directory-map
-status: V0 complete (all 32 skills have entries)
+status: V0 complete (all 24 remaining skills have entries; the eight retired on this machine were pruned)
 authored_by: Claude Opus 5
 ---
 
@@ -9,7 +9,7 @@ authored_by: Claude Opus 5
 
 AI-authored commentary on each personal-tier skill in `~/.claude/skills/`. When I invoke the skill, what failure mode it prevents, how it compounds, and where it has limits. Entries follow the format documented in the top-level `WORLDMAP.md`.
 
-Skills fall into four loose buckets: planning / decomposition (converge, bead-forge, ideate, refine, synthesize, challenge, consult, enrich), execution and review (launch, campaign, pr-intel, review, cold-review, post-review, babysit-pr, overwatch, test-forge, autopilot), investigation and memory (investigate, handoff, reflect, compound, calibrate, snapshot-system-prompt, recall, bd-related, capture-transcript), and tactical chores (audit-worktrees, codility-review, doc-sweep, standup-prep, skill-catalog). The boundaries blur (autopilot is execution but also planning; reflect is memory but also rule-enforcement; overwatch watches rather than executes); the buckets are reading aids, not strict taxonomy.
+Skills fall into four loose buckets: planning / decomposition (converge, ideate, refine, synthesize, challenge, consult, enrich), execution and review (pr-intel, review, cold-review, post-review, babysit-pr, test-forge), investigation and memory (investigate, handoff, reflect, compound, calibrate, snapshot-system-prompt, capture-transcript), and tactical chores (audit-worktrees, codility-review, standup-prep, skill-catalog). The boundaries blur (reflect is memory but also rule-enforcement); the buckets are reading aids, not strict taxonomy.
 
 ---
 
@@ -108,36 +108,6 @@ Limits: convergence is expensive. For small features (a one-file fix, a single-P
 
 ```yaml
 ---
-component: launch
-type: skill
-status: active
-trigger_signals:
-  - "well-scoped ticket ready for hands-off implementation"
-  - "user wants 'fire and forget' from a clear specification"
-  - "implementation work that should produce a draft PR without further input"
-prevents:
-  - "context bloat in main conversation during multi-phase implementation"
-  - "the user being a bottleneck in routine implementation cycles"
-related: [converge (produces the plan launch executes against), babysit-pr (handles the PR after launch publishes it)]
----
-```
-
-When I reach for this: the user has a clear ticket (or a converged plan) and wants implementation without further conversation. The skill enriches context, converges a plan, gets approval, dispatches an agent team in a shared worktree, and produces a draft PR.
-
-What it prevents: implementation work consuming the user's attention when the work is well-scoped and pattern-matching. The agent team handles the cycle; the user reviews the PR.
-
-Cold-start resume: `/launch <bead-id>` resumes a prior execution from the last verified checkpoint without re-running completed phases. Important for long-running multi-day work where the codespace might restart between sessions.
-
-Before publishing the PR, the skill runs structured self-review (PR-intel in `--mine` mode) for AC compliance, CI status, specialist dispatch, pre-submission checklist. Per-phase reviews catch issues within each phase but miss integration bugs between phases. The pre-PR consolidated review catches these.
-
-How it compounds: pairs with `converge` (upstream, produces the plan) and `babysit-pr` (downstream, handles the PR after publish). The three skills together cover the full lifecycle.
-
-Limits: only as good as the plan. A vague plan produces vague implementation. The skill enforces plan quality before execution but cannot fix a fundamentally unclear request. Also, multi-PR work requires multiple launch invocations; the skill is single-PR-shaped.
-
----
-
-```yaml
----
 component: pr-intel
 type: skill
 status: active
@@ -163,35 +133,6 @@ Self-review mode (`--mine`): different output shape. Instead of "what concerns s
 How it compounds: with `post-review` (posts the briefing's draft comments as an atomic GitHub review), with `babysit-pr` (handles the PR after publish), with `enrich` (loads Jira/Confluence context the briefing references).
 
 Limits: per-revision delta detection only works if a prior review memory exists. First-round reviews start cold. The skill's verification step catches some false positives (specialist claims that depend on production state the agent has not verified) but not all.
-
----
-
-```yaml
----
-component: bead-forge
-type: skill
-status: active
-trigger_signals:
-  - "plan approved, work needs decomposition into tracker items"
-  - "conversation has 3+ exchanges of accumulated design/decision content not in tracker"
-  - "checkpoint trigger: deep analysis or discussion before compaction would lose it"
-prevents:
-  - "decisions lost to compaction"
-  - "decomposed work items that need 2-3 rounds of refinement before they are workable"
-  - "single-bead requests that should be multi-bead epics"
-related: [converge (uses forge for decomposition), handoff (companion durability mechanism)]
----
-```
-
-When I reach for this: two modes. (1) Task decomposition: a plan is converged, work needs to be split into tracker items with acceptance criteria, design notes, dependency graph. (2) Memory checkpoint: the conversation has accumulated decisions that would be lost to compaction; persist them now.
-
-What it prevents: cold-start agents picking up work mid-stream that have no context about what was decided and why. Tracker items written without forge quality are skeletons that need re-refinement. Forge front-loads the quality.
-
-The two-mode split matters because checkpoint mode is a fast-path (no codebase exploration needed; the conversation context is the input) while decomposition mode is the full process (codebase scoping, collision checks, challenge gate, self-check).
-
-How it compounds: with `handoff` (which handles conversation-state preservation; forge handles work-state preservation). Forge for things that should be tasks; handoff for things that should be conversation context.
-
-Limits: relies on the user (or an agent's checkpoint recommendation) to fire. Forge does not auto-detect "this deserves checkpointing"; it has explicit triggers in CLAUDE.md but those still require the model to recognize the trigger and act on it. Misses are common in fast-moving conversations.
 
 ---
 
@@ -299,32 +240,6 @@ What it prevents: invoking analysis skills (pr-intel, converge, challenge) witho
 How it compounds: feeds into downstream skills as their input context. Enrich + pr-intel produces better reviews than pr-intel alone. Enrich + converge produces better plans than converge alone.
 
 Limits: source coverage is bounded by available MCPs (Atlassian for Jira/Confluence, GitHub for PRs, AWS for service state, Datadog for signals). New external sources require new enrich source modules. The skill is extensible but each new source is real work.
-
----
-
-```yaml
----
-component: autopilot
-type: skill
-status: active
-trigger_signals:
-  - "user wants to 'kick off and walk away' on a planned or implementable task"
-  - "task is well-scoped enough that human approval at every gate is overhead"
-  - "explicit /autopilot invocation"
-prevents:
-  - "long-running work blocked on human availability at routine approval gates"
-  - "decision-quality drop when the user must gate decisions they lack context for"
-related: [converge, launch, decision-maker, skeptic]
----
-```
-
-When I reach for this: well-scoped work where the gating decisions are routine and the decision-maker agent's calibration covers the call space. Two modes: `plan` (converge only, output = beads) and `build` (converge + launch, output = draft PR).
-
-What it prevents: the failure mode where well-scoped work waits hours or days because the user wasn't around to approve a routine gate. The decision-maker handles the routine calls; the user gates only ESCALATE outcomes.
-
-How it compounds: with decision-maker (quality gate at each checkpoint) and skeptic (adversarial advisor on borderline calls). The decision-maker makes calls; the skeptic surfaces what the decision-maker might have missed.
-
-Limits: only as good as the decision-maker's calibration. Domains where calibration is thin produce uncertain decisions; the ESCALATE escape valve is load-bearing. The author's discipline: invoke autopilot in well-calibrated domains, prefer `/launch` with human gates in newer domains.
 
 ---
 
@@ -668,61 +583,6 @@ Limits: the ranked-approach output is the artifact; the user decides whether to 
 
 ```yaml
 ---
-component: recall
-type: skill
-status: active
-trigger_signals:
-  - "user references past work without a current-session referent ('the thing with X', 'what we discussed about Y')"
-  - "vague pronouns ('that bug', 'the doc') with no in-session antecedent"
-  - "cold-start session where the user assumes context this session does not have"
-prevents:
-  - "answering from thin context when the real answer lives in another session's beads, memories, or topic files"
-  - "fabricating a plausible-but-wrong referent for a vague reference"
-  - "deep-reading the wrong artifact because the search was single-corpus (beads only, or memories only)"
-related: [enrich, bd-related, investigate]
----
-```
-
-When I reach for this: the user references work I have no current-session memory of. Phrases like "what we landed on for X", "remind me about Y", or a bare named entity that was never introduced this turn. The skill runs a breadth-first search across all three persistent corpora (beads titles + descriptions, memory keys + values, topic files) in parallel and returns one-line previews with IDs and recency, then stops; the agent decides which hits warrant a deep read.
-
-What it prevents: the failure mode where a vague back-reference gets answered from the shallow current context, producing a confident-but-wrong answer because the actual decision lives in a closed bead from three sessions ago. The BFS-only discipline is the safeguard against the opposite failure too: pulling full content for every hit blows the context budget before the right artifact is even identified. Recall surfaces the map; DFS into the territory is a separate, agent-initiated step.
-
-How it compounds: with `enrich` (recall finds the ID when it is unknown; enrich loads full context once the ID is known, so recall feeds enrich) and with `bd-related` (recall calls `bd_related.py` for the memory-graph leg of its parallel search). It is the consumer-side complement to the producer-side `bd-recency-surface` hook: the hook surfaces what is in the corpus at write time, recall queries it at read time.
-
-Limits: coverage is bounded by what the search corpora hold. There is no comment-search flag, so bead comments are invisible to recall; and the `--status all` requirement is load-bearing precisely because the target work usually lives in closed beads that `bd` excludes by default. When recall returns nothing and the user is certain the info exists, the escape valve is the external surfaces (Slack, Jira, Confluence) the skill names explicitly.
-
----
-
-```yaml
----
-component: bd-related
-type: skill
-status: active
-user_invokable: false
-trigger_signals:
-  - "about to write a plan / review / fix in a known domain AND the load-time preload hook has not fired for this task"
-  - "user names a topic, bead, or memory key and wider corpus context is wanted before responding"
-  - "a subagent's findings need cross-checking against prior correction memories in the same domain"
-prevents:
-  - "forming a response in a domain without seeing the prior corrections that govern it"
-  - "missing a ratified decision living in a sibling bead under a different epic"
-  - "the load-time preload hook being the only graph walk, when it did not cover the mid-conversation domain shift"
-related: [recall, enrich]
----
-```
-
-When I reach for this: never via the user (`user_invokable: false`); it is a model-only subroutine. I invoke it when entering a domain mid-conversation that the most recent /enrich, /converge, or /pr-intel did not cover, or when I want the wider neighborhood of a seed (memory key, bead ID, or free-text keyword) before forming a response. It walks the personal memory graph: matches, bridges (co-mentioned cross-tree neighbors), and namespace siblings/cousins.
-
-What it prevents: the specific failure the harness keeps relitigating, where the ratified decision lives in a sibling bead under a different epic and a parent-only check misses it. The walker surfaces those cross-tree neighbors (the `bridge` kind ranks first for exactly this reason) so a review or plan does not proceed in ignorance of a correction or decision that already governs the case. It is the deliberate, on-demand graph walk that backstops the load-time `preload-sibling-beads.sh` hook when that hook did not fire for the current task.
-
-How it compounds: it is the graph engine underneath `recall` (recall calls `bd_related.py` for its memory-graph leg) and a precursor to `enrich` (the walker names what is relevant; enrich loads it). Three layers of context retrieval at different granularities: the load-time hook (automatic, allowlist-gated), bd-related (on-demand, model-invoked), and recall (user-facing, multi-corpus).
-
-Limits: output is informational, not directive: a surfaced neighbor does not mean the user wants action on it, and treating it as a to-do list is the misread to avoid. Quality also depends on the namespace index and bridges file being fresh; both regenerate in under two seconds, but a stale graph (corpus changed substantially since the last build) silently undercovers.
-
----
-
-```yaml
----
 component: capture-transcript
 type: skill
 status: active
@@ -745,33 +605,6 @@ What it prevents: pasted transcripts are high-value and high-loss; they carry de
 How it compounds: it shares the durable-capture machinery with `bead-forge` (the recall bead, the `log-append.py` chronological entry) and is the meeting-transcript-shaped sibling of the other capture primitives. `/handoff` produces a cold-start prompt for the next session; `/bead-forge` checkpoint preserves in-flight conversation analysis; `bd remember` stores one fact; this skill captures a meeting that already happened. Its durable output then becomes discoverable through `recall`.
 
 Limits: classification and routing are only as good as the transcript and the org-context source of truth. A name that will not resolve gets marked tentative rather than guessed, and a misrouted decision-bearing standup (sent to ephemeral output because its form is a standup) is the named anti-pattern the skill guards against but still depends on the model recognizing the decision content. The chunked-streaming path adds a finalization discipline (one PARTIAL banner, defer the log append to the closing chunk) that a careless re-run per chunk would violate.
-
----
-
-```yaml
----
-component: campaign
-type: skill
-status: active
-trigger_signals:
-  - "an epic already decomposed into PR-sized node beads that are each bypass-shaped"
-  - "user says 'run the campaign for <epic>', 'execute the epic unattended', 'walk-away build the stack'"
-  - "bare re-invocation after a halt, an abandon, or a context-budget rollover (the resume path)"
-prevents:
-  - "an unattended runner improvising on a malformed node bead instead of stopping"
-  - "double-firing a node whose inner /launch is still live after a session died mid-node"
-  - "a downstream PR stacking on a failed or silently stale base"
-related: [launch, converge, ideate, audit-worktrees]
----
-```
-
-When I reach for this: never for a single ticket, and never to plan. One human `/converge` happens BEFORE this skill enters the picture. Campaign owns only the epic layer (node ordering, stack bases, cursor durability, halt and abandon semantics, the run report) and hands every node to `/launch` inline with `--gate=agent`. It adds no judgment about WHAT to build.
-
-What it prevents: the incoherence failure of a walk-away runner filling in a gap. A node bead reading "implement the design" would fall through launch's pre-converged bypass into a full UNATTENDED re-converge, which is a plan nobody reviewed becoming code nobody asked for. The construction gate is the last attended moment in the run, and it fails loudly listing every deficient bead rather than proceeding. The second class is duplicate work on resume: node status is always re-derived from the node bead's own event log, never trusted from the cursor cache, so an `in_flight` node holding a live launch lock is waited on rather than re-driven.
-
-How it compounds: with `/launch` (the per-node engine, including its own review fan-out and draft-PR finalization) and with `audit-worktrees` (the cleanup pass for the orphans a halted chain leaves behind). Failure is a whole-chain halt, not a per-node skip: every open PR in the chain gets a status comment, including the green upstream ones, because a green parent merged mid-halt would strand the rest.
-
-Limits: sequential nodes only in v1, since worktree and branch naming is second-resolution and collides under concurrency. It never merges, never flips a draft ready, and never performs terminal ticket transitions. "Walk away" is bounded by the machine: a codespace that sleeps during a CI wait kills the poll, and recovery is a manual bare re-invocation. The mid-run merge case is a deliberate loud halt rather than an autonomous fix, because a lease push needs a human verb that round. And the skill gates itself on a drill suite (`docr-k8l6y`) that had to be green before its first real epic, which is the honest read: this was not trusted on arrival.
 
 ---
 
@@ -806,33 +639,6 @@ Limits: the decorrelation half is explicitly unproven and under evaluation; only
 
 ```yaml
 ---
-component: overwatch
-type: skill
-status: active
-trigger_signals:
-  - "'watch my work queue', 'tell me when something needs my attention' asked as a STANDING request"
-  - "user is heads-down and does not want to break focus to poll beads, PRs, and tickets"
-  - "a bare /overwatch arriving from its own scheduled wakeup"
-prevents:
-  - "hand-polling three sources every hour to answer 'what should I pick up next'"
-  - "a watcher that is itself a notification source (noisy no-op cycles)"
-  - "a source that errored being read as a source that was quiet"
-related: [babysit-pr, standup-prep, launch]
----
-```
-
-When I reach for this: standing requests only. "What is ready right now" is `bd ready`; overwatch is for the case where the polling itself is the toil. It runs a self-paced wakeup loop over beads, PRs, and tickets, surfaces only deltas (a bead newly unblocked, a review newly requested, an in-progress item going stale), and keeps all state as one JSON blob in a tracking bead so any wakeup can cold-start.
-
-What it prevents: the obvious answer is manual polling, but the more interesting one is the failure of watchers generally, which is that they become noise. A cycle with no deltas and every source healthy prints nothing at all, so silence carries information. Two smaller disciplines back that up: a source's failure is its exit code and never an empty stdout (so an outage is never mistaken for a quiet queue), and state is persisted AFTER output, so a crash re-alerts rather than marking an alert seen that the user never received. Duplicate over drop, deliberately.
-
-How it compounds: it is the read-only counterpart to `babysit-pr` (single PR, mutating, window-bounded) and the forward-looking counterpart to `standup-prep` (backward-looking, one-shot). It also inverts babysit-pr's state mechanism on purpose: a fixed-size blob replacing the bead's notes each cycle, because babysit-pr's append-only comment log is fine across a handful of cycles and unbounded in a standing loop.
-
-Limits: the skill names its own tradeoffs, and they are real. Coverage is in-session only: both scheduling primitives fire only while the REPL is alive, so a codespace that sleeps on idle kills the loop, and there is no server-side mechanism in v1. Output is chat-only, which is the sharpest limit, because a delta can land in one of five concurrent windows and go unseen, and by construction the user does not notice a miss on a channel they are not watching. Lose the tracking bead and the loop re-baselines from scratch for one silent cycle rather than reconstructing what it knew.
-
----
-
-```yaml
----
 component: standup-prep
 type: skill
 status: active
@@ -857,30 +663,3 @@ How it compounds: the inbound complement is `capture-transcript` (what others sa
 Limits: a good part of this file is a vendor-quirk ledger, and quirks expire. Bare dates in Confluence search evaluate in UTC while ticket search uses the profile timezone; the Slack tool's `after`/`before` parameters are epoch seconds rather than dates; a contributor filter returns pages the user ever touched, not pages they touched that day. Each is verified and each is true only until the vendor changes it, and nothing here detects when that happens. The Confluence last-modified value comes back as a friendly string ("yesterday at 6:23 PM") that cannot support exact gating at all, so that source is accepted approximately by design. Default scope is the current repo; multi-repo weeks need an explicit loop.
 
 ---
-
-```yaml
----
-component: doc-sweep
-type: skill
-status: active
-trigger_signals:
-  - "monthly cadence on one specific Confluence page series"
-  - "after a batch of agent, skill, or rule additions that the pages document"
-  - "a prior review left findings unapplied"
-prevents:
-  - "documentation describing a harness that no longer exists (inventory and model-lineup drift)"
-  - "editing a page from memory of what it said rather than from a fresh fetch"
-  - "a fix applied against a stale claim about what an enforcement hook actually blocks"
-related: [handoff, compound]
----
-```
-
-When I reach for this: maintenance of one named Confluence series, on a monthly-ish cadence or after harness changes that the pages describe. Verify-then-fix in two workflows: parallel read-only agents check each page and fact-check external product claims, then per-page fix agents apply exact-substring edits, publish, and re-fetch to confirm.
-
-What it prevents: the drift classes that a docs corpus about fast-moving tooling accumulates by default (agent and command inventories going stale, third-party product claims rotting on roughly a monthly cycle, mechanical schema slips). More specific to this skill's shape: it prevents the fix pass from becoming its own source of damage. Edits are exact substrings against a freshly fetched body with an occurrence-count guard, the fetch aborts on version drift, and every replacement is verified by re-fetch.
-
-Two habits worth naming because they are unusual: the skill distrusts its own reviewers (a proposed "schema drift" finding is checked against the ratified schema first, after a reviewer flagged a deliberate special case as drift), and it reads enforcement claims from the hook source rather than a memory paraphrase (a stale memory claim about a hook degraded a fix once).
-
-How it compounds: with the page-format memory file, which is both its input and its output. Each sweep writes back a convergence-history entry and an updated held-items list, so the next sweep starts from what the last one could not close.
-
-Limits: narrow by construction, and it says so. One page series, one author, one space, personal-tier with no promotion path (the machinery reaches into personal memory files and hooks). Items owned by someone outside the loop are never fixed unilaterally, so a sweep can finish "converged" with known drift still standing. Cadence is a recurring bead check rather than cron because the codespace sleeps, which means in practice the sweep runs when someone remembers it. And it accepts a documented class of round-trip noise (trailing-space widening, bold-link normalization) rather than chasing it.
