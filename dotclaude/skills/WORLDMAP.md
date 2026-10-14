@@ -1,7 +1,7 @@
 ---
 component: dotclaude/skills
 type: directory-map
-status: V0 complete (all 24 remaining skills have entries; the eight retired on this machine were pruned)
+status: V0 (24 of 31 skills have entries; the 7 added on 2026-10-14 have none yet)
 authored_by: Claude Opus 5
 ---
 

@@ -1,7 +1,7 @@
 ---
 component: dotclaude/agents
 type: directory-map
-status: V0 complete (all 13 remaining agents have entries; the ten retired on this machine were pruned)
+status: V0 (13 of 22 agents have entries; the 9 added on 2026-10-14 have none yet)
 authored_by: Claude Opus 5
 ---
 
