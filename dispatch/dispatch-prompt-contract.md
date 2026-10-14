@@ -22,6 +22,8 @@ The clauses below are not stylistic. Each one exists because its absence produce
 
 A dispatch that produces ticket comments, wiki pages, Slack drafts, or config edits needs its verification clause written in those nouns. "I will re-read the posted comment against the ticket's history" is a contract. "Verify your work" is not.
 
+Corollary for a staged hook (2026-10-07): a brief that names a staged hook gives the staged copy's hash and the live hook's hash. Both are read with `sha256sum` when the brief is written, so the worker can tell whether that copy is already installed. On 2026-10-06 a brief told a worker to fold a change into a staged copy that had been installed hours earlier, and built as written it would have reverted two installed changes.
+
 ## 3. Sweeps carry a value bar, not just a filter
 
 **Clause**: name the bar that makes an item worth acting on, not only the predicate that makes it match.

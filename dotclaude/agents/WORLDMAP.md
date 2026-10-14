@@ -1,7 +1,7 @@
 ---
 component: dotclaude/agents
 type: directory-map
-status: V0 complete (22 agents covered by 20 entries; one combined entry for the launch-flex/implementer/tester trio)
+status: V0 complete (23 agents covered by 21 entries; one combined entry for the launch-flex/implementer/tester trio)
 authored_by: Claude Opus 5
 ---
 
@@ -561,3 +561,30 @@ The seam is the design: the agent definition spends more words on what is NOT it
 Advisory by construction: every finding is a question the author answers, never a verdict, and the agent is required to answer by reading or grepping anything it could verify itself before asking. It is also told to say so in one line and stop when a module is clean, rather than manufacturing questions to fill a report.
 
 Limits: it is a Sonnet agent on a judgment-heavy lens, and the judgment it needs ("is this divergence deliberate?") depends on author intent it cannot observe. The pre-existing carve-out is a real coverage hole with a defensible reason behind it: a catch-all module the diff merely touched stays unflagged, so the worst cohesion debt in a file is invisible to the review of the change that walks right past it. And the interrogative framing cuts both ways; a genuinely wrong coupling arrives as a polite question that an author can close with "yes, intended" and no further pressure.
+
+---
+
+```yaml
+---
+component: human-lens-reviewer
+type: agent
+status: active
+trigger_signals:
+  - "an artifact is about to be handed to a person: a chat post, a page, a changelog section, a decision record, a README, a meeting brief"
+  - "a review verdict or a findings report is about to go back to a human author"
+  - "an agent-consumed artifact whose ambiguity could make two agents act differently"
+prevents:
+  - "a reader forming a different takeaway than the author intended"
+  - "session-internal vocabulary (finding ids, round names, scratch paths) reaching someone who cannot resolve it"
+  - "a reader approving or rejecting for the wrong reason because the page gave them a partial picture"
+related: [mx2-skeptic, prompt-refiner, provenance-classifier]
+---
+```
+
+When I reach for it: last, on the way out. Every other reviewer in this directory asks whether the work is right; this one asks whether the person receiving it can tell. That makes it the only reviewer whose client is not the author and not the codebase but the named reader, and it is why its dispatch is worthless without three inputs the caller usually leaves implicit: who the reader is, what they already know, and what they must do with the artifact. A dispatch that omits the reader gets a review against an inferred one, stated as inferred, because a caller that is an agent cannot answer a clarifying question and a review that refuses to run is a review that never happens.
+
+What it prevents: two failure modes named together by the harness owner, and they are not the same defect. The first is convolution, where the reader cannot get the point in one pass: sentence nesting, undefined acronyms, an ask buried mid-paragraph, identifiers that meant something inside the session that produced them and nothing outside it. The second, and the more dangerous, is the under-contexted artifact, where the reader gets the point cleanly and still cannot judge it, because what is decided, what is a lean and what is open have been blended into one confident voice. A confused reader asks a question; a misinformed one acts.
+
+How it compounds: it is the judgment half of a pair whose measurement half already existed. The brevity rule and its check script count words, bullets, questions and banned characters against a per-surface budget, which catches a draft that is too long but says nothing about a draft that is short and unreadable. The copy-discipline memory carries the rules about what a reader's copy may not contain. This agent reads those two rather than restating their numbers, so the budgets stay in one place, and then does the thing neither can: forms the takeaway a reader would actually form and compares it with the one the author meant.
+
+Limits, and they are real. It is a Sonnet agent on a judgment-heavy lens, deliberately, because a reviewer that runs on every outbound artifact has to be cheap enough to actually run; the weaker tier is the point and also the exposure. It infers a reader's prior knowledge from a role, which is a guess about a person, and that guess is why its output is required to carry a never-empty could-not-determine section. It does not fact-check, so a fluent, well-shaped, wrong artifact passes it clean. And its minimal-rewrite discipline is easy to state and hard to hold: the failure mode to watch for in its output is a rewritten paragraph offered as a demonstration, which takes the pen out of the author's hand and is exactly what an advisory reviewer must not do.
